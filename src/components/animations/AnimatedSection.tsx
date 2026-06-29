@@ -16,11 +16,11 @@ export function AnimatedSection({
   y?: number
   amount?: number
 }) {
-  const { ref, inView } = useInView(amount)
+  const { ref, inView } = useInView<HTMLDivElement>(amount)
 
   return (
     <motion.div
-      ref={ref as React.RefObject<HTMLElement>}
+      ref={ref}
       className={className}
       initial={{ opacity: 0, y, willChange: 'transform, opacity' }}
       animate={inView ? { opacity: 1, y: 0, willChange: 'auto' } : {}}

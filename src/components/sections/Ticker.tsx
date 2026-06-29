@@ -20,7 +20,7 @@ function TickerComponent({ logos }: { logos: { src: string; alt: string }[] }) {
 
   return (
     <motion.div
-      className="relative border-y border-zinc-800 overflow-hidden"
+      className="relative border-y border-zinc-800 overflow-hidden group"
       initial={{ opacity: 0 }}
       whileInView={{ opacity: 1 }}
       viewport={{ once: true }}
@@ -32,7 +32,7 @@ function TickerComponent({ logos }: { logos: { src: string; alt: string }[] }) {
         style={{ background: 'linear-gradient(-90deg, #09090B, transparent)' }} />
 
       <div className="overflow-hidden py-2" style={{ height: '48px' }}>
-        <div className="ticker-track flex items-center h-full">
+        <div className="ticker-track flex items-center h-full group-hover:[animation-play-state:running]">
           {row1.map((logo, i) => <LogoItem key={`${logo.alt}-${i}`} {...logo} />)}
         </div>
       </div>
