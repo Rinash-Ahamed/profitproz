@@ -27,7 +27,7 @@ export function OTAGrid() {
             <h2 className="headline text-ink">
               One partner.
               <br />
-              <span className="display-serif text-blue-400">Seven platforms.</span>
+              <span className="display-serif text-[#66B159]">Seven platforms.</span>
             </h2>
           </div>
           <p className="text-sub text-sm max-w-sm leading-relaxed">
@@ -41,7 +41,7 @@ export function OTAGrid() {
             <motion.div
               key={p.name}
               className="surface rounded-xl p-5 hover:border-zinc-600 transition-all duration-200 cursor-default group"
-              whileHover={{ y: -4, scale: 1.01, boxShadow: '0 10px 30px rgba(59,130,246,0.08)' }}
+              whileHover={{ y: -4, scale: 1.01, boxShadow: '0 10px 30px rgba(102, 177, 89, 0.08)' }}
               initial={{ opacity: 0, y: 18, scale: 0.98 }}
               animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
               transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: i * 0.06 }}
@@ -56,7 +56,7 @@ export function OTAGrid() {
               <p className="font-sans font-semibold text-ink text-sm mb-0.5">{p.name}</p>
               <p className="text-ghost text-xs font-sans mb-2">{p.sub}</p>
               <p className="text-sub text-xs font-sans">{p.reach}</p>
-              <div className="mt-4 h-px bg-zinc-800 group-hover:bg-blue-500/30 transition-colors duration-300" />
+              <div className="mt-4 h-px bg-zinc-800 group-hover:bg-[#66B159]/30 transition-colors duration-300" />
             </motion.div>
           ))}
 
@@ -68,7 +68,7 @@ export function OTAGrid() {
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.44 }}
           >
             <div className="w-9 h-9 rounded-lg surface-accent flex items-center justify-center mb-3">
-              <span className="text-blue-400 text-lg">+</span>
+              <span className="text-[#66B159] text-lg">+</span>
             </div>
             <p className="label-upper text-ghost">More platforms<br />being added</p>
           </motion.div>

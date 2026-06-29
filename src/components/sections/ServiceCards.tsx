@@ -74,7 +74,7 @@ export function ServiceCards() {
 
                   {/* Left */}
                   <div className="flex-1 min-w-0">
-                    <p className="label-upper text-blue-500 mb-5">{s.tag}</p>
+                    <p className="label-upper text-[#66B159] mb-5">{s.tag}</p>
                     <h2
                       className="text-ink mb-5 whitespace-pre-line"
                       style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, lineHeight: 1.05, letterSpacing: '-0.035em' }}
@@ -89,7 +89,7 @@ export function ServiceCards() {
                         const [bold, rest] = f.split(' - ')
                         return (
                           <div key={f} className="flex items-start gap-3">
-                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0 mt-1.5" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#66B159] flex-shrink-0 mt-1.5" />
                             <span className="text-sm font-sans">
                               <span className="text-ink font-medium">{bold}</span>
                               {rest && <span className="text-ghost"> - {rest}</span>}
@@ -100,7 +100,7 @@ export function ServiceCards() {
                     </div>
 
                     {/* Arrow CTA */}
-                    <div className="inline-flex items-center gap-2 text-blue-400 text-sm font-sans font-medium group-hover:gap-3 transition-all duration-300">
+                    <div className="inline-flex items-center gap-2 text-[#66B159] text-sm font-sans font-medium group-hover:gap-3 transition-all duration-300">
                       <span>Explore {s.title.replace('\n', ' ')}</span>
                       <motion.svg
                         width="14" height="14" viewBox="0 0 14 14" fill="none"
@@ -116,7 +116,7 @@ export function ServiceCards() {
                   <div className="lg:w-60 flex flex-col gap-3 flex-shrink-0">
                     {/* Metric card */}
                     <div className="surface-accent rounded-xl px-5 py-5">
-                      <p className="label-upper text-blue-400 mb-2">{s.metric.label}</p>
+                      <p className="label-upper text-[#66B159] mb-2">{s.metric.label}</p>
                       <p
                         className="text-ink font-sans font-bold tracking-tight mb-1"
                         style={{ fontSize: '2.5rem', lineHeight: 1 }}

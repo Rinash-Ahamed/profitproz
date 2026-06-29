@@ -36,7 +36,7 @@ export default function AboutPage() {
           transition={{ duration: 0.8, ease: ease.out }}
         >
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-2 h-2 rounded-full bg-blue-500 pulse-dot" />
+            <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">About ProfitPro</span>
           </div>
           <h1 className="display-xl text-ink mb-4 max-w-3xl">We help hotels turn visibility into measurable revenue.</h1>
@@ -54,7 +54,7 @@ export default function AboutPage() {
           transition={{ duration: 0.8, ease: ease.out, delay: 0.1 }}
         >
           <div className="surface rounded-2xl p-8 md:p-10">
-            <p className="label-upper text-blue-400 mb-4">Why we exist</p>
+            <p className="label-upper text-[#66B159] mb-4">Why we exist</p>
             <h2 className="headline text-ink mb-4">Most hotels are not short on potential. They are short on structure.</h2>
             <p className="text-sub text-sm leading-relaxed">
               We work with hotels that are doing good business but leaving money on the table through inconsistent pricing, weak OTA positioning, or manual distribution processes. ProfitPro brings a focused system to those gaps so the property can grow without adding internal complexity.
@@ -81,7 +81,7 @@ export default function AboutPage() {
             <p className="label-upper text-sub mb-3">Ready to see what’s possible?</p>
             <h3 className="headline text-ink">Let’s map your next revenue gain.</h3>
           </div>
-          <Link href="/contact" className="glow-blue inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200">
+          <Link href="/contact" className="glow-green inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200">
             Book a Free Audit
           </Link>
         </motion.div>

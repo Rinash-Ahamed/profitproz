@@ -25,9 +25,9 @@ function Stat({ item, active, i }: { item: typeof data[0]; active: boolean; i: n
         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-px h-10 bg-zinc-800" />
       )}
       <div className="font-sans text-3xl md:text-4xl font-bold text-ink tracking-tight mb-1.5">
-        <span className="text-blue-400">{item.pre}</span>
+        <span className="text-[#66B159]">{item.pre}</span>
         {n.toLocaleString()}
-        <span className="text-blue-400">{item.suf}</span>
+        <span className="text-[#66B159]">{item.suf}</span>
       </div>
       <p className="label-upper text-ghost">{item.label}</p>
     </motion.div>

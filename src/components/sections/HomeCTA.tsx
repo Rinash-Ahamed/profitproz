@@ -30,14 +30,14 @@ export function HomeCTA() {
             {/* Left - text */}
             <div className="p-10 md:p-14 flex flex-col justify-between">
               <div>
-                <p className="label-upper text-blue-400 mb-6">Start Today - It's Free</p>
+                <p className="label-upper text-[#66B159] mb-6">Start Today - It's Free</p>
                 <h2
                   className="text-ink mb-5"
                   style={{ fontSize: 'clamp(1.8rem, 4vw, 3rem)', fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.035em' }}
                 >
                   Your rooms are empty
                   <br />
-                  <span style={{ fontFamily: 'var(--font-instrument)', fontStyle: 'italic', fontWeight: 400, color: '#60A5FA' }}>
+                  <span style={{ fontFamily: 'var(--font-instrument)', fontStyle: 'italic', fontWeight: 400, color: '#66B159' }}>
                     some nights. They don't have to be.
                   </span>
                 </h2>
@@ -47,7 +47,7 @@ export function HomeCTA() {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link
                     href="/contact"
-                    className="glow-blue inline-flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-sans font-semibold text-sm px-7 py-3.5 rounded-lg transition-all duration-200"
+                    className="glow-green inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-7 py-3.5 rounded-lg transition-all duration-200"
                   >
                     Request Free Audit
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -56,7 +56,7 @@ export function HomeCTA() {
                   </Link>
                   <Link
                     href="/revenue"
-                    className="inline-flex items-center justify-center gap-2 surface-accent text-blue-400 font-sans font-medium text-sm px-7 py-3.5 rounded-lg transition-colors duration-200 hover:border-blue-500/40"
+                    className="inline-flex items-center justify-center gap-2 surface-accent text-[#66B159] font-sans font-medium text-sm px-7 py-3.5 rounded-lg transition-colors duration-200 hover:border-[#66B159]/40"
                   >
                     See Revenue Services
                   </Link>
@@ -67,7 +67,7 @@ export function HomeCTA() {
               <div className="flex flex-wrap gap-x-6 gap-y-2 mt-10 pt-8 border-t border-zinc-800">
                 {['500+ hotels onboarded', '₹180Cr+ revenue managed', '98% client retention'].map((t) => (
                   <div key={t} className="flex items-center gap-2">
-                    <div className="w-1 h-1 rounded-full bg-blue-500" />
+                    <div className="w-1 h-1 rounded-full bg-[#66B159]" />
                     <span className="text-ghost text-xs font-sans">{t}</span>
                   </div>
                 ))}
@@ -84,7 +84,7 @@ export function HomeCTA() {
                   animate={inView ? { opacity: 1, x: 0 } : {}}
                   transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1], delay: i * 0.08 + 0.18 }}
                 >
-                  <div className="w-9 h-9 rounded-lg surface-accent flex items-center justify-center flex-shrink-0 text-blue-400 text-sm">
+                  <div className="w-9 h-9 rounded-lg surface-accent flex items-center justify-center flex-shrink-0 text-[#66B159] text-sm">
                     {p.icon}
                   </div>
                   <div>

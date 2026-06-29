@@ -31,7 +31,7 @@ export function Footer() {
           {/* Brand column */}
           <div className="lg:col-span-1">
             <Link href="/" className="flex items-center gap-2.5 mb-5 group w-fit">
-              <div className="w-7 h-7 rounded-md bg-blue-500 group-hover:bg-blue-400 transition-colors duration-200 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-md bg-[#66B159] group-hover:bg-[#73bd66] transition-colors duration-200 flex items-center justify-center">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M2 10V6l3-3 2 2 3-4v9" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                   <path d="M2 10h10" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
@@ -101,7 +101,7 @@ export function Footer() {
             <ul className="space-y-3">
               {platforms.map((p) => (
                 <li key={p} className="flex items-center gap-2">
-                  <div className="w-1 h-1 rounded-full bg-blue-500 flex-shrink-0" />
+                  <div className="w-1 h-1 rounded-full bg-[#66B159] flex-shrink-0" />
                   <span className="text-ghost text-sm font-sans">{p}</span>
                 </li>
               ))}
@@ -123,7 +123,7 @@ export function Footer() {
             <span className="text-ghost text-xs font-sans">Terms of Service</span>
             <span className="text-zinc-700">·</span>
             <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 pulse-dot" />
+              <div className="w-1.5 h-1.5 rounded-full bg-[#66B159] pulse-dot" />
               <span className="text-ghost text-xs font-sans">All systems live</span>
             </div>
           </div>

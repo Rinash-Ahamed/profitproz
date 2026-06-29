@@ -28,10 +28,10 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         title: 'One platform Every OTA Complete Control',
         subtitle: 'we make property listing and management effortless across multiple ota\'s',
         theme: {
-          glowA: 'rgba(59,130,246,0.18)',
-          glowB: 'rgba(96,165,250,0.14)',
+          glowA: 'rgba(102, 177, 89, 0.18)',
+          glowB: 'rgba(102, 177, 89, 0.14)',
           grid: 'rgba(255,255,255,0.025)',
-          accent: '#60A5FA',
+          accent: '#66B159',
         },
       },
     ],
@@ -121,8 +121,8 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         />
 
         {/* Accent dots - static, no JS */}
-        <div className="absolute top-[28%] left-[10%] w-1.5 h-1.5 rounded-full bg-blue-500 pulse-dot" />
-        <div className="absolute top-[60%] right-[14%] w-1 h-1 rounded-full bg-blue-400 pulse-dot" style={{ animationDelay: '1s' }} />
+        <div className="absolute top-[28%] left-[10%] w-1.5 h-1.5 rounded-full bg-[#66B159] pulse-dot" />
+        <div className="absolute top-[60%] right-[14%] w-1 h-1 rounded-full bg-[#66B159] pulse-dot" style={{ animationDelay: '1s' }} />
         <div className="absolute top-[42%] right-[34%] w-1 h-1 rounded-full bg-zinc-600 pulse-dot" style={{ animationDelay: '1.8s' }} />
 
         <motion.div
@@ -136,7 +136,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: ease.out, delay: 0.12 }}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 pulse-dot" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Turn potential into profit...</span>
           </motion.div>
 
@@ -166,7 +166,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           >
             <a
               href="/contact"
-              className="glow-blue inline-flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200 w-full sm:w-auto"
+              className="glow-green inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200 w-full sm:w-auto"
             >
               Get a Free Revenue Audit
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -198,7 +198,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
               { icon: '◉', text: 'Launch support in 14 days' },
             ].map((t) => (
               <div key={t.text} className="flex items-center gap-2">
-                <span className="text-blue-500 text-xs">{t.icon}</span>
+                <span className="text-[#66B159] text-xs">{t.icon}</span>
                 <span className="text-ghost text-xs font-sans">{t.text}</span>
               </div>
             ))}

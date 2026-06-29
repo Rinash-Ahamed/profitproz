@@ -75,7 +75,7 @@ function FAQItem({ item, i }: { item: typeof faqs[0]; i: number }) {
           className="flex-shrink-0 w-5 h-5 rounded-full border border-zinc-700 flex items-center justify-center"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path d="M5 2v6M2 5h6" stroke={open ? '#3B82F6' : '#71717A'} strokeWidth="1.5" strokeLinecap="round"/>
+            <path d="M5 2v6M2 5h6" stroke={open ? '#66B159' : '#71717A'} strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
         </motion.div>
       </button>
@@ -166,7 +166,7 @@ export default function ContactPage() {
   }
 
   const inputClass =
-    'w-full bg-zinc-900 border rounded-lg px-4 py-3 text-ink text-sm font-sans placeholder:text-ghost focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all duration-200'
+    'w-full bg-zinc-900 border rounded-lg px-4 py-3 text-ink text-sm font-sans placeholder:text-ghost focus:outline-none focus:border-[#66B159] focus:ring-1 focus:ring-[#66B159]/40 transition-all duration-200'
 
   return (
     <div className="min-h-screen bg-zinc-1000">
@@ -178,9 +178,9 @@ export default function ContactPage() {
         <motion.div
           className="absolute inset-0 -z-10 pointer-events-none"
           style={{
-            backgroundImage: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(59, 130, 246, 0.1), transparent),
-                            radial-gradient(ellipse 50% 40% at 20% 110%, rgba(96, 165, 250, 0.08), transparent),
-                            radial-gradient(ellipse 50% 40% at 80% 100%, rgba(96, 165, 250, 0.08), transparent)`,
+            backgroundImage: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(102, 177, 89, 0.1), transparent),
+                            radial-gradient(ellipse 50% 40% at 20% 110%, rgba(102, 177, 89, 0.08), transparent),
+                            radial-gradient(ellipse 50% 40% at 80% 100%, rgba(102, 177, 89, 0.08), transparent)`,
             backgroundRepeat: 'no-repeat',
           }}
           initial={{ opacity: 0, scale: 1.1 }}
@@ -195,7 +195,7 @@ export default function ContactPage() {
             animate={hero.inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.7, ease: ease.out, delay: 0.1 }}
           >
-            <div className="w-2 h-2 rounded-full bg-blue-500 pulse-dot" />
+            <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Contact Us</span>
           </motion.div>
 
@@ -211,7 +211,7 @@ export default function ContactPage() {
               Let's grow your
             </motion.h1>
             <motion.h1
-              style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)', fontFamily: 'var(--font-instrument)', fontStyle: 'italic', fontWeight: 400, color: '#60A5FA', letterSpacing: '-0.02em', lineHeight: 0.95 }}
+              style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)', fontFamily: 'var(--font-instrument)', fontStyle: 'italic', fontWeight: 400, color: '#66B159', letterSpacing: '-0.02em', lineHeight: 0.95 }}
               initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
               animate={hero.inView ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
               transition={{ duration: 0.9, ease: ease.out, delay: 0.3 }}
@@ -238,7 +238,7 @@ export default function ContactPage() {
           {contactCards.map((c) => {
             const Inner = (
               <div className="surface rounded-xl p-5 flex items-start gap-4 hover:border-zinc-600 transition-colors duration-200 h-full">
-                <div className="w-9 h-9 rounded-lg surface-accent flex items-center justify-center flex-shrink-0 text-blue-400">
+                <div className="w-9 h-9 rounded-lg surface-accent flex items-center justify-center flex-shrink-0 text-[#66B159]">
                   {c.icon}
                 </div>
                 <div>
@@ -288,7 +288,7 @@ export default function ContactPage() {
                     <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
                       <motion.path
                         d="M6 14l5 5 11-11"
-                        stroke="#3B82F6"
+                        stroke="#66B159"
                         strokeWidth="2.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -307,7 +307,7 @@ export default function ContactPage() {
                   <motion.button
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: ease.out, delay: 0.8 }}
                     onClick={() => { setSubmitted(false); setForm(initialForm) }}
-                    className="text-blue-400 text-sm font-sans hover:text-blue-300 transition-colors"
+                    className="text-[#66B159] text-sm font-sans hover:text-[#73bd66] transition-colors"
                   >
                     Send another enquiry
                   </motion.button>
@@ -427,7 +427,7 @@ export default function ContactPage() {
                       type="button"
                       onClick={handleSubmit}
                       disabled={loading || !form.name || !form.email || !form.hotel || !form.service}
-                      className="w-full glow-blue bg-blue-500 hover:bg-blue-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-sans font-semibold text-sm py-3.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                      className="w-full glow-green bg-[#66B159] hover:bg-[#73bd66] disabled:opacity-40 disabled:cursor-not-allowed text-[#FFFCFC] font-sans font-semibold text-sm py-3.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
                       whileTap={{ scale: 0.98 }}
                     >
                       <AnimatePresence mode="wait" initial={false}>
@@ -479,7 +479,7 @@ export default function ContactPage() {
                 ].map((s) => (
                   <div key={s.step} className="flex gap-3">
                     <div className="w-6 h-6 rounded-md surface-accent flex items-center justify-center flex-shrink-0">
-                      <span className="font-sans font-bold text-blue-400" style={{ fontSize: '0.6rem' }}>{s.step}</span>
+                      <span className="font-sans font-bold text-[#66B159]" style={{ fontSize: '0.6rem' }}>{s.step}</span>
                     </div>
                     <div>
                       <p className="font-sans font-medium text-ink text-xs mb-0.5">{s.title}</p>
@@ -494,11 +494,11 @@ export default function ContactPage() {
             <div className="surface rounded-xl p-6">
               <div className="flex items-center gap-1 mb-3">
                 {[...Array(5)].map((_, i) => (
-                  <svg key={i} width="12" height="12" viewBox="0 0 12 12" fill="#3B82F6">
+                  <svg key={i} width="12" height="12" viewBox="0 0 12 12" fill="#66B159">
                     <path d="M6 1l1.4 2.9L10.5 4l-2.25 2.2.53 3.1L6 7.75 3.22 9.3l.53-3.1L1.5 4l3.1-.1L6 1z"/>
                   </svg>
                 ))}
-                <span className="text-blue-400 text-xs font-sans ml-1 font-medium">4.9 / 5.0</span>
+                <span className="text-[#66B159] text-xs font-sans ml-1 font-medium">4.9 / 5.0</span>
               </div>
               <p className="text-sub text-xs leading-relaxed italic mb-3">
                 "ProfitPro increased our RevPAR by 43% in the first quarter. The weekly reports are clear and the team is genuinely proactive."
@@ -508,7 +508,7 @@ export default function ContactPage() {
 
             {/* Quick numbers */}
             <div className="surface-accent rounded-xl p-6">
-              <p className="label-upper text-blue-400 mb-4">Our track record</p>
+              <p className="label-upper text-[#66B159] mb-4">Our track record</p>
               <div className="space-y-3">
                 {[
                   { v: '500+', l: 'Hotels managed' },

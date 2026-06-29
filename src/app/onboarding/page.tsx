@@ -124,13 +124,13 @@ export default function OnboardingPage() {
       <section ref={hero.ref as React.RefObject<HTMLElement>} className="pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={hero.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.8, ease: ease.out }}>
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-2 h-2 rounded-full bg-blue-500 pulse-dot" />
+            <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Hotel Onboarding</span>
             <div className="h-px flex-1 max-w-24 bg-zinc-800" />
             <span className="label-upper text-ghost">Service 02</span>
           </div>
           <h1 className="display-xl text-ink mb-3 max-w-3xl">Listed everywhere.</h1>
-          <h1 className="display-serif text-blue-400 mb-7">Booked constantly.</h1>
+          <h1 className="display-serif text-[#66B159] mb-7">Booked constantly.</h1>
           <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
             Getting a hotel correctly listed on 7 OTAs - with optimised content, proper room types, rate parity, and a working channel sync - takes most properties 3 to 6 months. We do it completely, correctly, in 7 days.
           </p>
@@ -143,7 +143,7 @@ export default function OnboardingPage() {
               { label: 'Hidden costs', value: 'None', sub: 'transparent pricing only' },
             ].map((b) => (
               <div key={b.label} className="surface-accent rounded-xl px-5 py-4">
-                <p className="label-upper text-blue-400 mb-1.5">{b.label}</p>
+                <p className="label-upper text-[#66B159] mb-1.5">{b.label}</p>
                 <p className="font-sans font-bold text-ink text-xl tracking-tight mb-0.5">{b.value}</p>
                 <p className="text-ghost text-xs font-sans">{b.sub}</p>
               </div>
@@ -151,7 +151,7 @@ export default function OnboardingPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link href="/contact" className="glow-blue inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200">
+            <Link href="/contact" className="glow-green inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200">
               Start Onboarding
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Link>
@@ -207,7 +207,7 @@ export default function OnboardingPage() {
       <section ref={journey.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-20">
         <motion.div className="mb-10" initial={{ opacity: 0, y: 16 }} animate={journey.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
           <p className="label-upper text-sub mb-3">The Process</p>
-          <h2 className="headline text-ink">Seven days.<br /><span className="display-serif text-blue-400">Step by step.</span></h2>
+          <h2 className="headline text-ink">Seven days.<br /><span className="display-serif text-[#66B159]">Step by step.</span></h2>
         </motion.div>
 
         {/* Progress bar */}
@@ -217,7 +217,7 @@ export default function OnboardingPage() {
               key={i}
               aria-label={`Go to stage ${i + 1}: ${stages[i].title}`}
               className="flex-1 h-1 rounded-full transition-all duration-300"
-              style={{ backgroundColor: i <= active ? '#3B82F6' : '#27272A' }}
+              style={{ backgroundColor: i <= active ? '#66B159' : '#27272A' }}
               onClick={() => setActive(i)} />
           ))}
         </motion.div>
@@ -233,7 +233,7 @@ export default function OnboardingPage() {
                 transition={{ delay: i * 0.05 + 0.15, duration: 0.5, ease: ease.out }}
               >
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 text-sm"
-                  style={{ backgroundColor: active === i ? 'rgba(59,130,246,0.18)' : '#1C1C1F', color: active === i ? '#60A5FA' : '#52525B', border: active === i ? '1px solid rgba(59,130,246,0.28)' : '1px solid #27272A' }}>
+                  style={{ backgroundColor: active === i ? 'rgba(102, 177, 89, 0.18)' : '#1C1C1F', color: active === i ? '#66B159' : '#52525B', border: active === i ? '1px solid rgba(102, 177, 89, 0.28)' : '1px solid #27272A' }}>
                   {s.icon}
                 </div>
                 <div className="min-w-0">
@@ -255,10 +255,10 @@ export default function OnboardingPage() {
               >
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <div>
-                    <p className="label-upper text-blue-400 mb-1.5">{stage.day}</p>
+                    <p className="label-upper text-[#66B159] mb-1.5">{stage.day}</p>
                     <h3 className="font-sans font-bold text-ink text-xl">{stage.title}</h3>
                   </div>
-                  <div className="text-blue-400 text-2xl flex-shrink-0">{stage.icon}</div>
+                  <div className="text-[#66B159] text-2xl flex-shrink-0">{stage.icon}</div>
                 </div>
 
                 <p className="text-sub text-sm leading-relaxed mb-7">{stage.desc}</p>
@@ -266,8 +266,8 @@ export default function OnboardingPage() {
                 <div className="space-y-2 mb-6">
                   {stage.tasks.map((task) => (
                     <div key={task} className="flex items-start gap-2.5 surface rounded-lg px-3.5 py-2.5">
-                      <div className="w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'rgba(59,130,246,0.15)' }}>
-                        <svg width="8" height="7" viewBox="0 0 8 7" fill="none"><path d="M1 3.5L3 5.5L7 1" stroke="#60A5FA" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <div className="w-4 h-4 rounded-sm flex items-center justify-center flex-shrink-0 mt-0.5" style={{ backgroundColor: 'rgba(102, 177, 89, 0.15)' }}>
+                        <svg width="8" height="7" viewBox="0 0 8 7" fill="none"><path d="M1 3.5L3 5.5L7 1" stroke="#66B159" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                       </div>
                       <span className="text-sub text-xs font-sans leading-relaxed">{task}</span>
                     </div>
@@ -276,8 +276,8 @@ export default function OnboardingPage() {
 
                 {/* Deliverable */}
                 <div className="mt-auto pt-4 border-t border-zinc-800/60 flex items-center gap-2.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
-                  <span className="text-blue-400 text-xs font-sans font-medium">Deliverable: {stage.deliverable}</span>
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#66B159] flex-shrink-0" />
+                  <span className="text-[#66B159] text-xs font-sans font-medium">Deliverable: {stage.deliverable}</span>
                 </div>
 
                 {active < stages.length - 1 && (
@@ -297,7 +297,7 @@ export default function OnboardingPage() {
       <section ref={plat.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-20">
         <motion.div className="mb-12" initial={{ opacity: 0, y: 16 }} animate={plat.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
           <p className="label-upper text-sub mb-3">Where You'll Be Listed</p>
-          <h2 className="headline text-ink">Seven platforms.<br /><span className="display-serif text-blue-400">Fully optimised.</span></h2>
+          <h2 className="headline text-ink">Seven platforms.<br /><span className="display-serif text-[#66B159]">Fully optimised.</span></h2>
           <p className="text-sub text-sm max-w-xl mt-4 leading-relaxed">Each platform gets a listing tailored to its own algorithm and guest profile. Not one listing copy-pasted seven times.</p>
         </motion.div>
 
@@ -317,7 +317,7 @@ export default function OnboardingPage() {
               <p className="font-sans font-semibold text-ink text-sm mb-1">{p.name}</p>
               <p className="text-ghost text-xs font-sans mb-3">{p.reach}</p>
               <p className="text-sub text-xs leading-relaxed flex-1">{p.detail}</p>
-              <div className="mt-4 h-px bg-zinc-800 group-hover:bg-blue-500/30 transition-colors duration-300" />
+              <div className="mt-4 h-px bg-zinc-800 group-hover:bg-[#66B159]/30 transition-colors duration-300" />
             </motion.div>
           ))}
         </div>
@@ -330,17 +330,17 @@ export default function OnboardingPage() {
           animate={cta.inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, ease: ease.out }}
         >
-          <p className="label-upper text-blue-400 mb-5">500+ Hotels Onboarded</p>
-          <h2 className="headline text-ink mb-4">7 days to fully live.<br /><span className="display-serif text-blue-400">Let's begin today.</span></h2>
+          <p className="label-upper text-[#66B159] mb-5">500+ Hotels Onboarded</p>
+          <h2 className="headline text-ink mb-4">7 days to fully live.<br /><span className="display-serif text-[#66B159]">Let's begin today.</span></h2>
           <p className="text-sub text-sm max-w-md mx-auto mb-10 leading-relaxed">
             The process is proven, the timeline is real, and we've done it for hotels across India - from 10-room boutiques to 200-room city hotels.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href="/contact" className="glow-blue inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-all duration-200">
+            <Link href="/contact" className="glow-green inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-all duration-200">
               Start My Onboarding
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Link>
-            <Link href="/revenue" className="surface-accent inline-flex items-center gap-2 text-blue-400 font-sans font-medium text-sm px-9 py-4 rounded-xl transition-colors duration-200">
+            <Link href="/revenue" className="surface-accent inline-flex items-center gap-2 text-[#66B159] font-sans font-medium text-sm px-9 py-4 rounded-xl transition-colors duration-200">
               Add Revenue Management
             </Link>
           </div>

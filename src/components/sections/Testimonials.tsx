@@ -56,13 +56,13 @@ export function Testimonials() {
             <h2 className="headline text-ink">
               Heard directly from
               <br />
-              <span className="display-serif text-blue-400">hotel owners.</span>
+              <span className="display-serif text-[#66B159]">hotel owners.</span>
             </h2>
           </div>
           <div className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/80 px-5 py-3 w-fit shadow-[0_16px_50px_rgba(0,0,0,0.2)]">
             <div className="flex items-center gap-0.5">
               {[...Array(5)].map((_, i) => (
-                <svg key={i} width="13" height="13" viewBox="0 0 13 13" fill="#3B82F6">
+                <svg key={i} width="13" height="13" viewBox="0 0 13 13" fill="#66B159">
                   <path d="M6.5 1l1.5 3.1L11.5 4.6l-2.5 2.4.6 3.4L6.5 9l-3.1 1.4.6-3.4-2.5-2.4 3.5-.5L6.5 1z"/>
                 </svg>
               ))}
@@ -86,14 +86,14 @@ export function Testimonials() {
               <div className="flex items-center justify-between mb-5">
                 <div
                   className="px-3 py-1 rounded-md text-xs font-sans font-semibold"
-                  style={{ backgroundColor: 'rgba(59,130,246,0.12)', color: '#60A5FA' }}
+                  style={{ backgroundColor: 'rgba(102, 177, 89, 0.12)', color: '#66B159' }}
                 >
                   {t.metric}
                 </div>
                 {/* Stars */}
                 <div className="flex gap-0.5">
                   {[...Array(5)].map((_, i) => (
-                    <svg key={i} width="11" height="11" viewBox="0 0 11 11" fill="#3B82F6" opacity="0.7">
+                    <svg key={i} width="11" height="11" viewBox="0 0 11 11" fill="#66B159" opacity="0.7">
                       <path d="M5.5 1l1.2 2.6L9.5 3.9l-2 1.95.47 2.75L5.5 7.4 3.03 8.6l.47-2.75L1.5 3.9l2.8-.3L5.5 1z"/>
                     </svg>
                   ))}
@@ -110,7 +110,7 @@ export function Testimonials() {
                 {/* Avatar placeholder - initials */}
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 font-sans font-bold text-xs"
-                  style={{ backgroundColor: 'rgba(59,130,246,0.15)', color: '#60A5FA' }}
+                  style={{ backgroundColor: 'rgba(102, 177, 89, 0.15)', color: '#66B159' }}
                 >
                   {t.author.split(' ').map(n => n[0]).join('')}
                 </div>

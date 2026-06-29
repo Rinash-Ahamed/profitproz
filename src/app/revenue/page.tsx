@@ -34,19 +34,19 @@ const services = [
   {
     icon: '⬡',
     title: 'Competitor Rate Intelligence',
-    description: 'We track your competitive set across every OTA every single day - rate levels, availability, promotions, and positioning. When a rival drops rates aggressively or a new property enters your market, you\'ll know and we\'ll respond.',
+    description: 'We track your competitive set across every OTA every single day — rate levels, availability, promotions, and positioning. When a rival drops rates aggressively or a new property enters your market, you\'ll know and we\'ll respond.',
     result: '360° competitive visibility updated daily.',
   },
   {
     icon: '◎',
     title: 'Demand Forecasting',
-    description: 'Corporate booking windows, leisure demand patterns, local events, public holidays, and macro travel trends - all built into a demand calendar that tells us when to be aggressive on rate and when to prioritise fill.',
+    description: 'Corporate booking windows, leisure demand patterns, local events, public holidays, and macro travel trends — all built into a demand calendar that tells us when to be aggressive on rate and when to prioritise fill.',
     result: 'Occupancy gaps reduced by 60% on average.',
   },
   {
     icon: '◇',
     title: 'Yield Management',
-    description: 'Minimum length of stay controls, close-out dates, non-refundable rate fencing, and channel allocation decisions - all configured to maximise revenue contribution per available room, not just fill rates.',
+    description: 'Minimum length of stay controls, close-out dates, non-refundable rate fencing, and channel allocation decisions — all configured to maximise revenue contribution per available room, not just fill rates.',
     result: 'RevPAR indexed above market average for 94% of clients.',
   },
   {
@@ -73,7 +73,7 @@ const process = [
   {
     week: 'Week 1–2',
     title: 'Strategy Design',
-    description: 'A custom revenue strategy blueprint for your property: seasonal rate architecture, comp set definition, demand event calendar, channel mix targets, and yield rule framework. Nothing generic - every hotel gets its own plan.',
+    description: 'A custom revenue strategy blueprint for your property: seasonal rate architecture, comp set definition, demand event calendar, channel mix targets, and yield rule framework. Nothing generic — every hotel gets its own plan.',
   },
   {
     week: 'Week 2–3',
@@ -95,9 +95,9 @@ const process = [
 /* ── Competitors table ──────────────────────────────── */
 const compTable = [
   { name: 'Your Property', rate: '₹8,400', rgi: '1.12', occ: '87%', you: true },
-  { name: 'Rival A - Same Star', rate: '₹7,900', rgi: '1.05', occ: '81%', you: false },
-  { name: 'Rival B - Same Location', rate: '₹7,200', rgi: '0.96', occ: '76%', you: false },
-  { name: 'Rival C - Nearby Hotel', rate: '₹6,800', rgi: '0.91', occ: '79%', you: false },
+  { name: 'Rival A — Same Star', rate: '₹7,900', rgi: '1.05', occ: '81%', you: false },
+  { name: 'Rival B — Same Location', rate: '₹7,200', rgi: '0.96', occ: '76%', you: false },
+  { name: 'Rival C — Nearby Hotel', rate: '₹6,800', rgi: '0.91', occ: '79%', you: false },
   { name: 'Market Average', rate: '₹7,575', rgi: '1.00', occ: '80%', you: false },
 ]
 
@@ -107,7 +107,7 @@ function KPI({ pre, n, suf, label, active }: { pre: string; n: number; suf: stri
     <div className="surface-accent rounded-xl p-6">
       <p className="label-upper text-sub mb-3">{label}</p>
       <p className="font-sans font-bold text-ink tracking-tight" style={{ fontSize: '2.6rem', lineHeight: 1 }}>
-        <span className="text-blue-400">{pre}</span>{v.toLocaleString()}<span className="text-blue-400">{suf}</span>
+        <span className="text-[#66B159]">{pre}</span>{v.toLocaleString()}<span className="text-[#66B159]">{suf}</span>
       </p>
     </div>
   )
@@ -129,18 +129,18 @@ export default function RevenuePage() {
       <section ref={hero.ref as React.RefObject<HTMLElement>} className="pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={hero.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.8, ease: ease.out }}>
           <div className="flex items-center gap-3 mb-8">
-            <div className="w-2 h-2 rounded-full bg-blue-500 pulse-dot" />
+            <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Revenue Management</span>
             <div className="h-px flex-1 max-w-24 bg-zinc-800" />
             <span className="label-upper text-ghost">Service 01</span>
           </div>
           <h1 className="display-xl text-ink mb-3 max-w-3xl">Every night.</h1>
-          <h1 className="display-serif text-blue-400 mb-7">Maximum revenue.</h1>
+          <h1 className="display-serif text-[#66B159] mb-7">Maximum revenue.</h1>
           <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
-            Most hotels price based on intuition and what worked last year. We replace that with a data-driven revenue engine - competitor rates tracked daily, demand signals captured in advance, and pricing adjusted to maximise what you earn every single night.
+            Most hotels price based on intuition and what worked last year. We replace that with a data-driven revenue engine — competitor rates tracked daily, demand signals captured in advance, and pricing adjusted to maximise what you earn every single night.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link href="/contact" className="glow-blue inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200">
+            <Link href="/contact" className="glow-green inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200">
               Get a Free Revenue Audit
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Link>
@@ -178,11 +178,11 @@ export default function RevenuePage() {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <p className="font-sans font-semibold text-ink text-sm mb-0.5">Revenue Per Available Room</p>
-                <p className="text-ghost text-xs font-sans">12 months - Before vs. After ProfitPro</p>
+                <p className="text-ghost text-xs font-sans">12 months — Before vs. After ProfitPro</p>
               </div>
               <div className="flex items-center gap-4 text-xs text-sub font-sans">
                 <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-zinc-700 inline-block" />Before</span>
-                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500 inline-block" />After</span>
+                <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-[#66B159] inline-block" />After</span>
               </div>
             </div>
             <div className="flex items-end justify-between gap-1.5 h-40">
@@ -198,7 +198,7 @@ export default function RevenuePage() {
                     </div>
                     <div className="flex-1 flex items-end">
                       <motion.div className="w-full rounded-t-sm"
-                        style={{ background: 'linear-gradient(180deg, #60A5FA 0%, #2563EB 100%)' }}
+                        style={{ background: 'linear-gradient(180deg, #73bd66 0%, #66B159 100%)' }}
                         initial={{ height: 0 }}
                         animate={dash.inView ? { height: `${(d.after / 100) * 128}px` } : {}}
                         transition={{ duration: 0.8, ease: ease.out, delay: i * 0.04 + 0.12 }}
@@ -215,18 +215,18 @@ export default function RevenuePage() {
           <div className="flex flex-col gap-4">
             {/* Comp table */}
             <div className="surface rounded-xl p-6">
-              <p className="label-upper text-sub mb-4">Competitor Intelligence - Live View</p>
+              <p className="label-upper text-sub mb-4">Competitor Intelligence — Live View</p>
               <div className="space-y-1.5">
                 {compTable.map((c) => (
                   <div key={c.name} className={`flex items-center justify-between px-3 py-2.5 rounded-lg ${c.you ? 'surface-accent' : ''}`}>
                     <div className="flex items-center gap-2.5 min-w-0">
-                      {c.you && <div className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />}
-                      <span className={`font-sans text-xs truncate ${c.you ? 'text-blue-400 font-semibold' : 'text-sub'}`}>{c.name}</span>
+                      {c.you && <div className="w-1.5 h-1.5 rounded-full bg-[#66B159] flex-shrink-0" />}
+                      <span className={`font-sans text-xs truncate ${c.you ? 'text-[#66B159] font-semibold' : 'text-sub'}`}>{c.name}</span>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0 ml-2">
                       <span className={`font-mono text-xs ${c.you ? 'text-ink' : 'text-ghost'}`}>{c.rate}</span>
-                      <span className={`font-mono text-xs px-2 py-0.5 rounded-md ${parseFloat(c.rgi) > 1 ? 'text-blue-400' : 'text-ghost'}`}
-                        style={{ backgroundColor: parseFloat(c.rgi) > 1 ? 'rgba(59,130,246,0.12)' : 'rgba(82,82,91,0.15)' }}>
+                      <span className={`font-mono text-xs px-2 py-0.5 rounded-md ${parseFloat(c.rgi) > 1 ? 'text-[#66B159]' : 'text-ghost'}`}
+                        style={{ backgroundColor: parseFloat(c.rgi) > 1 ? 'rgba(102, 177, 89, 0.12)' : 'rgba(82,82,91,0.15)' }}>
                         {c.rgi}
                       </span>
                     </div>
@@ -240,7 +240,7 @@ export default function RevenuePage() {
               <p className="label-upper text-sub mb-4">Upcoming Demand Events</p>
               <div className="space-y-3.5">
                 {[
-                  { event: 'IPL Match - Local Stadium', when: '15 Nov', lift: '+41%', type: 'Sports' },
+                  { event: 'IPL Match — Local Stadium', when: '15 Nov', lift: '+41%', type: 'Sports' },
                   { event: 'National Conference Venue', when: '18–20 Nov', lift: '+28%', type: 'Corporate' },
                   { event: 'Long Weekend Cluster', when: '22–24 Nov', lift: '+35%', type: 'Leisure' },
                   { event: 'Year-End Corporate Travel', when: 'Dec 1–20', lift: '+22%', type: 'Corporate' },
@@ -250,7 +250,7 @@ export default function RevenuePage() {
                       <p className="text-sub text-xs font-sans">{s.event}</p>
                       <p className="text-ghost text-xs font-sans">{s.type} · {s.when}</p>
                     </div>
-                    <span className="text-blue-400 text-xs font-mono font-semibold flex-shrink-0">{s.lift}</span>
+                    <span className="text-[#66B159] text-xs font-mono font-semibold flex-shrink-0">{s.lift}</span>
                   </div>
                 ))}
               </div>
@@ -263,7 +263,7 @@ export default function RevenuePage() {
       <section ref={svc.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-24">
         <motion.div className="mb-12" initial={{ opacity: 0, y: 16 }} animate={svc.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
           <p className="label-upper text-sub mb-3">What's Included</p>
-          <h2 className="headline text-ink">Six disciplines.<br /><span className="display-serif text-blue-400">One outcome.</span></h2>
+          <h2 className="headline text-ink">Six disciplines.<br /><span className="display-serif text-[#66B159]">One outcome.</span></h2>
           <p className="text-sub text-sm max-w-xl mt-4 leading-relaxed">Revenue management isn't a single lever. It's six instruments played simultaneously. We conduct all of them.</p>
         </motion.div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -275,12 +275,12 @@ export default function RevenuePage() {
               animate={svc.inView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.55, ease: ease.out, delay: i * 0.07 }}
             >
-              <div className="w-8 h-8 rounded-lg surface-accent flex items-center justify-center text-blue-400 text-sm mb-5">{s.icon}</div>
+              <div className="w-8 h-8 rounded-lg surface-accent flex items-center justify-center text-[#66B159] text-sm mb-5">{s.icon}</div>
               <h3 className="font-sans font-semibold text-ink text-sm mb-3">{s.title}</h3>
               <p className="text-sub text-xs leading-relaxed mb-5 flex-1">{s.description}</p>
               <div className="pt-4 border-t border-zinc-800 flex items-center gap-2">
-                <div className="w-1 h-1 rounded-full bg-blue-500 flex-shrink-0" />
-                <span className="text-blue-400 text-xs font-sans">{s.result}</span>
+                <div className="w-1 h-1 rounded-full bg-[#66B159] flex-shrink-0" />
+                <span className="text-[#66B159] text-xs font-sans">{s.result}</span>
               </div>
             </motion.div>
           ))}
@@ -291,7 +291,7 @@ export default function RevenuePage() {
       <section ref={proc.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-4xl mx-auto">
         <motion.div className="mb-12" initial={{ opacity: 0, y: 16 }} animate={proc.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
           <p className="label-upper text-sub mb-3">How It Works</p>
-          <h2 className="headline text-ink">Audit to performance<br /><span className="display-serif text-blue-400">in three weeks.</span></h2>
+          <h2 className="headline text-ink">Audit to performance<br /><span className="display-serif text-[#66B159]">in three weeks.</span></h2>
         </motion.div>
         <div className="relative">
           <div className="absolute left-[19px] top-5 bottom-5 w-px bg-zinc-800" />
@@ -303,7 +303,7 @@ export default function RevenuePage() {
                 transition={{ duration: 0.6, ease: ease.out, delay: i * 0.09 }}
               >
                 <div className="relative z-10 w-10 h-10 rounded-full surface flex items-center justify-center flex-shrink-0">
-                  <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-[#66B159]" />
                 </div>
                 <div className="pt-2 pb-2">
                   <div className="flex items-center gap-3 mb-1.5">
@@ -326,12 +326,12 @@ export default function RevenuePage() {
           animate={cta.inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, ease: ease.out }}
         >
-          <p className="label-upper text-blue-400 mb-5">Free, No Obligation</p>
-          <h2 className="headline text-ink mb-4">See what your revenue<br /><span className="display-serif text-blue-400">could look like.</span></h2>
+          <p className="label-upper text-[#66B159] mb-5">Free, No Obligation</p>
+          <h2 className="headline text-ink mb-4">See what your revenue<br /><span className="display-serif text-[#66B159]">could look like.</span></h2>
           <p className="text-sub text-sm max-w-lg mx-auto mb-10 leading-relaxed">
-            We'll audit your current pricing strategy, OTA positioning, and competitor rates - then show you the gap and exactly what we'd do to close it. No charge, no commitment.
+            We'll audit your current pricing strategy, OTA positioning, and competitor rates — then show you the gap and exactly what we'd do to close it. No charge, no commitment.
           </p>
-          <Link href="/contact" className="glow-blue inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-all duration-200">
+          <Link href="/contact" className="glow-green inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-all duration-200">
             Request Your Free Audit
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </Link>

@@ -46,7 +46,7 @@ export function Nav() {
       >
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
-          <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-[linear-gradient(135deg,#3B82F6_0%,#60A5FA_100%)] shadow-[0_10px_24px_rgba(59,130,246,0.24)] ring-1 ring-white/10">
+          <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-[#66B159] shadow-[0_10px_24px_rgba(102,177,89,0.24)] ring-1 ring-white/10">
             <Image src="/logo.png" alt="ProfitPro logo" width={24} height={24} className="object-contain" />
           </div>
           <span className="text-ink font-sans font-semibold text-sm tracking-tight">ProfitPro</span>
@@ -91,7 +91,7 @@ export function Nav() {
         <div className="flex items-center gap-3">
           <Link
             href="/contact"
-            className="hidden md:flex items-center gap-2 bg-blue-500 hover:bg-blue-400 text-white text-xs font-sans font-semibold px-4 py-2 rounded-lg transition-colors duration-200"
+            className="hidden md:flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] text-xs font-sans font-semibold px-4 py-2 rounded-lg transition-colors duration-200"
           >
             Free Audit
             <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
@@ -158,7 +158,7 @@ export function Nav() {
               <div className="h-px bg-zinc-800 my-2 mx-1" />
               <Link
                 href="/contact"
-                className="mx-1 flex items-center justify-center gap-2 bg-blue-500 text-white text-sm font-sans font-semibold py-2.5 rounded-lg"
+                className="mx-1 flex items-center justify-center gap-2 bg-[#66B159] text-[#FFFCFC] text-sm font-sans font-semibold py-2.5 rounded-lg"
               >
                 Get Free Audit
               </Link>
