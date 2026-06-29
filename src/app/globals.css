@@ -102,29 +102,12 @@ img, video {
 .ticker-track {
   display: flex;
   width: max-content;
-  animation: ticker 28s linear infinite;
+  animation: ticker 150s linear infinite;
   will-change: transform;
 }
-
-.ticker-track-rev {
-  display: flex;
-  width: max-content;
-  animation: ticker-rev 32s linear infinite;
-  will-change: transform;
-}
-
-.ticker-track:hover,
-.ticker-track-rev:hover {
-  animation-play-state: paused;
-}
-
 @keyframes ticker {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
-}
-@keyframes ticker-rev {
-  0%   { transform: translateX(-50%); }
-  100% { transform: translateX(0); }
 }
 
 /* ─── Pulse dot ──────────────────────────────────────── */

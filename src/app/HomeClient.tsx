@@ -223,7 +223,12 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       </section>
 
       {/* ── LIVE TICKER ──────────────────────────────── */}
-      <Ticker logos={otaLogos} />
+      {otaLogos.length > 0 && (
+        <div className="py-16 text-center">
+          <p className="label-upper text-ghost mb-6">Powering listings on every major platform</p>
+          <Ticker logos={otaLogos} />
+        </div>
+      )}
 
       {/* ── SERVICES ─────────────────────────────────── */}
       <ServiceCards />
