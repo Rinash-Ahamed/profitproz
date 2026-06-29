@@ -1,0 +1,169 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Lenis ─────────────────────────────────────────── */
+html.lenis { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+html {
+  scroll-behavior: auto;
+}
+
+body {
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img, video {
+  content-visibility: auto;
+}
+
+* {
+  will-change: auto;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: #09090B; }
+::-webkit-scrollbar-thumb { background: #27272A; border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: #3B82F6; }
+
+/* ─── Type scale ─────────────────────────────────────── */
+.display-xl {
+  font-family: var(--font-geist), system-ui, sans-serif;
+  font-size: clamp(3rem, 8vw, 7rem);
+  font-weight: 700;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+}
+
+.display-serif {
+  font-family: var(--font-instrument), Georgia, serif;
+  font-size: clamp(2.5rem, 6vw, 5.5rem);
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-style: italic;
+}
+
+.headline {
+  font-family: var(--font-geist), system-ui, sans-serif;
+  font-size: clamp(1.75rem, 4vw, 3rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.label-upper {
+  font-family: var(--font-geist), system-ui, sans-serif;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* ─── Surface system ─────────────────────────────────── */
+/* Rule: surfaces are opaque. No backdrop-filter unless critical. */
+.surface {
+  background-color: #111113;
+  border: 1px solid #27272A;
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.24);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.surface-raised {
+  background-color: #1C1C1F;
+  border: 1px solid #27272A;
+}
+
+/* Blue accent glass - used sparingly */
+.surface-accent {
+  background-color: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+/* ─── Ticker ─────────────────────────────────────────── */
+.ticker-track {
+  display: flex;
+  width: max-content;
+  animation: ticker 28s linear infinite;
+  will-change: transform;
+}
+
+.ticker-track-rev {
+  display: flex;
+  width: max-content;
+  animation: ticker-rev 32s linear infinite;
+  will-change: transform;
+}
+
+.ticker-track:hover,
+.ticker-track-rev:hover {
+  animation-play-state: paused;
+}
+
+@keyframes ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes ticker-rev {
+  0%   { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
+/* ─── Pulse dot ──────────────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.35; transform: scale(0.75); }
+}
+.pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* ─── Blue glow - used only on hero CTA ─────────────── */
+.glow-blue {
+  box-shadow: 0 0 0 1px rgba(59,130,246,0.5),
+              0 8px 32px rgba(59,130,246,0.25);
+}
+.glow-blue:hover {
+  box-shadow: 0 0 0 1px rgba(59,130,246,0.8),
+              0 12px 48px rgba(59,130,246,0.35);
+}
+
+/* ─── Reveal clip ────────────────────────────────────── */
+.clip-reveal {
+  clip-path: inset(0 100% 0 0);
+  transition: clip-path 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.clip-reveal.in {
+  clip-path: inset(0 0% 0 0);
+}
+
+/* ─── Focus ──────────────────────────────────────────── */
+*:focus-visible {
+  outline: 1px solid #3B82F6;
+  outline-offset: 3px;
+}
+
+/* ─── Reduced motion ─────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

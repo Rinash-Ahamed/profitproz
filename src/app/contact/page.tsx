@@ -1,0 +1,595 @@
+'use client'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import Image from 'next/image'
+import { Nav } from '@/components/layout/Nav'
+import { Footer } from '@/components/layout/Footer'
+import { useInView } from '@/hooks/useInView'
+import { ease } from '@/lib/utils'
+
+/* ── Form state types ───────────────────────────────── */
+type FormData = {
+  name: string
+  email: string
+  phone: string
+  hotel: string
+  rooms: string
+  service: string
+  message: string
+}
+
+const initialForm: FormData = {
+  name: '', email: '', phone: '', hotel: '', rooms: '', service: '', message: '',
+}
+
+/* ── FAQ ────────────────────────────────────────────── */
+const faqs = [
+  {
+    q: 'How quickly can you start managing our revenue?',
+    a: 'We can audit your property and deploy a pricing strategy within 5–7 business days. Most hotels see measurable rate improvement within the first two weeks.',
+  },
+  {
+    q: 'Do we need a channel manager already?',
+    a: 'No. If you don\'t have one, we recommend and set up the right channel manager for your property size as part of the onboarding process.',
+  },
+  {
+    q: 'What OTAs do you cover in onboarding?',
+    a: 'MakeMyTrip, Booking.com, Agoda, Yatra, Expedia, Goibibo, and Airbnb - all seven, simultaneously, within 7 days.',
+  },
+  {
+    q: 'How is your pricing structured?',
+    a: 'We work on a monthly retainer based on property size and service scope. The free audit gives you a clear picture before you commit to anything.',
+  },
+  {
+    q: 'Do you work with independent hotels or only chains?',
+    a: 'Mostly independent hotels and small to mid-size properties across India - boutique hotels, business hotels, resorts, and homestays. That\'s our speciality.',
+  },
+  {
+    q: 'What does the free revenue audit include?',
+    a: 'A full review of your current pricing strategy, OTA positioning, competitor rates, and occupancy patterns - delivered as a clear report with specific recommendations.',
+  },
+]
+
+function FAQItem({ item, i }: { item: typeof faqs[0]; i: number }) {
+  const [open, setOpen] = useState(false)
+  const { ref, inView } = useInView<HTMLDivElement>(0.2)
+
+  return (
+    <motion.div
+      ref={ref}
+      className="border-b border-zinc-800"
+      initial={{ opacity: 0, y: 12 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.5, ease: ease.out, delay: i * 0.05 }}
+    >
+      <button
+        className="w-full flex items-center justify-between py-5 text-left group"
+        onClick={() => setOpen(!open)}
+      >
+        <span className="font-sans font-medium text-ink text-sm pr-4 group-hover:text-blue-400 transition-colors duration-200">
+          {item.q}
+        </span>
+        <motion.div
+          animate={{ rotate: open ? 45 : 0 }}
+          transition={{ duration: 0.25, ease: ease.out }}
+          className="flex-shrink-0 w-5 h-5 rounded-full border border-zinc-700 flex items-center justify-center"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M5 2v6M2 5h6" stroke={open ? '#3B82F6' : '#71717A'} strokeWidth="1.5" strokeLinecap="round"/>
+          </svg>
+        </motion.div>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.35, ease: ease.out }}
+            className="overflow-hidden"
+          >
+            <p className="text-sub text-sm leading-relaxed pb-5">{item.a}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+/* ── Contact info cards ─────────────────────────────── */
+const contactCards = [
+  {
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3"/>
+        <path d="M2 6l7 5 7-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+      </svg>
+    ),
+    label: 'Email',
+    value: 'hello@profitpro.in',
+    sub: 'We reply within 4 hours',
+    href: 'mailto:hello@profitpro.in',
+  },
+  {
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <path d="M3 3.5C3 3 3.5 2.5 4.5 2.5H6l1.5 3.5L6 7.5C6.5 9 8 10.5 9.5 11L11 9.5l3.5 1.5v1.5c0 1-.5 1.5-1 1.5C6 14 3 8.5 3 3.5z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    ),
+    label: 'Phone',
+    value: '+91 80000 00000',
+    sub: 'Mon–Sat, 9 AM – 7 PM IST',
+    href: 'tel:+918000000000',
+  },
+  {
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+        <circle cx="9" cy="8" r="2.5" stroke="currentColor" strokeWidth="1.3"/>
+        <path d="M9 2C6 2 3.5 4.5 3.5 7.5c0 4.5 5.5 8.5 5.5 8.5s5.5-4 5.5-8.5C14.5 4.5 12 2 9 2z" stroke="currentColor" strokeWidth="1.3"/>
+      </svg>
+    ),
+    label: 'Office',
+    value: 'Bangalore, India',
+    sub: 'Serving hotels across Tamil Nadu',
+    href: undefined,
+  },
+]
+
+export default function ContactPage() {
+  const [form, setForm] = useState<FormData>(initialForm)
+  const [submitted, setSubmitted] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, boolean>>>({})
+  const hero = useInView(0.1)
+  const formSec = useInView(0.05)
+  const faqSec = useInView(0.05)
+
+  const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const handleSubmit = async () => {
+    const requiredFields: (keyof FormData)[] = ['name', 'email', 'hotel', 'service'];
+    const newErrors: Partial<Record<keyof FormData, boolean>> = {};
+    requiredFields.forEach(field => {
+      if (!form[field]) {
+        newErrors[field] = true;
+      }
+    });
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
+
+    setLoading(true)
+    // Simulate async - replace with real API call or Formspree/EmailJS
+    await new Promise((r) => setTimeout(r, 1400))
+    setLoading(false)
+    setSubmitted(true)
+  }
+
+  const inputClass =
+    'w-full bg-zinc-900 border rounded-lg px-4 py-3 text-ink text-sm font-sans placeholder:text-ghost focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all duration-200'
+
+  return (
+    <div className="min-h-screen bg-zinc-1000">
+      <Nav />
+
+      {/* ── HERO ────────────────────────────────────── */}
+      <section ref={hero.ref as React.RefObject<HTMLElement>} className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+        {/* Subtle animated background */}
+        <motion.div
+          className="absolute inset-0 -z-10 pointer-events-none"
+          style={{
+            backgroundImage: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(59, 130, 246, 0.1), transparent),
+                            radial-gradient(ellipse 50% 40% at 20% 110%, rgba(96, 165, 250, 0.08), transparent),
+                            radial-gradient(ellipse 50% 40% at 80% 100%, rgba(96, 165, 250, 0.08), transparent)`,
+            backgroundRepeat: 'no-repeat',
+          }}
+          initial={{ opacity: 0, scale: 1.1 }}
+          animate={hero.inView ? { opacity: 1, scale: 1 } : {}}
+          transition={{ duration: 1.2, ease: ease.out }}
+        />
+
+        <div>
+          <motion.div
+            className="flex items-center gap-3 mb-8"
+            initial={{ opacity: 0, y: 16 }}
+            animate={hero.inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, ease: ease.out, delay: 0.1 }}
+          >
+            <div className="w-2 h-2 rounded-full bg-blue-500 pulse-dot" />
+            <span className="label-upper text-sub">Contact Us</span>
+          </motion.div>
+
+          {/* Staggered headline */}
+          <div className="mb-5">
+            <motion.h1
+              className="font-sans text-ink"
+              style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)', fontWeight: 700, lineHeight: 0.95, letterSpacing: '-0.04em' }}
+              initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
+              animate={hero.inView ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
+              transition={{ duration: 0.9, ease: ease.out, delay: 0.2 }}
+            >
+              Let's grow your
+            </motion.h1>
+            <motion.h1
+              style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)', fontFamily: 'var(--font-instrument)', fontStyle: 'italic', fontWeight: 400, color: '#60A5FA', letterSpacing: '-0.02em', lineHeight: 0.95 }}
+              initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
+              animate={hero.inView ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
+              transition={{ duration: 0.9, ease: ease.out, delay: 0.3 }}
+            >
+              hotel revenue.
+            </motion.h1>
+          </div>
+
+          <motion.p className="text-sub text-lg max-w-lg leading-relaxed"
+            initial={{ opacity: 0, y: 16 }}
+            animate={hero.inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, ease: ease.out, delay: 0.45 }}>
+            Start with a free audit - no commitment. We’re a new market entrant focused on helping hotels in Tamil Nadu unlock stronger revenue performance from day one.
+          </motion.p>
+        </div>
+
+        {/* Contact info cards */}
+        <motion.div
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12"
+          initial={{ opacity: 0, y: 20 }}
+          animate={hero.inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7, ease: ease.out, delay: 0.55 }}
+        >
+          {contactCards.map((c) => {
+            const Inner = (
+              <div className="surface rounded-xl p-5 flex items-start gap-4 hover:border-zinc-600 transition-colors duration-200 h-full">
+                <div className="w-9 h-9 rounded-lg surface-accent flex items-center justify-center flex-shrink-0 text-blue-400">
+                  {c.icon}
+                </div>
+                <div>
+                  <p className="label-upper text-ghost mb-1">{c.label}</p>
+                  <p className="font-sans font-semibold text-ink text-sm mb-0.5">{c.value}</p>
+                  <p className="text-ghost text-xs font-sans">{c.sub}</p>
+                </div>
+              </div>
+            )
+            return c.href ? (
+              <a key={c.label} href={c.href}>{Inner}</a>
+            ) : (
+              <div key={c.label}>{Inner}</div>
+            )
+          })}
+        </motion.div>
+
+        <motion.div
+          className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={hero.inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7, ease: ease.out, delay: 0.65 }}
+        >
+          {[
+            {
+              src: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
+              alt: 'Luxury hotel suite with premium interiors',
+              href: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
+            },
+            {
+              src: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
+              alt: 'Modern hotel reception and lobby',
+              href: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
+            },
+            {
+              src: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
+              alt: 'Upscale resort view with hospitality atmosphere',
+              href: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
+            },
+          ].map((item) => (
+            <a
+              key={item.src}
+              href={item.href}
+              target="_blank"
+              rel="noreferrer"
+              className="group relative block h-48 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+            >
+              <Image
+                src={item.src}
+                alt={item.alt}
+                fill
+                className="object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+              <div className="p-3 text-xs font-sans text-ghost group-hover:text-blue-400 transition-colors duration-200">
+                Open image ↗
+              </div>
+            </a>
+          ))}
+        </motion.div>
+      </section>
+
+      {/* ── FORM + SIDEBAR ──────────────────────────── */}
+      <section ref={formSec.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          {/* Form - 2 cols */}
+          <motion.div
+            className="lg:col-span-2"
+            initial={{ opacity: 0, y: 24 }}
+            animate={formSec.inView ? { opacity: 1, y: 0 } : {}}
+            transition={{ duration: 0.7, ease: ease.out }}
+          >
+            <AnimatePresence mode="wait">
+              {submitted ? (
+                <motion.div
+                  key="success"
+                  className="surface rounded-2xl p-12 flex flex-col items-center justify-center text-center min-h-[480px]"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.5, ease: ease.out }}
+                >
+                  {/* Animated checkmark */}
+                  <motion.div
+                    className="w-16 h-16 rounded-full surface-accent flex items-center justify-center mb-6"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 220, damping: 18, delay: 0.1 }}
+                  >
+                    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                      <motion.path
+                        d="M6 14l5 5 11-11"
+                        stroke="#3B82F6"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        initial={{ pathLength: 0, opacity: 0 }}
+                        animate={{ pathLength: 1, opacity: 1 }}
+                        transition={{ duration: 0.4, ease: 'easeOut', delay: 0.3 }}
+                      />
+                    </svg>
+                  </motion.div>
+                  <motion.h3 className="font-sans font-bold text-ink text-xl mb-3" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: ease.out, delay: 0.5 }}>
+                    Message received
+                  </motion.h3>
+                  <motion.p className="text-sub text-sm max-w-xs leading-relaxed mb-8" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: ease.out, delay: 0.6 }}>
+                    We'll review your property details and get back to you within 4 hours with next steps.
+                  </motion.p>
+                  <motion.button
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: ease.out, delay: 0.8 }}
+                    onClick={() => { setSubmitted(false); setForm(initialForm) }}
+                    className="text-blue-400 text-sm font-sans hover:text-blue-300 transition-colors"
+                  >
+                    Send another enquiry
+                  </motion.button>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="form"
+                  className="surface rounded-2xl p-8 md:p-10"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <p className="font-sans font-semibold text-ink text-lg mb-1">Free Revenue Audit Request</p>
+                  <p className="text-sub text-sm mb-8">Fill in your details and we'll prepare a personalised assessment.</p>
+
+                  <div className="space-y-5">
+                    {/* Row 1 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="label-upper text-ghost">Your Name *</label>
+                          {errors.name && <span className="text-red-400 text-xs font-sans">Required</span>}
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Rahul Sharma"
+                          value={form.name}
+                          onChange={set('name')}
+                          className={`${inputClass} ${errors.name ? 'border-red-500/40' : 'border-zinc-700'}`}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="label-upper text-ghost">Email Address *</label>
+                          {errors.email && <span className="text-red-400 text-xs font-sans">Required</span>}
+                        </div>
+                        <input
+                          type="email"
+                          placeholder="rahul@hotel.com"
+                          value={form.email}
+                          onChange={set('email')}
+                          className={`${inputClass} ${errors.email ? 'border-red-500/40' : 'border-zinc-700'}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Row 2 */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <label className="label-upper text-ghost">Phone Number</label>
+                        </div>
+                        <input
+                          type="tel"
+                          placeholder="+91 98000 00000"
+                          value={form.phone}
+                          onChange={set('phone')}
+                          className={inputClass}
+                        />
+                      </div>
+                      <div>
+                        <label className="label-upper text-ghost block mb-2">Number of Rooms</label>
+                        <select value={form.rooms} onChange={set('rooms')} className={`${inputClass} border-zinc-700`}>
+                          <option value="" disabled>Select room count</option>
+                          <option value="1-15">1–15 rooms</option>
+                          <option value="16-40">16–40 rooms</option>
+                          <option value="41-100">41–100 rooms</option>
+                          <option value="100+">100+ rooms</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Hotel name */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="label-upper text-ghost">Hotel Name *</label>
+                        {errors.hotel && <span className="text-red-400 text-xs font-sans">Required</span>}
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="The Grand Coimbatore"
+                        value={form.hotel}
+                        onChange={set('hotel')}
+                        className={`${inputClass} ${errors.hotel ? 'border-red-500/40' : 'border-zinc-700'}`}
+                      />
+                    </div>
+
+                    {/* Service */}
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <label className="label-upper text-ghost">What do you need? *</label>
+                        {errors.service && <span className="text-red-400 text-xs font-sans">Required</span>}
+                      </div>
+                      <select value={form.service} onChange={set('service')} className={`${inputClass} ${errors.service ? 'border-red-500/40' : 'border-zinc-700'}`}>
+                        <option value="" disabled>Select a service</option>
+                        <option value="revenue">Revenue Management</option>
+                        <option value="onboarding">Hotel Onboarding (OTA Setup)</option>
+                        <option value="both">Both - Revenue + Onboarding</option>
+                        <option value="audit">Just the Free Audit first</option>
+                      </select>
+                    </div>
+
+                    {/* Message */}
+                    <div>
+                      <label className="label-upper text-ghost block mb-2">Anything else?</label>
+                      <textarea
+                        rows={4}
+                        placeholder="Tell us about your property, current challenges, or what you'd like to improve…"
+                        value={form.message}
+                        onChange={set('message')}
+                        className={`${inputClass} resize-none border-zinc-700`}
+                      />
+                    </div>
+
+                    {/* Submit */}
+                    <motion.button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={loading || !form.name || !form.email || !form.hotel || !form.service}
+                      className="w-full glow-blue bg-blue-500 hover:bg-blue-400 disabled:opacity-40 disabled:cursor-not-allowed text-white font-sans font-semibold text-sm py-3.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                      whileTap={{ scale: 0.98 }}
+                    >
+                      <AnimatePresence mode="wait" initial={false}>
+                        {loading ? (
+                        <>
+                          <motion.div
+                            className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                            animate={{ rotate: 360 }}
+                            transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                          />
+                          Sending…
+                        </>
+                      ) : (
+                        <>
+                          Request Free Audit
+                          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                            <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        </>
+                      )}
+                      </AnimatePresence>
+                    </motion.button>
+
+                    <p className="text-ghost text-xs font-sans text-center">
+                      No commitment. No spam. Just a clear, honest assessment of your property's revenue potential.
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Sidebar */}
+          <motion.div
+            className="flex flex-col gap-4"
+            initial={{ opacity: 0, x: 20 }}
+            animate={formSec.inView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 0.7, ease: ease.out, delay: 0.15 }}
+          >
+            {/* What to expect */}
+            <div className="surface rounded-xl p-6">
+              <p className="font-sans font-semibold text-ink text-sm mb-4">What happens next</p>
+              <div className="space-y-4">
+                {[
+                  { step: '01', title: 'We review your details', desc: 'Within 4 hours of your request.' },
+                  { step: '02', title: 'Free audit delivered', desc: 'A clear PDF with your revenue gap analysis.' },
+                  { step: '03', title: 'Strategy call', desc: '30 minutes. No pitch, just recommendations.' },
+                  { step: '04', title: 'You decide', desc: 'Engage us or take the audit and run - no pressure.' },
+                ].map((s) => (
+                  <div key={s.step} className="flex gap-3">
+                    <div className="w-6 h-6 rounded-md surface-accent flex items-center justify-center flex-shrink-0">
+                      <span className="font-sans font-bold text-blue-400" style={{ fontSize: '0.6rem' }}>{s.step}</span>
+                    </div>
+                    <div>
+                      <p className="font-sans font-medium text-ink text-xs mb-0.5">{s.title}</p>
+                      <p className="text-ghost text-xs">{s.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Social proof */}
+            <div className="surface rounded-xl p-6">
+              <div className="flex items-center gap-1 mb-3">
+                {[...Array(5)].map((_, i) => (
+                  <svg key={i} width="12" height="12" viewBox="0 0 12 12" fill="#3B82F6">
+                    <path d="M6 1l1.4 2.9L10.5 4l-2.25 2.2.53 3.1L6 7.75 3.22 9.3l.53-3.1L1.5 4l3.1-.1L6 1z"/>
+                  </svg>
+                ))}
+                <span className="text-blue-400 text-xs font-sans ml-1 font-medium">4.9 / 5.0</span>
+              </div>
+              <p className="text-sub text-xs leading-relaxed italic mb-3">
+                "ProfitPro increased our RevPAR by 43% in the first quarter. The weekly reports are clear and the team is genuinely proactive."
+              </p>
+              <p className="text-ghost text-xs font-sans">- GM, The Orchid Hotel, Mumbai</p>
+            </div>
+
+            {/* Quick numbers */}
+            <div className="surface-accent rounded-xl p-6">
+              <p className="label-upper text-blue-400 mb-4">Our track record</p>
+              <div className="space-y-3">
+                {[
+                  { v: '500+', l: 'Hotels managed' },
+                  { v: '+38%', l: 'Avg RevPAR uplift' },
+                  { v: '7 days', l: 'OTA go-live time' },
+                  { v: '98%', l: 'Client retention' },
+                ].map((s) => (
+                  <div key={s.l} className="flex items-center justify-between">
+                    <span className="text-sub text-xs font-sans">{s.l}</span>
+                    <span className="font-sans font-bold text-ink text-sm">{s.v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* ── FAQ ─────────────────────────────────────── */}
+      <section ref={faqSec.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-3xl mx-auto">
+        <motion.div
+          className="mb-10"
+          initial={{ opacity: 0, y: 16 }}
+          animate={faqSec.inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, ease: ease.out }}
+        >
+          <p className="label-upper text-sub mb-3">FAQ</p>
+          <h2 className="font-sans font-bold text-ink" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.5rem)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+            Questions we hear often
+          </h2>
+        </motion.div>
+        <div>
+          {faqs.map((f, i) => (
+            <FAQItem key={f.q} item={f} i={i} />
+          ))}
+        </div>
+      </section>
+
+      <Footer />
+    </div>
+  )
+}
