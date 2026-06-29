@@ -69,7 +69,7 @@ export function ServiceCards() {
             transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: i * 0.12 }}
           >
             <Link href={s.href} className="block group">
-              <div className="surface rounded-2xl p-8 md:p-10 hover:border-zinc-600 transition-all duration-300 group-hover:shadow-[0_0_40px_rgba(59,130,246,0.08)] group-hover:-translate-y-1">
+              <div className="surface rounded-2xl p-8 md:p-10 hover:border-zinc-600 transition-all duration-300 group-hover:shadow-[0_0_40px_rgba(102,177,89,0.08)] group-hover:-translate-y-1">
                 <div className="flex flex-col lg:flex-row lg:items-start gap-10">
 
                   {/* Left */}

@@ -29,7 +29,20 @@ export default function AboutPage() {
     <div className="min-h-screen bg-zinc-1000">
       <Nav />
 
-      <section ref={hero.ref as React.RefObject<HTMLElement>} className="pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto">
+      <section ref={hero.ref as React.RefObject<HTMLElement>} className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+        {/* Subtle animated background */}
+        <motion.div
+          className="absolute inset-0 -z-10 pointer-events-none"
+          style={{
+            backgroundImage: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(102, 177, 89, 0.1), transparent),
+                            radial-gradient(ellipse 50% 40% at 20% 110%, rgba(102, 177, 89, 0.08), transparent),
+                            radial-gradient(ellipse 50% 40% at 80% 100%, rgba(102, 177, 89, 0.08), transparent)`,
+            backgroundRepeat: 'no-repeat',
+          }}
+          initial={{ opacity: 0, scale: 1.1 }}
+          animate={hero.inView ? { opacity: 1, scale: 1 } : {}}
+          transition={{ duration: 1.2, ease: ease.out }}
+        />
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={hero.inView ? { opacity: 1, y: 0 } : {}}

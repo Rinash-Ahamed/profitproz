@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
 
 /* ─── Lenis ─────────────────────────────────────────── */
 html.lenis { height: auto; }
@@ -96,18 +96,6 @@ img, video {
 .surface-accent {
   background-color: rgba(102, 177, 89, 0.08);
   border: 1px solid rgba(102, 177, 89, 0.2);
-}
-
-/* ─── Ticker ─────────────────────────────────────────── */
-.ticker-track {
-  display: flex;
-  width: max-content;
-  animation: ticker 150s linear infinite;
-  will-change: transform;
-}
-@keyframes ticker {
-  0%   { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
 }
 
 /* ─── Pulse dot ──────────────────────────────────────── */

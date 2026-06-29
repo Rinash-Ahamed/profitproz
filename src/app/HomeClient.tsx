@@ -114,8 +114,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
               <span style={{ color: activeMessage.theme.accent }}>{activeMessage.lastLine}</span>
             </h1>
             <p
-              className="max-w-2xl text-lg sm:text-xl md:text-2xl leading-relaxed text-sub font-[family-name:var(--font-instrument),Georgia,serif] italic"
-              style={{ color: activeMessage.theme.accent }}
+              className="max-w-2xl text-base sm:text-lg leading-relaxed text-ink/80 italic"
             >
               {activeMessage.subtitle}
             </p>
@@ -126,24 +125,30 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
             className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-12 mt-8"
             style={{ y: ctaY, opacity: ctaO }}
           >
-            <a
-              href="/contact"
-              className="glow-green inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200 w-full sm:w-auto"
-            >
+          <a
+            href="/contact"
+            className="glow-green inline-flex items-center justify-center gap-2 bg-gradient-to-br from-[#66B159] to-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200 w-full sm:w-auto hover:brightness-110"
+          >
               Get a Free Revenue Audit
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                <path
+                  d="M2 7h10M8 3l4 4-4 4"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
               </svg>
             </a>
             <a
               href="/revenue"
-              className="inline-flex items-center justify-center gap-2 surface hover:border-zinc-600 text-sub hover:text-ink font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#66B159] text-ink hover:bg-[#66B159]/10 font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
             >
               Revenue Management
             </a>
             <a
               href="/onboarding"
-              className="inline-flex items-center justify-center gap-2 surface hover:border-zinc-600 text-sub hover:text-ink font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
+              className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#66B159] text-ink hover:bg-[#66B159]/10 font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
             >
               Hotel Onboarding
             </a>
@@ -155,12 +160,14 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
             style={{ y: trustY, opacity: trustO }}
           >
             {[
-              { icon: '◉', text: 'Early-stage growth focus' },
-              { icon: '◉', text: 'No lock-in contracts' },
-              { icon: '◉', text: 'Launch support in 14 days' },
+              { text: 'Early-stage growth focus' },
+              { text: 'No lock-in contracts' },
+              { text: 'Launch support in 14 days' },
             ].map((t) => (
               <div key={t.text} className="flex items-center gap-2">
-                <span className="text-[#66B159] text-xs">{t.icon}</span>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#66B159]">
+                  <path d="M3 6l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
                 <span className="text-ghost text-xs font-sans">{t.text}</span>
               </div>
             ))}
@@ -187,7 +194,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       {/* ── LIVE TICKER ──────────────────────────────── */}
       {otaLogos.length > 0 && (
         <div className="py-16 text-center">
-          <p className="label-upper text-ghost mb-6">Powering listings on every major platform</p>
+          <p className="label-upper text-sub mb-6">Powering listings on every major platform</p>
           <Ticker logos={otaLogos} />
         </div>
       )}

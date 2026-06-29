@@ -10,32 +10,28 @@ const testimonials = [
     author: 'Rajesh Menon',
     role: 'General Manager',
     hotel: 'The Orchid Hotel, Mumbai',
-    metric: '+43% RevPAR',
-    color: '#3B82F6',
+    metric: '+43% RevPAR'
   },
   {
     quote: 'We were on just two OTAs before ProfitPro. Within 7 days we were live on all seven, fully optimised with professional copy and photos properly sequenced. Bookings came in on day one. I wish we had done this two years ago.',
     author: 'Priya Nambiar',
     role: 'Owner',
     hotel: 'Spice Garden Boutique Resort, Wayanad',
-    metric: '7 OTAs · 7 days',
-    color: '#3B82F6',
+    metric: '7 OTAs · 7 days'
   },
   {
     quote: 'The weekly reports are exactly what a busy hotel owner needs - one page, clear numbers, what changed and why. I stopped logging into the OTA extranets entirely. The team just handles it.',
     author: 'Aditya Singhania',
     role: 'Director of Operations',
     hotel: 'Heritage Haveli, Jaipur',
-    metric: '+29% Occupancy',
-    color: '#3B82F6',
+    metric: '+29% Occupancy'
   },
   {
     quote: 'Our ADR went from ₹4,200 to ₹5,800 in five months without any drop in occupancy. The dynamic pricing engine is smart - it captures corporate demand on weekdays and leisure premium on weekends automatically.',
     author: 'Kavitha Krishnamurthy',
     role: 'Co-Founder',
     hotel: 'The Canopy Stays, Coorg',
-    metric: '+38% ADR',
-    color: '#3B82F6',
+    metric: '+38% ADR'
   },
 ]
 

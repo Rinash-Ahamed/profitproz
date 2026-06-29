@@ -32,9 +32,17 @@ function TickerComponent({ logos }: { logos: { src: string; alt: string }[] }) {
         style={{ background: 'linear-gradient(-90deg, #09090B, transparent)' }} />
 
       <div className="overflow-hidden py-6">
-        <div className="ticker-track flex items-center h-full">
+        <motion.div
+          className="flex items-center h-full"
+          animate={{ x: '-50%' }}
+          transition={{
+            ease: 'linear',
+            duration: 50,
+            repeat: Infinity,
+          }}
+        >
           {row1.map((logo, i) => <LogoItem key={`${logo.alt}-${i}`} {...logo} />)}
-        </div>
+        </motion.div>
       </div>
     </motion.div>
   )

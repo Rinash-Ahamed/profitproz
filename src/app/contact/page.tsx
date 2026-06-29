@@ -66,7 +66,7 @@ function FAQItem({ item, i }: { item: typeof faqs[0]; i: number }) {
         className="w-full flex items-center justify-between py-5 text-left group"
         onClick={() => setOpen(!open)}
       >
-        <span className="font-sans font-medium text-ink text-sm pr-4 group-hover:text-blue-400 transition-colors duration-200">
+        <span className="font-sans font-medium text-ink text-sm pr-4 group-hover:text-[#66B159] transition-colors duration-200">
           {item.q}
         </span>
         <motion.div
