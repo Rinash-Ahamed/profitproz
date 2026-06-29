@@ -131,13 +131,13 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         >
           {/* Live status pill */}
           <motion.div
-            className="inline-flex items-center gap-2.5 surface px-3.5 py-1.5 rounded-full mb-10"
+            className="inline-flex items-center gap-2.5 glass-pill px-4 py-2 rounded-full mb-10"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: ease.out, delay: 0.12 }}
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#66B159] pulse-dot" />
-            <span className="label-upper text-sub">Turn potential into profit...</span>
+            <span className="label-upper text-ink/80">Turn potential into profit...</span>
           </motion.div>
 
           {/* Headline */}

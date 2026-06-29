@@ -35,21 +35,16 @@ export function Nav() {
       transition={{ duration: 0.7, ease: ease.out, delay: 0.1 }}
     >
       <div
-        className="mx-4 mt-3 rounded-xl flex items-center justify-between h-13 px-5 transition-[background-color,border-color,transform] duration-300 will-change-transform"
+        className="mx-auto mt-4 max-w-5xl rounded-xl flex items-center justify-between h-14 px-4 transition-colors duration-300 backdrop-blur-lg saturate-150"
         style={{
-          height: '52px',
-          backgroundColor: scrolled ? '#111113' : 'rgba(9,9,11,0.5)',
-          borderColor: scrolled ? '#27272A' : 'rgba(39,39,42,0.5)',
+          backgroundColor: scrolled ? 'rgba(17, 17, 19, 0.7)' : 'rgba(17, 17, 19, 0.25)',
+          borderColor: scrolled ? '#27272A' : 'rgba(39, 39, 42, 0.3)',
           borderWidth: '1px',
-          borderStyle: 'solid',
         }}
       >
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
-          <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-[#66B159] shadow-[0_10px_24px_rgba(102,177,89,0.24)] ring-1 ring-white/10">
-            <Image src="/logo.png" alt="ProfitPro logo" width={24} height={24} className="object-contain" />
-          </div>
-          <span className="text-ink font-sans font-semibold text-sm tracking-tight">ProfitPro</span>
+        <Link href="/" className="flex items-center group flex-shrink-0">
+          <Image src="/oneliner.png" alt="ProfitPro logo" width={120} height={24} className="h-6 w-auto object-contain" />
         </Link>
 
         {/* Desktop links */}
@@ -62,7 +57,7 @@ export function Nav() {
                 href={l.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="relative px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 text-sub hover:text-ink hover:bg-zinc-900"
+                className="px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 text-sub hover:text-ink"
               >
                 {l.label}
               </a>
@@ -70,18 +65,11 @@ export function Nav() {
               <Link
                 key={l.href}
                 href={l.href}
-                className={`relative px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 ${
-                  path === l.href ? 'text-ink bg-zinc-800' : 'text-sub hover:text-ink hover:bg-zinc-900'
+                className={`px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 ${
+                  path === l.href ? 'text-ink' : 'text-sub hover:text-ink'
                 }`}
               >
                 {l.label}
-                {path === l.href && (
-                  <motion.div
-                    layoutId="nav-pill"
-                    className="absolute inset-0 rounded-lg bg-zinc-800 -z-10"
-                    transition={{ duration: 0.3, ease: ease.out }}
-                  />
-                )}
               </Link>
             )
           })}
@@ -123,8 +111,7 @@ export function Nav() {
       <AnimatePresence>
         {open && (
           <motion.div
-            className="md:hidden mx-4 mt-1.5 rounded-xl overflow-hidden"
-            style={{ backgroundColor: '#111113', border: '1px solid #27272A' }}
+            className="md:hidden mx-auto mt-2 max-w-5xl rounded-xl overflow-hidden bg-zinc-950/80 backdrop-blur-lg border border-zinc-800"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
@@ -139,7 +126,7 @@ export function Nav() {
                     href={l.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3.5 py-3 rounded-lg text-sm font-sans transition-colors duration-150 text-sub hover:text-ink hover:bg-zinc-900"
+                    className="px-3.5 py-3 rounded-lg text-sm font-sans transition-colors duration-150 text-sub hover:text-ink"
                   >
                     {l.label}
                   </a>
@@ -148,7 +135,7 @@ export function Nav() {
                     key={l.href}
                     href={l.href}
                     className={`px-3.5 py-3 rounded-lg text-sm font-sans transition-colors duration-150 ${
-                      path === l.href ? 'text-ink bg-zinc-800' : 'text-sub hover:text-ink hover:bg-zinc-900'
+                      path === l.href ? 'text-ink' : 'text-sub hover:text-ink'
                     }`}
                   >
                     {l.label}
