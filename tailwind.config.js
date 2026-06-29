@@ -4,7 +4,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Base surfaces - pure, no gradients blending
+        // Base surfaces — pure, no gradients blending
         zinc: {
           1000: '#09090B',
           950: '#0C0C0F',
@@ -27,7 +27,7 @@ module.exports = {
         ghost: '#52525B',
       },
       fontFamily: {
-        sans: ['var(--font-geist)', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
         serif: ['var(--font-instrument)', 'Georgia', 'serif'],
         mono: ['var(--font-geist-mono)', 'monospace'],
       },

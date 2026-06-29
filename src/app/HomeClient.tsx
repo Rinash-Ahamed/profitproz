@@ -25,7 +25,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
   const heroMessages = useMemo(
     () => [
       {
-        title: 'One platform Every OTA Complete Control',
+        title: 'One Platform Every OTA Complete Control',
         subtitle: 'we make property listing and management effortless across multiple ota\'s',
         theme: {
           glowA: 'rgba(102, 177, 89, 0.18)',
@@ -148,7 +148,10 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
-            <h1 className="display-xl text-ink leading-[0.92] tracking-[-0.035em] max-w-3xl">
+            <h1
+              className="display-xl text-ink leading-[0.92] tracking-[-0.035em] max-w-4xl"
+              style={{ fontSize: 'clamp(2.5rem, 6.5vw, 5.5rem)' }}
+            >
               {activeMessage.title}
             </h1>
             <p
@@ -193,8 +196,8 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
             style={{ y: trustY, opacity: trustO }}
           >
             {[
-              { icon: '★', text: 'Early-stage growth focus' },
-              { icon: '◈', text: 'No lock-in contracts' },
+              { icon: '◉', text: 'Early-stage growth focus' },
+              { icon: '◉', text: 'No lock-in contracts' },
               { icon: '◉', text: 'Launch support in 14 days' },
             ].map((t) => (
               <div key={t.text} className="flex items-center gap-2">
