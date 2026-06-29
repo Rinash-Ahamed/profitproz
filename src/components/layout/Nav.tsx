@@ -1,14 +1,16 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ease } from '@/lib/utils'
 
 const links = [
-  { label: 'Home', href: 'https://restaverse.com/' },
+  { label: 'Home', href: '/' },
   { label: 'Revenue Management', href: '/revenue' },
   { label: 'Hotel Onboarding', href: '/onboarding' },
+  { label: 'Testimonials', href: '/#testimonials' },
   { label: 'Contact', href: '/contact' },
 ]
 
@@ -44,34 +46,45 @@ export function Nav() {
       >
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
-          <div className="w-8 h-8 overflow-hidden flex items-center justify-center">
-            <img src="/logo.svg" alt="ProfitPro logo" className="w-7 h-7 object-contain" />
+          <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center bg-[linear-gradient(135deg,#3B82F6_0%,#60A5FA_100%)] shadow-[0_10px_24px_rgba(59,130,246,0.24)] ring-1 ring-white/10">
+            <Image src="/logo.png" alt="ProfitPro logo" width={24} height={24} className="object-contain" />
           </div>
           <span className="text-ink font-sans font-semibold text-sm tracking-tight">ProfitPro</span>
         </Link>
 
         {/* Desktop links */}
         <nav className="hidden md:flex items-center gap-1">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              target={l.href.startsWith('http') ? '_blank' : undefined}
-              rel={l.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-              className={`relative px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 ${
-                path === l.href ? 'text-ink bg-zinc-800' : 'text-sub hover:text-ink hover:bg-zinc-900'
-              }`}
-            >
-              {l.label}
-              {path === l.href && (
-                <motion.div
-                  layoutId="nav-pill"
-                  className="absolute inset-0 rounded-lg bg-zinc-800 -z-10"
-                  transition={{ duration: 0.3, ease: ease.out }}
-                />
-              )}
-            </Link>
-          ))}
+          {links.map((l) => {
+            const isExternal = l.href.startsWith('http')
+            return isExternal ? (
+              <a
+                key={l.href}
+                href={l.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 text-sub hover:text-ink hover:bg-zinc-900"
+              >
+                {l.label}
+              </a>
+            ) : (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`relative px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 ${
+                  path === l.href ? 'text-ink bg-zinc-800' : 'text-sub hover:text-ink hover:bg-zinc-900'
+                }`}
+              >
+                {l.label}
+                {path === l.href && (
+                  <motion.div
+                    layoutId="nav-pill"
+                    className="absolute inset-0 rounded-lg bg-zinc-800 -z-10"
+                    transition={{ duration: 0.3, ease: ease.out }}
+                  />
+                )}
+              </Link>
+            )
+          })}
         </nav>
 
         {/* CTA */}
@@ -118,19 +131,30 @@ export function Nav() {
             transition={{ duration: 0.3, ease: ease.out }}
           >
             <div className="p-3 flex flex-col gap-0.5">
-              {links.map((l) => (
-                <Link
-                  key={l.href}
-                  href={l.href}
-                  target={l.href.startsWith('http') ? '_blank' : undefined}
-                  rel={l.href.startsWith('http') ? 'noopener noreferrer' : undefined}
-                  className={`px-3.5 py-3 rounded-lg text-sm font-sans transition-colors duration-150 ${
-                    path === l.href ? 'text-ink bg-zinc-800' : 'text-sub hover:text-ink hover:bg-zinc-900'
-                  }`}
-                >
-                  {l.label}
-                </Link>
-              ))}
+              {links.map((l) => {
+                const isExternal = l.href.startsWith('http')
+                return isExternal ? (
+                  <a
+                    key={l.href}
+                    href={l.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3.5 py-3 rounded-lg text-sm font-sans transition-colors duration-150 text-sub hover:text-ink hover:bg-zinc-900"
+                  >
+                    {l.label}
+                  </a>
+                ) : (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    className={`px-3.5 py-3 rounded-lg text-sm font-sans transition-colors duration-150 ${
+                      path === l.href ? 'text-ink bg-zinc-800' : 'text-sub hover:text-ink hover:bg-zinc-900'
+                    }`}
+                  >
+                    {l.label}
+                  </Link>
+                )
+              })}
               <div className="h-px bg-zinc-800 my-2 mx-1" />
               <Link
                 href="/contact"

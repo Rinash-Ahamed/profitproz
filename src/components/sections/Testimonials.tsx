@@ -44,6 +44,7 @@ export function Testimonials() {
 
   return (
     <section
+      id="testimonials"
       ref={ref as React.RefObject<HTMLElement>}
       className="py-24 md:py-32 px-6 md:px-10 border-t border-zinc-800"
     >
@@ -58,7 +59,7 @@ export function Testimonials() {
               <span className="display-serif text-blue-400">hotel owners.</span>
             </h2>
           </div>
-          <div className="flex items-center gap-3 surface rounded-xl px-5 py-3 w-fit">
+          <div className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/80 px-5 py-3 w-fit shadow-[0_16px_50px_rgba(0,0,0,0.2)]">
             <div className="flex items-center gap-0.5">
               {[...Array(5)].map((_, i) => (
                 <svg key={i} width="13" height="13" viewBox="0 0 13 13" fill="#3B82F6">
@@ -76,7 +77,7 @@ export function Testimonials() {
           {testimonials.map((t, i) => (
             <motion.div
               key={t.author}
-              className="surface rounded-xl p-7 flex flex-col justify-between hover:border-zinc-600 transition-colors duration-200"
+              className="rounded-2xl border border-zinc-800 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-7 flex flex-col justify-between shadow-[0_20px_60px_rgba(0,0,0,0.2)] hover:border-zinc-600 transition-all duration-300 hover:-translate-y-1"
               initial={{ opacity: 0, y: 22, scale: 0.98, willChange: 'transform, opacity' }}
               animate={inView ? { opacity: 1, y: 0, scale: 1, willChange: 'auto' } : {}}
               transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: i * 0.08 }}
@@ -105,7 +106,7 @@ export function Testimonials() {
               </p>
 
               {/* Author */}
-              <div className="flex items-center gap-3 pt-5 border-t border-zinc-800">
+              <div className="flex items-center gap-3 pt-5 border-t border-zinc-800/80">
                 {/* Avatar placeholder - initials */}
                 <div
                   className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 font-sans font-bold text-xs"

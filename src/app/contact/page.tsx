@@ -256,48 +256,6 @@ export default function ContactPage() {
           })}
         </motion.div>
 
-        <motion.div
-          className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-4"
-          initial={{ opacity: 0, y: 20 }}
-          animate={hero.inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease: ease.out, delay: 0.65 }}
-        >
-          {[
-            {
-              src: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
-              alt: 'Luxury hotel suite with premium interiors',
-              href: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
-            },
-            {
-              src: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-              alt: 'Modern hotel reception and lobby',
-              href: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-            },
-            {
-              src: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
-              alt: 'Upscale resort view with hospitality atmosphere',
-              href: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
-            },
-          ].map((item) => (
-            <a
-              key={item.src}
-              href={item.href}
-              target="_blank"
-              rel="noreferrer"
-              className="group relative block h-48 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
-            >
-              <Image
-                src={item.src}
-                alt={item.alt}
-                fill
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
-              />
-              <div className="p-3 text-xs font-sans text-ghost group-hover:text-blue-400 transition-colors duration-200">
-                Open image ↗
-              </div>
-            </a>
-          ))}
-        </motion.div>
       </section>
 
       {/* ── FORM + SIDEBAR ──────────────────────────── */}
@@ -564,6 +522,42 @@ export default function ContactPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Images */}
+            <div className="grid grid-cols-1 gap-4">
+              {[
+                {
+                  src: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
+                  alt: 'Luxury hotel suite with premium interiors',
+                  href: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
+                },
+                {
+                  src: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
+                  alt: 'Modern hotel reception and lobby',
+                  href: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
+                },
+                {
+                  src: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
+                  alt: 'Upscale resort view with hospitality atmosphere',
+                  href: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
+                },
+              ].map((item) => (
+                <a
+                  key={item.src}
+                  href={item.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group relative block h-48 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
+                >
+                  <Image
+                    src={item.src}
+                    alt={item.alt}
+                    fill
+                    className="object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                </a>
+              ))}
             </div>
           </motion.div>
         </div>

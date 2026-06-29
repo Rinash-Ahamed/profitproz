@@ -25,9 +25,9 @@ export const metadata: Metadata = {
   keywords:
     'hotel revenue management, OTA onboarding, hotel distribution, dynamic pricing, Booking.com, MakeMyTrip',
   icons: {
-    icon: '/logo.ico',
-    shortcut: '/logo.ico',
-    apple: '/logo.ico',
+    icon: '/login-whiteBG.ico',
+    shortcut: '/login-whiteBG.ico',
+    apple: '/login-whiteBG.ico',
   },
   openGraph: {
     title: 'ProfitPro - Turn Potential Into Profit',
