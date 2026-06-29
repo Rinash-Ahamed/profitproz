@@ -25,7 +25,8 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
   const heroMessages = useMemo(
     () => [
       {
-        title: 'One Platform Every OTA Complete Control',
+        titleLines: ['One Platform', 'Every OTA'],
+        lastLine: 'Complete Control',
         subtitle: 'we make property listing and management effortless across multiple ota\'s',
         theme: {
           glowA: 'rgba(102, 177, 89, 0.18)',
@@ -55,61 +56,18 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       {/* ── HERO ─────────────────────────────────────── */}
       <section ref={heroRef} className="relative min-h-[96vh] flex flex-col justify-center pt-20 overflow-hidden">
 
-        {/* Premium hero backdrop */}
-        <motion.div
-          className="absolute inset-0 pointer-events-none select-none overflow-hidden will-change-transform"
-          initial={false}
-          animate={{
-            backgroundPosition: ['0% 0%', '100% 100%'],
-            scale: [0.985, 1.01, 0.99],
-            opacity: [0.82, 1, 0.9],
-          }}
-          transition={{ duration: 9, repeat: Infinity, ease: 'linear' }}
-          style={{
-            backgroundImage:
-              `radial-gradient(circle at top left, ${activeMessage.theme.glowA}, transparent 34%), ` +
-              `radial-gradient(circle at 80% 18%, ${activeMessage.theme.glowB}, transparent 24%), ` +
-              `linear-gradient(${activeMessage.theme.grid} 1px, transparent 1px), ` +
-              `linear-gradient(90deg, ${activeMessage.theme.grid} 1px, transparent 1px)`,
-            backgroundSize: 'auto, auto, 72px 72px, 72px 72px',
-            maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)',
-            transform: 'perspective(1400px) translate3d(0,0,0)',
-            filter: 'contrast(1.08) saturate(1.08)',
-          }}
-        />
-
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {[0, 1, 2, 3].map((index) => (
-            <motion.div
-              key={`${activeMessage.title}-${index}`}
-              className="absolute bottom-0 rounded-full"
-              style={{
-                left: `${8 + index * 22}%`,
-                width: `${96 + index * 18}px`,
-                height: `${120 + index * 18}px`,
-                background: `linear-gradient(180deg, ${activeMessage.theme.accent}28 0%, transparent 84%)`,
-                border: `1px solid ${activeMessage.theme.accent}28`,
-                boxShadow: `0 0 32px ${activeMessage.theme.accent}16`,
-                transformOrigin: 'bottom center',
-              }}
-              initial={{ y: '84%', opacity: 0.18, scaleY: 0.9 }}
-              animate={{ y: ['84%', '-12%'], opacity: [0.18, 0.72], scaleY: [0.9, 1.05] }}
-              transition={{ duration: 3.2 + index * 0.35, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
-            />
-          ))}
-
-          <motion.div
-            className="absolute inset-x-0 bottom-0 h-[46%]"
-            initial={{ opacity: 0.28 }}
-            animate={{ opacity: [0.28, 0.6, 0.3] }}
-            transition={{ duration: 5.2, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <svg viewBox="0 0 1600 800" className="w-full h-full opacity-80" fill="none">
-              <path d="M0 720C120 660 220 560 310 520C408 476 486 510 580 470C686 426 760 310 858 286C956 262 1048 338 1148 324C1244 310 1322 214 1422 204C1498 196 1560 224 1600 248" stroke={activeMessage.theme.accent} strokeWidth="1.4" strokeLinecap="round" />
-              <path d="M0 760C140 712 232 646 332 612C430 580 520 610 610 580C706 548 768 452 870 430C970 408 1054 482 1156 472C1262 462 1338 380 1444 364C1518 352 1568 370 1600 382" stroke={activeMessage.theme.accent} strokeOpacity="0.45" strokeWidth="1" strokeLinecap="round" />
-              <path d="M120 670H320M300 610H500M480 548H680M670 486H850M840 424H1040M1020 368H1220M1180 306H1400" stroke={activeMessage.theme.accent} strokeOpacity="0.28" strokeWidth="1" strokeLinecap="round" />
-            </svg>
-          </motion.div>
+        {/* Video Background */}
+        <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="w-full h-full object-cover"
+            style={{ maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)' }}
+            src="/grow.mp4"
+          />
+          <div className="absolute inset-0 bg-zinc-1000/70" />
         </div>
 
         <div
@@ -142,17 +100,18 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
 
           {/* Headline */}
           <motion.div
-            key={activeMessage.title}
+            key={activeMessage.lastLine}
             className="max-w-4xl flex flex-col items-start gap-4"
             initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
             <h1
-              className="display-xl text-ink leading-[0.92] tracking-[-0.035em] max-w-4xl"
-              style={{ fontSize: 'clamp(2.5rem, 6.5vw, 5.5rem)' }}
+              className="display-xl text-ink leading-[0.98] tracking-[-0.035em] max-w-4xl"
+              style={{ fontSize: 'clamp(2.5rem, 7vw, 6rem)' }}
             >
-              {activeMessage.title}
+              {activeMessage.titleLines.map((line, i) => <span key={i}>{line}<br /></span>)}
+              <span style={{ color: activeMessage.theme.accent }}>{activeMessage.lastLine}</span>
             </h1>
             <p
               className="max-w-2xl text-lg sm:text-xl md:text-2xl leading-relaxed text-sub font-[family-name:var(--font-instrument),Georgia,serif] italic"
