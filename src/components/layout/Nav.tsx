@@ -35,75 +35,77 @@ export function Nav() {
       transition={{ duration: 0.7, ease: ease.out, delay: 0.1 }}
     >
       <div
-        className="mx-auto mt-4 max-w-5xl rounded-xl flex items-center justify-between h-14 px-4 transition-colors duration-300 backdrop-blur-lg saturate-150"
-        style={{
-          backgroundColor: scrolled ? 'rgba(17, 17, 19, 0.7)' : 'rgba(17, 17, 19, 0.25)',
-          borderColor: scrolled ? '#27272A' : 'rgba(39, 39, 42, 0.3)',
-          borderWidth: '1px',
-        }}
+        className={`flex items-center justify-between h-16 px-6 md:px-10 transition-colors duration-300 backdrop-blur-lg saturate-150 ${
+          scrolled
+            ? `bg-zinc-950/70 border-b ${!open ? 'border-zinc-800' : 'border-transparent'}`
+            : 'bg-transparent border-b border-transparent'
+        }`}
       >
         {/* Logo */}
         <Link href="/" className="flex items-center group flex-shrink-0">
-          <Image src="/oneliner.png" alt="ProfitPro logo" width={120} height={24} className="h-6 w-auto object-contain" />
+          <Image src="/oneliner.png" alt="ProfitPro logo" width={140} height={28} className="object-contain" />
         </Link>
 
-        {/* Desktop links */}
-        <nav className="hidden md:flex items-center gap-1">
-          {links.map((l) => {
-            const isExternal = l.href.startsWith('http')
-            return isExternal ? (
-              <a
-                key={l.href}
-                href={l.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 text-sub hover:text-ink"
-              >
-                {l.label}
-              </a>
-            ) : (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={`px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 ${
-                  path === l.href ? 'text-ink' : 'text-sub hover:text-ink'
-                }`}
-              >
-                {l.label}
-              </Link>
-            )
-          })}
-        </nav>
+        {/* Right side items */}
+        <div className="flex items-center gap-4">
+          {/* Desktop links */}
+          <nav className="hidden md:flex items-center gap-1">
+            {links.map((l) => {
+              const isExternal = l.href.startsWith('http')
+              return isExternal ? (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 text-sub hover:text-ink"
+                >
+                  {l.label}
+                </a>
+              ) : (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={`px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 ${
+                    path === l.href ? 'text-ink' : 'text-sub hover:text-ink'
+                  }`}
+                >
+                  {l.label}
+                </Link>
+              )
+            })}
+          </nav>
 
-        {/* CTA */}
-        <div className="flex items-center gap-3">
-          <Link
-            href="/contact"
-            className="hidden md:flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] text-xs font-sans font-semibold px-4 py-2 rounded-lg transition-colors duration-200"
-          >
-            Free Audit
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-              <path d="M1.5 5.5h8M6 2l3.5 3.5L6 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </Link>
+          <div className="flex items-center gap-3">
+            {/* CTA */}
+            <Link
+              href="/contact"
+              className="hidden md:flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] text-xs font-sans font-semibold px-4 py-2 rounded-lg transition-colors duration-200"
+            >
+              Free Audit
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                <path d="M1.5 5.5h8M6 2l3.5 3.5L6 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </Link>
 
-          {/* Mobile toggle */}
-          <button
-            className="md:hidden w-8 h-8 flex flex-col items-center justify-center gap-1.5"
-            onClick={() => setOpen(!open)}
-            aria-label="Toggle menu"
-          >
-            <motion.span
-              className="block w-4 h-px bg-ink rounded-full"
-              animate={open ? { rotate: 45, y: 3.5 } : { rotate: 0, y: 0 }}
-              transition={{ duration: 0.22 }}
-            />
-            <motion.span
-              className="block w-4 h-px bg-ink rounded-full"
-              animate={open ? { rotate: -45, y: -3.5 } : { rotate: 0, y: 0 }}
-              transition={{ duration: 0.22 }}
-            />
-          </button>
+            {/* Mobile toggle */}
+            <button
+              className="md:hidden w-8 h-8 flex flex-col items-center justify-center gap-1.5"
+              onClick={() => setOpen(!open)}
+              aria-label="Toggle menu"
+            >
+              <motion.span
+                className="block w-4 h-px bg-ink rounded-full"
+                animate={open ? { rotate: 45, y: 3.5 } : { rotate: 0, y: 0 }}
+                transition={{ duration: 0.22 }}
+              />
+              <motion.span
+                className="block w-4 h-px bg-ink rounded-full"
+                animate={open ? { rotate: -45, y: -3.5 } : { rotate: 0, y: 0 }}
+                transition={{ duration: 0.22 }}
+              />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -111,7 +113,7 @@ export function Nav() {
       <AnimatePresence>
         {open && (
           <motion.div
-            className="md:hidden mx-auto mt-2 max-w-5xl rounded-xl overflow-hidden bg-zinc-950/80 backdrop-blur-lg border border-zinc-800"
+            className="md:hidden bg-zinc-950/80 backdrop-blur-lg border-b border-zinc-800"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}

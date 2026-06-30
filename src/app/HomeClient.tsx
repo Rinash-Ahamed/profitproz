@@ -12,13 +12,12 @@ import { HomeCTA } from '@/components/sections/HomeCTA'
 import { ease } from '@/lib/utils'
 
 export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt: string }[] }) {
+
+  const tickerSpeed = 5
   const heroRef = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
-  const headY = useTransform(scrollYProgress, [0, 1], [0, 60])
   const headO = useTransform(scrollYProgress, [0, 0.65], [1, 0])
-  const ctaY = useTransform(scrollYProgress, [0, 0.45], [-24, 0])
   const ctaO = useTransform(scrollYProgress, [0, 0.2, 0.45], [1, 0.94, 0.2])
-  const trustY = useTransform(scrollYProgress, [0, 0.55], [-16, 0])
   const trustO = useTransform(scrollYProgress, [0, 0.25, 0.55], [1, 0.94, 0.2])
   const [messageIndex, setMessageIndex] = useState(0)
 
@@ -84,7 +83,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         <div className="absolute top-[42%] right-[34%] w-1 h-1 rounded-full bg-zinc-600 pulse-dot" style={{ animationDelay: '1.8s' }} />
 
         <motion.div
-          style={{ y: headY, opacity: headO }}
+          style={{ opacity: headO }}
           className="relative z-10 max-w-6xl mx-auto w-full px-6 md:px-10"
         >
           {/* Live status pill */}
@@ -123,7 +122,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           {/* CTA row */}
           <motion.div
             className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-12 mt-8"
-            style={{ y: ctaY, opacity: ctaO }}
+            style={{ opacity: ctaO }}
           >
           <a
             href="/contact"
@@ -157,7 +156,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           {/* Trust row */}
           <motion.div
             className="flex flex-wrap items-center gap-4 sm:gap-6"
-            style={{ y: trustY, opacity: trustO }}
+            style={{ opacity: trustO }}
           >
             {[
               { text: 'Early-stage growth focus' },
@@ -195,7 +194,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       {otaLogos.length > 0 && (
         <div className="py-16 text-center">
           <p className="label-upper text-sub mb-6">Powering listings on every major platform</p>
-          <Ticker logos={otaLogos} />
+          <Ticker key={tickerSpeed} logos={otaLogos} duration={tickerSpeed} />
         </div>
       )}
 

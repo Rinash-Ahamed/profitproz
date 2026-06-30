@@ -1,51 +1,48 @@
 'use client'
-import { motion } from 'framer-motion'
-import { memo } from 'react'
 import Image from 'next/image'
+import React from 'react'
 
-const logos = [
-]
+type TickerProps = {
+  logos: { src: string; alt: string }[]
+  duration?: number
+}
 
-function LogoItem({ src, alt }: { src: string; alt: string }) {
+const tickerKeyframes = `
+  @keyframes ticker {
+    0% { transform: translateX(0%); }
+    100% { transform: translateX(-50%); }
+  }
+`
+
+const TickerComponent = ({ logos, duration = 40 }: TickerProps) => {
+  const duplicatedLogos = [...logos, ...logos]
+
   return (
-    <div className="flex items-center justify-center px-10 flex-shrink-0 h-full">
-      <Image src={src} alt={alt} width={120} height={40} className="h-9 w-auto object-contain opacity-70" />
+    <div className="relative w-full overflow-hidden">
+      {/* Gradient Fades: This is a more performant way to create the fade-out effect than using mask-image, which can cause rendering glitches during animation. */}
+      <div className="pointer-events-none absolute left-0 top-0 h-full w-1/5 bg-gradient-to-r from-zinc-1000 to-transparent z-10" />
+      <div className="pointer-events-none absolute right-0 top-0 h-full w-1/5 bg-gradient-to-l from-zinc-1000 to-transparent z-10" />
+
+      <style>{tickerKeyframes}</style>
+      <div
+        className="flex items-center"
+        style={{
+          animation: `ticker ${duration}s linear infinite`,
+          width: 'max-content',
+          willChange: 'transform',
+          backfaceVisibility: 'hidden',
+        } as React.CSSProperties}
+      >
+        {duplicatedLogos.map((logo, i) => (
+          <div key={`${logo.src}-${i}`} className="flex-shrink-0 h-8 flex items-center px-6 md:px-8">
+            <Image src={logo.src} alt={logo.alt} width={120} height={32} className="h-full w-auto object-contain" />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
 
-function TickerComponent({ logos }: { logos: { src: string; alt: string }[] }) {
-  const wideBlock = [...logos, ...logos, ...logos];
-  const row1 = [...wideBlock, ...wideBlock];
-
-  return (
-    <motion.div
-      className="relative bg-zinc-900/50 border-y border-zinc-800 overflow-hidden"
-      initial={{ opacity: 0 }}
-      whileInView={{ opacity: 1 }}
-      viewport={{ once: true }}
-      transition={{ duration: 0.4 }}
-    >
-      <div className="absolute left-0 top-0 bottom-0 w-20 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(90deg, #09090B, transparent)' }} />
-      <div className="absolute right-0 top-0 bottom-0 w-20 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(-90deg, #09090B, transparent)' }} />
-
-      <div className="overflow-hidden py-6">
-        <motion.div
-          className="flex items-center h-full"
-          animate={{ x: '-50%' }}
-          transition={{
-            ease: 'linear',
-            duration: 50,
-            repeat: Infinity,
-          }}
-        >
-          {row1.map((logo, i) => <LogoItem key={`${logo.alt}-${i}`} {...logo} />)}
-        </motion.div>
-      </div>
-    </motion.div>
-  )
-}
-
-export const Ticker = memo(TickerComponent)
+// Memoizing the component prevents it from re-rendering due to parent state changes
+// (like the hero text cycle), which can interrupt the smooth CSS animation.
+export const Ticker = React.memo(TickerComponent)

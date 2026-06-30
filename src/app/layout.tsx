@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { Instrument_Serif, Inter } from 'next/font/google'
 import './globals.css'
-import { SmoothScroll } from '@/components/layout/SmoothScroll'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -40,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className={`${inter.variable} ${instrument.variable}`}>
       <body className="bg-zinc-1000 text-ink font-sans antialiased overflow-x-hidden">
-        <SmoothScroll>{children}</SmoothScroll>
+        {children}
       </body>
     </html>
   )
