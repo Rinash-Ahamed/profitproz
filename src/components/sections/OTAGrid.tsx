@@ -1,7 +1,6 @@
 'use client'
 import { motion } from 'framer-motion'
 import { useInView } from '@/hooks/useInView'
-import { ease } from '@/lib/utils'
 import { AnimatedSection } from '@/components/animations/AnimatedSection'
 
 const platforms = [

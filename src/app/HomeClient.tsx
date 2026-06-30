@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { Ticker } from '@/components/sections/Ticker'
+import { MobilePreview } from '@/components/sections/MobilePreview'
 import { ServiceCards } from '@/components/sections/ServiceCards'
 import { Stats } from '@/components/sections/Stats'
 import { Testimonials } from '@/components/sections/Testimonials'
@@ -197,6 +198,9 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           <Ticker key={tickerSpeed} logos={otaLogos} duration={tickerSpeed} />
         </div>
       )}
+
+      {/* ── MOBILE PREVIEW ───────────────────────────── */}
+      <MobilePreview />
 
       {/* ── SERVICES ─────────────────────────────────── */}
       <ServiceCards />

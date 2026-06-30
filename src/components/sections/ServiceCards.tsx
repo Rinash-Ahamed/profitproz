@@ -60,16 +60,24 @@ export function ServiceCards() {
         <span className="label-upper text-ghost">Two services, one mission</span>
       </motion.div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4" style={{ perspective: '1200px' }}>
         {services.map((s, i) => (
           <motion.div
             key={s.tag}
-            initial={{ opacity: 0, x: s.dir * 36, y: 16, willChange: 'transform, opacity' }}
-            animate={inView ? { opacity: 1, x: 0, y: 0, willChange: 'auto' } : {}}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: i * 0.12 }}
+            initial={{ opacity: 0, rotateX: -12, y: 50, scale: 0.95 }}
+            animate={inView ? { opacity: 1, rotateX: 0, y: 0, scale: 1 } : {}}
+            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: i * 0.15 }}
           >
             <Link href={s.href} className="block group">
-              <div className="surface rounded-2xl p-8 md:p-10 hover:border-zinc-600 transition-all duration-300 group-hover:shadow-[0_0_40px_rgba(102,177,89,0.08)] group-hover:-translate-y-1">
+              <motion.div
+                className="surface rounded-2xl p-8 md:p-10 hover:border-zinc-600 transition-colors duration-300"
+                whileHover={{
+                  y: -12,
+                  rotateX: 4,
+                  boxShadow: '0px 25px 50px -12px rgba(0,0,0,0.25), 0px 10px 25px -8px rgba(102, 177, 89, 0.2)',
+                }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+              >
                 <div className="flex flex-col lg:flex-row lg:items-start gap-10">
 
                   {/* Left */}
@@ -150,7 +158,7 @@ export function ServiceCards() {
                     </motion.div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </Link>
           </motion.div>
         ))}

@@ -43,6 +43,4 @@ const TickerComponent = ({ logos, duration = 40 }: TickerProps) => {
   )
 }
 
-// Memoizing the component prevents it from re-rendering due to parent state changes
-// (like the hero text cycle), which can interrupt the smooth CSS animation.
 export const Ticker = React.memo(TickerComponent)
