@@ -51,7 +51,7 @@ const faqs = [
 ]
 
 function FAQItem({ item, i }: { item: typeof faqs[0]; i: number }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(i === 0)
   const { ref, inView } = useInView<HTMLDivElement>(0.2)
 
   return (
@@ -203,8 +203,8 @@ export default function ContactPage() {
           <div className="mb-5">
             <motion.h1
               className="headline text-ink"
-              initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
-              animate={hero.inView ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
+              initial={{ opacity: 0, y: 20 }}
+              animate={hero.inView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.9, ease: ease.out, delay: 0.2 }}
             >
               Let's grow your <span className="text-[#66B159]">hotel revenue.</span>
@@ -513,8 +513,6 @@ export default function ContactPage() {
                   </div>
                 ))}
               </div>
-            </div>
-              ))}
             </div>
           </motion.div>
         </div>
