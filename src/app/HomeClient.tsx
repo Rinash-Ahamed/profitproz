@@ -167,7 +167,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
 
           {/* Trust row */}
           <motion.div
-            className="flex flex-wrap items-center gap-4 sm:gap-6"
+            className="flex flex-wrap items-center gap-x-6 gap-y-3"
             style={{ opacity: trustO }}
           >
             {[
@@ -176,10 +176,10 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
               { text: 'Launch support in 14 days' },
             ].map((t) => (
               <div key={t.text} className="flex items-center gap-2">
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#66B159]">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" className="text-[#66B159]">
                   <path d="M3 6l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="text-ghost text-xs font-sans">{t.text}</span>
+                <span className="text-sub text-sm font-light">{t.text}</span>
               </div>
             ))}
           </motion.div>
