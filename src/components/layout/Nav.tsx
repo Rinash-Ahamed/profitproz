@@ -129,6 +129,7 @@ export function Nav() {
                     href={l.href}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() => setOpen(false)}
                     className="px-3.5 py-3 rounded-lg text-sm font-sans transition-colors duration-150 text-sub hover:text-ink"
                   >
                     {l.label}
@@ -137,6 +138,7 @@ export function Nav() {
                   <Link
                     key={l.href}
                     href={l.href}
+                    onClick={() => setOpen(false)}
                     className={`px-3.5 py-3 rounded-lg text-sm font-sans transition-colors duration-150 ${
                       path === l.href ? 'text-ink' : 'text-sub hover:text-ink'
                     }`}
@@ -148,6 +150,7 @@ export function Nav() {
               <div className="h-px bg-zinc-800 my-2 mx-1" />
               <Link
                 href="/contact"
+                onClick={() => setOpen(false)}
                 className="mx-1 flex items-center justify-center gap-2 bg-[#66B159] text-[#FFFCFC] text-sm font-sans font-semibold py-2.5 rounded-lg"
               >
                 Get Free Audit

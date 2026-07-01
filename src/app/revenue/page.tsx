@@ -16,17 +16,17 @@ const services = [
   },
   {
     title: 'Competitor Rate Intelligence',
-    description: 'We track your competitive set across every OTA every single day — rate levels, availability, promotions, and positioning. When a rival drops rates aggressively or a new property enters your market, you\'ll know and we\'ll respond.',
+    description: 'We track your competitive set across every OTA every single day - rate levels, availability, promotions, and positioning. When a rival drops rates aggressively or a new property enters your market, you\'ll know and we\'ll respond.',
     result: '360° competitive visibility updated daily.',
   },
   {
     title: 'Demand Forecasting',
-    description: 'Corporate booking windows, leisure demand patterns, local events, public holidays, and macro travel trends — all built into a demand calendar that tells us when to be aggressive on rate and when to prioritise fill.',
+    description: 'Corporate booking windows, leisure demand patterns, local events, public holidays, and macro travel trends - all built into a demand calendar that tells us when to be aggressive on rate and when to prioritise fill.',
     result: 'Occupancy gaps reduced by 60% on average.',
   },
   {
     title: 'Yield Management',
-    description: 'Minimum length of stay controls, close-out dates, non-refundable rate fencing, and channel allocation decisions — all configured to maximise revenue contribution per available room, not just fill rates.',
+    description: 'Minimum length of stay controls, close-out dates, non-refundable rate fencing, and channel allocation decisions - all configured to maximise revenue contribution per available room, not just fill rates.',
     result: 'RevPAR indexed above market average for 94% of clients.',
   },
   {
@@ -51,7 +51,7 @@ const process = [
   {
     week: 'Week 1–2',
     title: 'Strategy Design',
-    description: 'A custom revenue strategy blueprint for your property: seasonal rate architecture, comp set definition, demand event calendar, channel mix targets, and yield rule framework. Nothing generic — every hotel gets its own plan.',
+    description: 'A custom revenue strategy blueprint for your property: seasonal rate architecture, comp set definition, demand event calendar, channel mix targets, and yield rule framework. Nothing generic - every hotel gets its own plan.',
   },
   {
     week: 'Week 2–3',
@@ -117,7 +117,7 @@ export default function RevenuePage() {
             Every Night <span className="text-[#66B159]">Maximum revenue.</span>
           </h1>
           <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
-            Most hotels price based on intuition and what worked last year. We replace that with a data-driven revenue engine — competitor rates tracked daily, demand signals captured in advance, and pricing adjusted to maximise what you earn every single night.
+            Most hotels price based on intuition and what worked last year. We replace that with a data-driven revenue engine - competitor rates tracked daily, demand signals captured in advance, and pricing adjusted to maximise what you earn every single night.
           </p>
           <div className="flex flex-wrap gap-3">
             <Link href="/contact" className="inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200">

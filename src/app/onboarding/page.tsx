@@ -10,107 +10,53 @@ import Link from 'next/link'
 /* ── Journey stages ─────────────────────────────────── */
 const stages = [
   {
-    day: 'Day 1–2',
-    title: 'Property Assessment',
+    day: 'Day 1',
+    title: 'Assessment & Account Setup',
     icon: '◈',
-    desc: 'Before we create a single listing, we do a thorough assessment of your property. We review your existing digital presence (if any), photo quality, facilities inventory, room configuration, and how your competitors are positioned. This audit shapes every listing decision that follows.',
+    desc: 'We start with a thorough assessment of your property, then register and verify you on all major OTA platforms simultaneously. This includes handling paperwork, compliance, and extranet access.',
     tasks: [
       'Existing OTA audit and performance review',
-      'Facilities and room type documentation',
-      'Photo quality and gap assessment',
-      'Competitive positioning analysis',
-      'Recommended room category structure',
-    ],
-    deliverable: 'Written assessment report with recommendations',
-  },
-  {
-    day: 'Day 2–3',
-    title: 'OTA Account Setup',
-    icon: '⬡',
-    desc: 'We register and verify your property on all 7 OTA platforms simultaneously. This includes handling the paperwork, GST documentation, legal compliance, bank account verification, and extranet access setup. Most properties find this stage alone takes weeks - we do it in two days.',
-    tasks: [
-      'Account creation: MakeMyTrip, Booking.com, Agoda, Yatra, Expedia, Goibibo, Airbnb',
+      'Account creation on 7+ platforms',
       'GST and legal compliance documents submitted',
-      'Bank account and payout details verified',
-      'Extranet access configured and tested',
+      'Photo quality and gap assessment',
       'Connectivity partner relationships established',
     ],
-    deliverable: 'All 7 OTA accounts live and accessible',
+    deliverable: 'All OTA accounts live and accessible',
   },
   {
-    day: 'Day 3–5',
-    title: 'Content & Listing Creation',
+    day: 'Day 2',
+    title: 'Content & Rate Configuration',
     icon: '◎',
-    desc: 'Each OTA has a different search algorithm. A listing optimised for Booking.com is not the same as one optimised for MakeMyTrip. We write platform-specific descriptions with the right keywords, configure amenity flags correctly, sequence photos for maximum click-through, and set policies that reduce friction for the guest.',
+    desc: 'We write platform-specific descriptions, configure amenities, and sequence photos for maximum impact. Simultaneously, we build your rate structure, load seasonal pricing, and establish parity monitoring from day one.',
     tasks: [
-      'SEO-optimised property descriptions written for each platform',
-      'Room type descriptions and naming conventions set',
-      'Amenity, facility and accessibility flags configured',
+      'SEO-optimised property descriptions for each platform',
+      'Room type hierarchy and naming conventions set',
+      'Base rates, seasonal rates, and promotions loaded',
       'Photo sequence optimised for click-through rate',
-      'Cancellation and guest policies defined per platform',
+      'Rate parity monitoring established',
     ],
-    deliverable: 'Fully written listings on all 7 platforms',
+    deliverable: 'Fully written listings with live rates',
   },
   {
-    day: 'Day 5–6',
-    title: 'Rate & Inventory Setup',
-    icon: '◇',
-    desc: 'Room types are built correctly, base rates loaded, seasonal adjustments structured, and cancellation rate fences created. Rate parity is established and monitored from day one. This is the stage most hotels get wrong - wrong room type names, wrong base rates, missing non-refundable options - we get it right the first time.',
-    tasks: [
-      'Room type hierarchy configured and linked',
-      'Base rates, seasonal rates and promotional rates loaded',
-      'Non-refundable and flexible rate options created',
-      'Rate parity monitoring established across all channels',
-      'Minimum stay and advance purchase restrictions applied',
-    ],
-    deliverable: 'All rates live with parity confirmed',
-  },
-  {
-    day: 'Day 6',
-    title: 'Channel Manager Integration',
-    icon: '⬙',
-    desc: 'Your channel manager is connected to all 7 OTAs with full two-way sync. We run test bookings on each platform, validate that inventory reduces correctly, and confirm that modifications and cancellations flow back accurately. Nothing goes live until every test passes.',
-    tasks: [
-      'Channel manager connected and credentials validated',
-      'Two-way inventory sync tested on each OTA',
-      'Test booking placed and cancelled on each platform',
-      'Rate and availability push confirmed end-to-end',
-      'Overbooking protections and buffer rooms configured',
-    ],
-    deliverable: 'Fully tested, live channel distribution',
-  },
-  {
-    day: 'Day 7',
-    title: 'Go Live & Handover',
+    day: 'Day 3',
+    title: 'Integration & Go-Live',
     icon: '◉',
-    desc: 'All listings are activated simultaneously. We monitor your first real bookings live - watching for any sync issues, guest questions, or rate anomalies. You receive a handover document with login credentials, platform contacts, and a guide for managing day-to-day updates. Ongoing revenue management starts from this point.',
+    desc: 'Your channel manager is connected and tested with full two-way sync. After successful tests, all listings are activated. We monitor your first bookings and provide a full handover with credentials and guides.',
     tasks: [
+      'Channel manager connected and validated',
+      'Two-way inventory sync tested on each OTA',
       'All 7 listings activated and searchable',
-      'First 24 hours of bookings monitored in real time',
-      'Guest-facing communication templates provided',
+      'First 24 hours of bookings monitored',
       'Login credentials and platform guides handed over',
-      'Transition to ongoing revenue management',
     ],
     deliverable: 'Live hotel, first bookings, full handover',
   },
-]
-
-/* ── Platforms ──────────────────────────────────────── */
-const platforms = [
-  { name: 'MakeMyTrip', abbr: 'MMT', reach: '50M+ users', detail: 'India\'s largest OTA. Dominant in domestic leisure and family travel. Critical for any Indian hotel.', dot: '#E53E3E' },
-  { name: 'Booking.com', abbr: 'BDC', reach: '150M+ users', detail: 'Global leader with the widest international reach. Essential for any hotel targeting foreign guests.', dot: '#2B6CB0' },
-  { name: 'Agoda', abbr: 'AGD', reach: '35M+ users', detail: 'Dominant across Asia-Pacific. Strong corporate and business travel segment, particularly for South-East Asian guests.', dot: '#E53E3E' },
-  { name: 'Yatra', abbr: 'YTR', reach: '15M+ users', detail: 'Trusted Indian OTA with strong penetration in Tier 2 and Tier 3 cities. Good for domestic business travel.', dot: '#DD6B20' },
-  { name: 'Expedia', abbr: 'EXP', reach: '70M+ users', detail: 'Major reach into US and European travellers. Includes Hotels.com and Vrbo in the same content network.', dot: '#D69E2E' },
-  { name: 'Goibibo', abbr: 'GIB', reach: '25M+ users', detail: 'Tech-forward Indian OTA popular with millennial and Gen-Z domestic travellers. Strong mobile booking volumes.', dot: '#2B6CB0' },
-  { name: 'Airbnb', abbr: 'ABB', reach: '40M+ users', detail: 'Fastest growing platform for boutique, unique, and non-traditional stays. High ADR and lower commission than most OTAs.', dot: '#E53E3E' },
 ]
 
 export default function OnboardingPage() {
   const [active, setActive] = useState(0)
   const hero    = useInView(0.1)
   const journey = useInView(0.05)
-  const plat    = useInView(0.08)
   const why     = useInView(0.1)
   const cta     = useInView(0.2)
 
@@ -144,14 +90,14 @@ export default function OnboardingPage() {
             Listed everywhere <span className="text-[#66B159]">Booked constantly.</span>
           </h1>
           <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
-            Getting a hotel correctly listed on 7 OTAs - with optimised content, proper room types, rate parity, and a working channel sync - takes most properties 3 to 6 months. We do it completely, correctly, in 7 days.
+            Most hotels spend 2 to 4 months getting their OTA setup right. We do it completely, correctly, and across every major OTA - in just 3 days.
           </p>
 
           {/* Three badges */}
           <div className="flex flex-wrap gap-3 mb-10">
             {[
-              { label: 'Time to go live', value: '7 Days', sub: 'average across 7 OTAs' },
-              { label: 'Platforms covered', value: '7 OTAs', sub: 'simultaneously, from day one' },
+              { label: 'Time to go live', value: '3 Days', sub: 'average across OTAs' },
+              { label: 'Platforms covered', value: '7+ OTAs', sub: 'simultaneously, from day one' },
               { label: 'Hidden costs', value: 'None', sub: 'transparent pricing only' },
             ].map((b) => (
               <div key={b.label} className="surface-accent rounded-xl px-5 py-4">
@@ -189,7 +135,9 @@ export default function OnboardingPage() {
                 Why most hotels do OTA setup badly
               </h3>
               <p className="text-sub text-sm leading-relaxed">
-                OTA extranets are not intuitive. Each platform has different terminology for room types, different requirements for photos, different content fields, and different algorithms that determine where you rank in search results. A property listed with the wrong room categories, generic copy, and photos in the wrong sequence will consistently underperform - often indefinitely, because nobody revisits what's already live.
+                Getting listed is easy. Getting listed correctly isn't. <br /><br />
+                Every OTA has its own rules for room types, content, photos, pricing, and search visibility. Small setup mistakes - like incorrect room mapping, weak descriptions, or unoptimized images - can push your property down the rankings and reduce bookings. <br /><br />
+                Most hotels never revisit these settings after launch, leaving revenue on the table every single day. We make sure your listings are optimized from day one.<br />
               </p>
             </div>
             <div className="space-y-3">
@@ -219,7 +167,7 @@ export default function OnboardingPage() {
       <section ref={journey.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-20">
         <motion.div className="mb-10" initial={{ opacity: 0, y: 16 }} animate={journey.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
           <p className="label-upper text-sub mb-3">The Process</p>
-          <h2 className="headline text-ink">Seven days.<br /><span className="display-serif text-[#66B159]">Step by step.</span></h2>
+          <h2 className="headline text-ink">Three days <span className="text-[#66B159]">Step by step</span></h2>
         </motion.div>
 
         {/* Progress bar */}
@@ -305,36 +253,6 @@ export default function OnboardingPage() {
         </div>
       </section>
 
-      {/* ── PLATFORMS ────────────────────────────────── */}
-      <section ref={plat.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-20">
-        <motion.div className="mb-12" initial={{ opacity: 0, y: 16 }} animate={plat.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
-          <p className="label-upper text-sub mb-3">Where You'll Be Listed</p>
-          <h2 className="headline text-ink">Seven platforms.<br /><span className="display-serif text-[#66B159]">Fully optimised.</span></h2>
-          <p className="text-sub text-sm max-w-xl mt-4 leading-relaxed">Each platform gets a listing tailored to its own algorithm and guest profile. Not one listing copy-pasted seven times.</p>
-        </motion.div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {platforms.map((p, i) => (
-            <motion.div key={p.name} className="surface rounded-xl p-6 hover:border-zinc-600 transition-all duration-200 cursor-default group flex flex-col"
-              initial={{ opacity: 0, y: 20 }}
-              animate={plat.inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.55, ease: ease.out, delay: i * 0.06 }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: p.dot + '18', border: `1px solid ${p.dot}28` }}>
-                  <span className="font-sans font-bold" style={{ fontSize: '0.6rem', color: p.dot }}>{p.abbr}</span>
-                </div>
-                <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.dot }} />
-              </div>
-              <p className="font-sans font-semibold text-ink text-sm mb-1">{p.name}</p>
-              <p className="text-ghost text-xs font-sans mb-3">{p.reach}</p>
-              <p className="text-sub text-xs leading-relaxed flex-1">{p.detail}</p>
-              <div className="mt-4 h-px bg-zinc-800 group-hover:bg-[#66B159]/30 transition-colors duration-300" />
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
       {/* ── CTA ──────────────────────────────────────── */}
       <section ref={cta.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
         <motion.div className="surface rounded-2xl p-12 md:p-16 text-center"
@@ -343,16 +261,16 @@ export default function OnboardingPage() {
           transition={{ duration: 0.7, ease: ease.out }}
         >
           <p className="label-upper text-[#66B159] mb-5">500+ Hotels Onboarded</p>
-          <h2 className="headline text-ink mb-4">7 days to fully live.<br /><span className="display-serif text-[#66B159]">Let's begin today.</span></h2>
+          <h2 className="headline text-ink mb-4">3 days to fully live <span className="text-[#66B159]">Let's begin today.</span></h2>
           <p className="text-sub text-sm max-w-md mx-auto mb-10 leading-relaxed">
-            The process is proven, the timeline is real, and we've done it for hotels across India - from 10-room boutiques to 200-room city hotels.
+            The process is proven, the timeline is real, and we've done it for hotels across India - from 10 room to 100+ room city hotels.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             <Link href="/contact" className="inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-colors duration-200">
               Start My Onboarding
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Link>
-            <Link href="/revenue" className="surface-accent inline-flex items-center gap-2 text-[#66B159] font-sans font-medium text-sm px-9 py-4 rounded-xl transition-colors duration-200">
+            <Link href="/revenue" className="inline-flex items-center justify-center bg-transparent border border-[#66B159] text-ink hover:bg-[#66B159]/10 font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200">
               Add Revenue Management
             </Link>
           </div>
