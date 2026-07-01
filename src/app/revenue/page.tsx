@@ -157,7 +157,7 @@ export default function RevenuePage() {
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Link>
             <Link href="/onboarding" className="surface hover:border-zinc-600 text-sub hover:text-ink font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200 inline-flex items-center">
-              Also need OTA setup? →
+              Also need OTA setup?
             </Link>
           </div>
         </motion.div>

@@ -5,10 +5,10 @@ import { useInView } from '@/hooks/useInView'
 import { ease } from '@/lib/utils'
 
 const mobileImages = [
-  { src: '/mobile/mob1.png', alt: 'revenue insights' },
-  { src: '/mobile/mob2.png', alt: 'competitor rates' },
-  { src: '/mobile/mob3.png', alt: 'occupancy overview' },
-  { src: '/mobile/mob4.png', alt: 'dynamic pricing controls' },
+  { src: '/mobile/mobo1.png', alt: 'revenue insights' },
+  { src: '/mobile/mobo2.png', alt: 'competitor rates' },
+  { src: '/mobile/mobo3.png', alt: 'occupancy overview' },
+  { src: '/mobile/mobo4.png', alt: 'dynamic pricing controls' },
 ]
 
 export function MobilePreview() {

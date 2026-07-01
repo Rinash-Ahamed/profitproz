@@ -15,7 +15,7 @@ const testimonials = [
   },
   {
     quote: 'We were on just two OTAs before ProfitPro. Within 3 days we were live on all seven, fully optimised with professional copy and photos properly sequenced. Bookings came in on day one. I wish we had done this two years ago.',
-    author: 'Tamilarasi',
+    author: 'TamilArasi',
     role: 'Owner',
     hotel: 'Thekkady Arasi Hotel, Kerala',
     metric: '7 OTAs · 3 days'

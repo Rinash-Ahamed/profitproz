@@ -52,7 +52,9 @@ export default function AboutPage() {
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">About ProfitPro</span>
           </div>
-          <h1 className="display-xl text-ink mb-4 max-w-3xl">We help hotels turn visibility into measurable revenue.</h1>
+          <h1 className="headline text-ink mb-4 max-w-3xl">
+            We help hotels turn visibility into <span className="text-[#66B159]">measurable revenue.</span>
+          </h1>
           <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed">
             ProfitPro is a revenue and distribution partner for independent hotels that want sharper pricing, stronger OTA presence, and less operational complexity.
           </p>
