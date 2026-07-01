@@ -26,31 +26,31 @@ const chartData = [
 /* ── Services ───────────────────────────────────────── */
 const services = [
   {
-    icon: '◈',
+    icon: '◉',
     title: 'Dynamic Pricing Engine',
     description: 'Rates are recommended daily based on real-time demand signals, your competitor set, local events, and your own historical patterns. No more static pricing that leaves money on the table during peak periods or kills occupancy in soft ones.',
     result: 'Hotels see ADR improvement of 20–40% within 60 days.',
   },
   {
-    icon: '⬡',
+    icon: '◉',
     title: 'Competitor Rate Intelligence',
     description: 'We track your competitive set across every OTA every single day — rate levels, availability, promotions, and positioning. When a rival drops rates aggressively or a new property enters your market, you\'ll know and we\'ll respond.',
     result: '360° competitive visibility updated daily.',
   },
   {
-    icon: '◎',
+    icon: '◉',
     title: 'Demand Forecasting',
     description: 'Corporate booking windows, leisure demand patterns, local events, public holidays, and macro travel trends — all built into a demand calendar that tells us when to be aggressive on rate and when to prioritise fill.',
     result: 'Occupancy gaps reduced by 60% on average.',
   },
   {
-    icon: '◇',
+    icon: '◉',
     title: 'Yield Management',
     description: 'Minimum length of stay controls, close-out dates, non-refundable rate fencing, and channel allocation decisions — all configured to maximise revenue contribution per available room, not just fill rates.',
     result: 'RevPAR indexed above market average for 94% of clients.',
   },
   {
-    icon: '⬙',
+    icon: '◉',
     title: 'OTA Ranking Optimisation',
     description: 'Search ranking on Booking.com and MakeMyTrip is driven by content quality, review score, response rate, and pricing competitiveness. We manage all four simultaneously so your property appears higher in more searches.',
     result: 'Average 35% improvement in OTA page rank.',

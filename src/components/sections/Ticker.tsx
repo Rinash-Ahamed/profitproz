@@ -9,8 +9,8 @@ type TickerProps = {
 
 const tickerKeyframes = `
   @keyframes ticker {
-    0% { transform: translateX(0%); }
-    100% { transform: translateX(-50%); }
+    0% { transform: translateX(0%) translateZ(0); }
+    100% { transform: translateX(-50%) translateZ(0); }
   }
 `
 

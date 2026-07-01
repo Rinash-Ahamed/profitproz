@@ -43,7 +43,7 @@ export function Nav() {
       >
         {/* Logo */}
         <Link href="/" className="flex items-center group flex-shrink-0">
-          <Image src="/mainlogo.png" alt="ProfitPro logo" width={150} height={150} className="object-contain" />
+          <Image src="/mainlogo.png" alt="ProfitPro logo" width={150} height={150} className="h-10 w-auto object-contain" />
         </Link>
 
         {/* Right side items */}

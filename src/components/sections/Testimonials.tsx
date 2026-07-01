@@ -8,30 +8,30 @@ import { AnimatedSection } from '@/components/animations/AnimatedSection'
 const testimonials = [
   {
     quote: 'ProfitPro increased our RevPAR by 43% within the first quarter. What impressed us most was the proactive communication - they flagged a competitor rate drop before we even noticed it and adjusted our strategy overnight.',
-    author: 'Rajesh Menon',
-    role: 'General Manager',
-    hotel: 'The Orchid Hotel, Mumbai',
+    author: 'Liyakath Ali',
+    role: 'Proprietor',
+    hotel: 'Ambience Retreat, Karnataka',
     metric: '+43% RevPAR'
   },
   {
-    quote: 'We were on just two OTAs before ProfitPro. Within 7 days we were live on all seven, fully optimised with professional copy and photos properly sequenced. Bookings came in on day one. I wish we had done this two years ago.',
-    author: 'Priya Nambiar',
+    quote: 'We were on just two OTAs before ProfitPro. Within 3 days we were live on all seven, fully optimised with professional copy and photos properly sequenced. Bookings came in on day one. I wish we had done this two years ago.',
+    author: 'Tamilarasi',
     role: 'Owner',
-    hotel: 'Spice Garden Boutique Resort, Wayanad',
-    metric: '7 OTAs · 7 days'
+    hotel: 'Thekkady Arasi Hotel, Kerala',
+    metric: '7 OTAs · 3 days'
   },
   {
     quote: 'The weekly reports are exactly what a busy hotel owner needs - one page, clear numbers, what changed and why. I stopped logging into the OTA extranets entirely. The team just handles it.',
-    author: 'Aditya Singhania',
-    role: 'Director of Operations',
-    hotel: 'Heritage Haveli, Jaipur',
+    author: 'Adhilinga Perumal',
+    role: 'Property Owner',
+    hotel: 'ELMS Hotels, Kerala',
     metric: '+29% Occupancy'
   },
   {
-    quote: 'Our ADR went from ₹4,200 to ₹5,800 in five months without any drop in occupancy. The dynamic pricing engine is smart - it captures corporate demand on weekdays and leisure premium on weekends automatically.',
-    author: 'Kavitha Krishnamurthy',
-    role: 'Co-Founder',
-    hotel: 'The Canopy Stays, Coorg',
+    quote: 'Our ADR went from ₹1,200 to ₹3,500 in three months without any drop in occupancy. The dynamic pricing engine is smart - it captures corporate demand on weekdays and leisure premium on weekends automatically.',
+    author: 'Gokul',
+    role: 'Manager',
+    hotel: 'Hotel Nachas, Coimbatore',
     metric: '+38% ADR'
   },
 ]
@@ -74,8 +74,8 @@ export function Testimonials() {
                 </svg>
               ))}
             </div>
-            <span className="text-ink text-sm font-sans font-semibold">4.9</span>
-            <span className="text-sub text-xs font-sans">from 200+ reviews</span>
+            <span className="text-ink text-sm font-sans font-semibold">4.8</span>
+            <span className="text-sub text-xs font-sans">from 80+ reviews</span>
           </div>
         </AnimatedSection>
 

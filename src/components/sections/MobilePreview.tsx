@@ -44,7 +44,7 @@ export function MobilePreview() {
               transition={{ duration: 0.6, ease: ease.out, delay: i * 0.1 + 0.2 }}
             >
               <div className="relative transition-all duration-300 ease-out group-hover:-translate-y-2 group-active:-translate-y-2 group-hover:shadow-[0_25px_60px_-15px_rgba(102,177,89,0.25)] group-active:shadow-[0_25px_60px_-15px_rgba(102,177,89,0.25)] rounded-3xl">
-                <Image src={img.src} alt={img.alt} width={400} height={800} className="rounded-3xl object-contain" />
+                <Image src={img.src} alt={img.alt} width={400} height={800} className="rounded-3xl object-contain mix-blend-lighten" />
               </div>
             </motion.div>
           ))}

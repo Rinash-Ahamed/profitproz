@@ -51,11 +51,11 @@ export function Footer() {
                 </svg>
                 support@profitproz.com
               </a>
-              <a href="tel:+9182480002523" className="flex items-center gap-2.5 text-ghost hover:text-ink text-xs font-sans transition-colors duration-200">
+              <a href="tel:+919363509110" className="flex items-center gap-2.5 text-ghost hover:text-ink text-xs font-sans transition-colors duration-200">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
                   <path d="M2 2.5C2 2 2.5 1.5 3 1.5h1.5l1 2.5-1 1c.5 1 1.5 2 2.5 2.5l1-1 2.5 1V9c0 .5-.5 1-1 1C5 10 2 6.5 2 2.5z" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                +91 8248 000 2523
+                +91 936 350 9110
               </a>
               <p className="flex items-center gap-2.5 text-ghost text-xs font-sans">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">

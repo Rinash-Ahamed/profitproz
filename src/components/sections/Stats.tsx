@@ -5,11 +5,11 @@ import { useCounter } from '@/hooks/useCounter'
 import { ease } from '@/lib/utils'
 
 const data = [
-  { pre: '', value: 500, suf: '+', label: 'Hotels Managed' },
+  { pre: '', value: 10, suf: '+', label: 'Hotels Managed' },
   { pre: '+', value: 38, suf: '%', label: 'Avg RevPAR Uplift' },
   { pre: '', value: 7, suf: '', label: 'OTA Platforms' },
-  { pre: '₹', value: 180, suf: 'Cr+', label: 'Revenue Managed' },
-  { pre: '', value: 98, suf: '%', label: 'Client Retention' },
+  { pre: '₹', value: 40, suf: 'L+', label: 'Revenue Managed' },
+  { pre: '', value: 99.0, suf: '%', label: 'Client Retention' },
 ]
 
 function Stat({ item, active, i }: { item: typeof data[0]; active: boolean; i: number }) {

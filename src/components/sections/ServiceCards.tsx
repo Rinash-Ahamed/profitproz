@@ -10,16 +10,16 @@ const services = [
     tag: 'Hotel Onboarding',
     title: 'Hotel\nOnboarding',
     description:
-      'Getting on 7 OTAs correctly - with SEO-optimised content, right room types, proper rate parity, and a live channel sync - takes most hotels months. We do it in 7 days, and we do it right the first time.',
+      'Getting on major OTAs correctly - with proper content, right room types, proper rate parity, and a live channel sync - takes most hotels months. We do it in 3 days, and we do it right the first time.',
     href: '/onboarding',
     features: [
-      'OTA Account Setup - all 7 platforms simultaneously',
-      'Professional Listing Copy - platform-specific SEO',
-      'Rate & Inventory Config - room types, restrictions',
+      'OTA Account Setup - all platforms simultaneously',
+      'Professional Listing - For each platform, with photos, descriptions, and amenities',
+      'Rate & Inventory Config - room types, proper pricing',
       'Channel Manager Integration - two-way sync validated',
-      'Go-Live Monitoring - first bookings watched live',
+      'Go-Live Monitoring - ensure your listing is live and correct',
     ],
-    metric: { label: 'Average go-live time', value: '7 Days', sub: 'across all 7 OTAs' },
+    metric: { label: 'Average go-live time', value: '3 Days', sub: 'across all major OTAs' },
     dir: 1,
   },
   {
@@ -29,7 +29,7 @@ const services = [
       'Most hotels price based on gut feeling and last year\'s rates. We replace that with a live intelligence engine - competitor tracking, demand signals, and dynamic pricing running daily so your rates are always exactly where they should be.',
     href: '/revenue',
     features: [
-      'Dynamic Pricing Engine - AI-driven rates updated daily',
+      'Dynamic Pricing Engine - Data-driven rates updated daily',
       'Competitor Rate Pulse - track 10+ rivals in real time',
       'Demand Forecasting - events, seasons, local patterns',
       'Yield Management - restrictions & min-stay controls',
@@ -109,7 +109,7 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
                 <Image src={i === 0 ? 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80' : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=900&q=80'} alt={i === 0 ? 'Premium hotel room and revenue-driven experience' : 'Hotel reception and guest journey'} width={900} height={600} className="h-36 w-full object-cover" />
                 <div className="px-5 py-4">
                   <p className="label-upper text-ghost mb-2">Visual positioning</p>
-                  <p className="text-sub text-xs leading-relaxed">Stronger listing presentation and pricing clarity create a more compelling stay experience.</p>
+                  <p className="text-sub text-xs leading-relaxed">Stronger listing presentation and pricing clarity create a more bookings.</p>
                 </div>
               </motion.div>
             </div>

@@ -14,7 +14,7 @@ import { ease } from '@/lib/utils'
 
 export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt: string }[] }) {
 
-  const tickerSpeed = 5
+  const tickerSpeed = 15
   const heroRef = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
   const headO = useTransform(scrollYProgress, [0, 0.65], [1, 0])
