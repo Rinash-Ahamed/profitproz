@@ -6,10 +6,6 @@ import { ease } from '@/lib/utils'
 const services = [
   { label: 'Revenue Management', href: '/revenue' },
   { label: 'Hotel Onboarding', href: '/onboarding' },
-  { label: 'Dynamic Pricing', href: '/revenue' },
-  { label: 'OTA Distribution', href: '/onboarding' },
-  { label: 'Market Intelligence', href: '/revenue' },
-  { label: 'Channel Management', href: '/onboarding' },
 ]
 
 const company = [
@@ -115,7 +111,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-ghost text-xs font-sans">
-            © 2025 ProfitPro. All rights reserved. · Turn Potential Into Profit.
+            © 2026 ProfitPro. All rights reserved. · Turn Potential Into Profit.
           </p>
           <div className="flex items-center gap-5">
             <span className="text-ghost text-xs font-sans">Privacy Policy</span>

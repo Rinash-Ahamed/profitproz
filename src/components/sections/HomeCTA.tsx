@@ -64,7 +64,7 @@ export function HomeCTA() {
 
               {/* Trust signals */}
               <div className="flex flex-wrap gap-x-6 gap-y-2 mt-10 pt-8 border-t border-zinc-800">
-                {['500+ hotels onboarded', '₹180Cr+ revenue managed', '98% client retention'].map((t) => (
+                {['100+ hotels onboarded', '₹40Lakhs+ revenue managed', '99.9% client retention'].map((t) => (
                   <div key={t} className="flex items-center gap-2">
                     <div className="w-1 h-1 rounded-full bg-[#66B159]" />
                     <span className="text-ghost text-xs font-sans">{t}</span>

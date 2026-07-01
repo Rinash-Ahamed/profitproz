@@ -12,6 +12,7 @@ const links = [
   { label: 'Hotel Onboarding', href: '/onboarding' },
   { label: 'Testimonials', href: '/#testimonials' },
   { label: 'Contact', href: '/contact' },
+  { label: 'About Us', href: '/about' },
 ]
 
 export function Nav() {
