@@ -144,11 +144,10 @@ export default function RevenuePage() {
           <div className="flex items-center gap-3 mb-8">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Revenue Management</span>
-            <div className="h-px flex-1 max-w-24 bg-zinc-800" />
-            <span className="label-upper text-ghost">Service 01</span>
           </div>
-          <h1 className="display-xl text-ink mb-3 max-w-3xl">Every night.</h1>
-          <h1 className="display-serif text-[#66B159] mb-7">Maximum revenue.</h1>
+          <h1 className="headline text-ink mb-7">
+            Every Night <span className="text-[#66B159]">Maximum revenue.</span>
+          </h1>
           <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
             Most hotels price based on intuition and what worked last year. We replace that with a data-driven revenue engine — competitor rates tracked daily, demand signals captured in advance, and pricing adjusted to maximise what you earn every single night.
           </p>

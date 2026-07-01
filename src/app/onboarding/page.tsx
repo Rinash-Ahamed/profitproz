@@ -139,11 +139,10 @@ export default function OnboardingPage() {
           <div className="flex items-center gap-3 mb-8">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Hotel Onboarding</span>
-            <div className="h-px flex-1 max-w-24 bg-zinc-800" />
-            <span className="label-upper text-ghost">Service 02</span>
           </div>
-          <h1 className="display-xl text-ink mb-3 max-w-3xl">Listed everywhere.</h1>
-          <h1 className="display-serif text-[#66B159] mb-7">Booked constantly.</h1>
+          <h1 className="headline text-ink mb-7">
+            Listed everywhere <span className="text-[#66B159]">Booked constantly.</span>
+          </h1>
           <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
             Getting a hotel correctly listed on 7 OTAs - with optimised content, proper room types, rate parity, and a working channel sync - takes most properties 3 to 6 months. We do it completely, correctly, in 7 days.
           </p>

@@ -1,7 +1,6 @@
 'use client'
 import Link from 'next/link'
-import { motion } from 'framer-motion'
-import { ease } from '@/lib/utils'
+import Image from 'next/image'
 
 const services = [
   { label: 'Revenue Management', href: '/revenue' },
@@ -26,14 +25,8 @@ export function Footer() {
 
           {/* Brand column */}
           <div className="lg:col-span-1">
-            <Link href="/" className="flex items-center gap-2.5 mb-5 group w-fit">
-              <div className="w-7 h-7 rounded-md bg-[#66B159] group-hover:bg-[#73bd66] transition-colors duration-200 flex items-center justify-center">
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M2 10V6l3-3 2 2 3-4v9" stroke="white" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M2 10h10" stroke="white" strokeWidth="1.6" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <span className="font-sans font-semibold text-ink text-base">ProfitPro</span>
+            <Link href="/" className="block mb-5">
+              <Image src="/mainlogo.png" alt="ProfitPro logo" width={150} height={150} className="h-8 w-auto object-contain" />
             </Link>
             <p className="text-sub text-sm leading-relaxed mb-6 max-w-[220px]">
               Hotel revenue management and full OTA distribution - handled end-to-end, so you earn more without the complexity.

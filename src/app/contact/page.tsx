@@ -106,9 +106,9 @@ const contactCards = [
       </svg>
     ),
     label: 'Email',
-    value: 'hello@profitpro.in',
+    value: 'support@profitproz.com',
     sub: 'We reply within 4 hours',
-    href: 'mailto:hello@profitpro.in',
+    href: 'mailto:support@profitproz.com',
   },
   {
     icon: (
@@ -117,9 +117,9 @@ const contactCards = [
       </svg>
     ),
     label: 'Phone',
-    value: '+91 80000 00000',
-    sub: 'Mon–Sat, 9 AM – 7 PM IST',
-    href: 'tel:+918000000000',
+    value: '+91 936 350 9110',
+    sub: 'Mon–Sat, 9 AM – 8 PM IST',
+    href: 'tel:+919363509110',
   },
   {
     icon: (
@@ -129,8 +129,8 @@ const contactCards = [
       </svg>
     ),
     label: 'Office',
-    value: 'Bangalore, India',
-    sub: 'Serving hotels across Tamil Nadu',
+    value: 'Coimbatore, India',
+    sub: 'Serving hotels across India',
     href: undefined,
   },
 ]
@@ -159,7 +159,7 @@ export default function ContactPage() {
     if (Object.keys(newErrors).length > 0) return;
 
     setLoading(true)
-    // Simulate async - replace with real API call or Formspree/EmailJS
+
     await new Promise((r) => setTimeout(r, 1400))
     setLoading(false)
     setSubmitted(true)
@@ -202,21 +202,12 @@ export default function ContactPage() {
           {/* Staggered headline */}
           <div className="mb-5">
             <motion.h1
-              className="font-sans text-ink"
-              style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)', fontWeight: 700, lineHeight: 0.95, letterSpacing: '-0.04em' }}
+              className="headline text-ink"
               initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
               animate={hero.inView ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
               transition={{ duration: 0.9, ease: ease.out, delay: 0.2 }}
             >
-              Let's grow your
-            </motion.h1>
-            <motion.h1
-              style={{ fontSize: 'clamp(2.5rem, 6vw, 5rem)', fontFamily: 'var(--font-instrument)', fontStyle: 'italic', fontWeight: 400, color: '#66B159', letterSpacing: '-0.02em', lineHeight: 0.95 }}
-              initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
-              animate={hero.inView ? { opacity: 1, y: 0, filter: 'blur(0px)' } : {}}
-              transition={{ duration: 0.9, ease: ease.out, delay: 0.3 }}
-            >
-              hotel revenue.
+              Let's grow your <span className="text-[#66B159]">hotel revenue.</span>
             </motion.h1>
           </div>
 
