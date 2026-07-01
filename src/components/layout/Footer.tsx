@@ -9,7 +9,6 @@ const services = [
 
 const company = [
   { label: 'About ProfitPro', href: '/about' },
-  { label: 'Case Studies', href: '#' },
   { label: 'Contact Us', href: '/contact' },
   { label: 'Free Audit', href: '/contact' },
 ]

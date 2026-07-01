@@ -148,7 +148,7 @@ export default function ContactPage() {
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const handleSubmit = async () => {
-    const requiredFields: (keyof FormData)[] = ['name', 'email', 'hotel', 'service'];
+    const requiredFields: (keyof FormData)[] = ['name', 'phone', 'hotel', 'service'];
     const newErrors: Partial<Record<keyof FormData, boolean>> = {};
     requiredFields.forEach(field => {
       if (!form[field]) {
@@ -251,11 +251,11 @@ export default function ContactPage() {
 
       {/* ── FORM + SIDEBAR ──────────────────────────── */}
       <section ref={formSec.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="flex justify-center">
 
           {/* Form - 2 cols */}
           <motion.div
-            className="lg:col-span-2"
+            className="w-full max-w-3xl"
             initial={{ opacity: 0, y: 24 }}
             animate={formSec.inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.7, ease: ease.out }}
@@ -332,15 +332,14 @@ export default function ContactPage() {
                       </div>
                       <div>
                         <div className="flex justify-between items-center mb-2">
-                          <label className="label-upper text-ghost">Email Address *</label>
-                          {errors.email && <span className="text-red-400 text-xs font-sans">Required</span>}
+                          <label className="label-upper text-ghost">Email Address</label>
                         </div>
                         <input
                           type="email"
                           placeholder="rahul@hotel.com"
                           value={form.email}
                           onChange={set('email')}
-                          className={`${inputClass} ${errors.email ? 'border-red-500/40' : 'border-zinc-700'}`}
+                          className={`${inputClass} border-zinc-700`}
                         />
                       </div>
                     </div>
@@ -349,14 +348,15 @@ export default function ContactPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <div className="flex justify-between items-center mb-2">
-                          <label className="label-upper text-ghost">Phone Number</label>
+                          <label className="label-upper text-ghost">Phone Number *</label>
+                          {errors.phone && <span className="text-red-400 text-xs font-sans">Required</span>}
                         </div>
                         <input
                           type="tel"
                           placeholder="+91 98000 00000"
                           value={form.phone}
                           onChange={set('phone')}
-                          className={inputClass}
+                          className={`${inputClass} ${errors.phone ? 'border-red-500/40' : 'border-zinc-700'}`}
                         />
                       </div>
                       <div>
@@ -417,7 +417,7 @@ export default function ContactPage() {
                     <motion.button
                       type="button"
                       onClick={handleSubmit}
-                      disabled={loading || !form.name || !form.email || !form.hotel || !form.service}
+                      disabled={loading || !form.name || !form.phone || !form.hotel || !form.service}
                       className="w-full bg-[#66B159] hover:bg-[#73bd66] disabled:opacity-40 disabled:cursor-not-allowed text-[#FFFCFC] font-sans font-semibold text-sm py-3.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                       whileTap={{ scale: 0.98 }}
                     >
@@ -449,71 +449,6 @@ export default function ContactPage() {
                 </motion.div>
               )}
             </AnimatePresence>
-          </motion.div>
-
-          {/* Sidebar */}
-          <motion.div
-            className="flex flex-col gap-4"
-            initial={{ opacity: 0, x: 20 }}
-            animate={formSec.inView ? { opacity: 1, x: 0 } : {}}
-            transition={{ duration: 0.7, ease: ease.out, delay: 0.15 }}
-          >
-            {/* What to expect */}
-            <div className="surface rounded-xl p-6">
-              <p className="font-sans font-semibold text-ink text-sm mb-4">What happens next</p>
-              <div className="space-y-4">
-                {[
-                  { step: '01', title: 'We review your details', desc: 'Within 4 hours of your request.' },
-                  { step: '02', title: 'Free audit delivered', desc: 'A clear PDF with your revenue gap analysis.' },
-                  { step: '03', title: 'Strategy call', desc: '30 minutes. No pitch, just recommendations.' },
-                  { step: '04', title: 'You decide', desc: 'Engage us or take the audit and run - no pressure.' },
-                ].map((s) => (
-                  <div key={s.step} className="flex gap-3">
-                    <div className="w-6 h-6 rounded-md surface-accent flex items-center justify-center flex-shrink-0">
-                      <span className="font-sans font-bold text-[#66B159]" style={{ fontSize: '0.6rem' }}>{s.step}</span>
-                    </div>
-                    <div>
-                      <p className="font-sans font-medium text-ink text-xs mb-0.5">{s.title}</p>
-                      <p className="text-ghost text-xs">{s.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Social proof */}
-            <div className="surface rounded-xl p-6">
-              <div className="flex items-center gap-1 mb-3">
-                {[...Array(5)].map((_, i) => (
-                  <svg key={i} width="12" height="12" viewBox="0 0 12 12" fill="#66B159">
-                    <path d="M6 1l1.4 2.9L10.5 4l-2.25 2.2.53 3.1L6 7.75 3.22 9.3l.53-3.1L1.5 4l3.1-.1L6 1z"/>
-                  </svg>
-                ))}
-                <span className="text-[#66B159] text-xs font-sans ml-1 font-medium">4.9 / 5.0</span>
-              </div>
-              <p className="text-sub text-xs leading-relaxed italic mb-3">
-                "ProfitPro increased our RevPAR by 43% in the first quarter. The weekly reports are clear and the team is genuinely proactive."
-              </p>
-              <p className="text-ghost text-xs font-sans">- GM, The Orchid Hotel, Mumbai</p>
-            </div>
-
-            {/* Quick numbers */}
-            <div className="surface-accent rounded-xl p-6">
-              <p className="label-upper text-[#66B159] mb-4">Our track record</p>
-              <div className="space-y-3">
-                {[
-                  { v: '10+', l: 'Hotels managed' },
-                  { v: '+38%', l: 'Avg RevPAR uplift' },
-                  { v: '3 days', l: 'OTA go-live time' },
-                  { v: '99%', l: 'Client retention' },
-                ].map((s) => (
-                  <div key={s.l} className="flex items-center justify-between">
-                    <span className="text-sub text-xs font-sans">{s.l}</span>
-                    <span className="font-sans font-bold text-ink text-sm">{s.v}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
           </motion.div>
         </div>
       </section>
