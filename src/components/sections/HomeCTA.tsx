@@ -30,14 +30,11 @@ export function HomeCTA() {
             <div className="p-10 md:p-14 flex flex-col justify-between">
               <div>
                 <p className="label-upper text-[#66B159] mb-6">Start Today - It's Free</p>
-                <h2
-                  className="text-ink mb-5"
-                  style={{ fontSize: 'clamp(1.8rem, 4vw, 3rem)', fontWeight: 700, lineHeight: 1.08, letterSpacing: '-0.035em' }}
-                >
-                  Your rooms are empty
+                <h2 className="headline text-ink mb-5">
+                  More bookings.
                   <br />
-                  <span style={{ fontFamily: 'var(--font-instrument)', fontStyle: 'italic', fontWeight: 400, color: '#66B159' }}>
-                    some nights. They don't have to be.
+                  <span className="text-[#66B159]">
+                    Better revenue.
                   </span>
                 </h2>
                 <p className="text-sub text-sm leading-relaxed max-w-md mb-10">

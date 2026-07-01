@@ -43,18 +43,14 @@ const services = [
 function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: number; inView: boolean }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 24, scale: 0.98 }}
-      animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
+      className="group"
+      initial={{ opacity: 0, y: 24 }}
+      animate={inView ? { opacity: 1, y: 0 } : {}}
       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: i * 0.15 }}
     >
-      <Link href={service.href} className="block group">
-        <motion.div
-          className="surface rounded-2xl p-8 md:p-10 hover:border-zinc-600 transition-colors duration-300"
-          whileHover={{
-            y: -12,
-            boxShadow: '0px 25px 50px -12px rgba(0,0,0,0.25), 0px 10px 25px -8px rgba(102, 177, 89, 0.2)',
-          }}
-          transition={{ duration: 0.3, ease: 'easeOut' }}
+      <Link href={service.href} className="block">
+        <div
+          className="surface rounded-2xl p-8 md:p-10 group-hover:border-zinc-700 transition-all duration-300 group-hover:shadow-[inset_0_0_80px_rgba(102,177,89,0.1)]"
         >
           <div className="flex flex-col lg:flex-row lg:items-start gap-10">
             {/* Left */}
@@ -87,9 +83,9 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
               {/* Arrow CTA */}
               <div className="inline-flex items-center gap-2 text-[#66B159] text-sm font-sans font-medium group-hover:gap-3 transition-all duration-300">
                 <span>Explore {service.title.replace('\n', ' ')}</span>
-                <motion.svg width="14" height="14" viewBox="0 0 14 14" fill="none" animate={{ x: 0 }} whileHover={{ x: 3 }}>
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-300 group-hover:translate-x-1">
                   <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                </motion.svg>
+                </svg>
               </div>
             </div>
 
@@ -105,16 +101,16 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
               </div>
 
               {/* Hotel image visual */}
-              <motion.div className="surface rounded-xl overflow-hidden" whileHover={{ scale: 1.02, y: -3, filter: 'brightness(1.03)' }} transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}>
-                <Image src={i === 0 ? 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80' : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=900&q=80'} alt={i === 0 ? 'Premium hotel room and revenue-driven experience' : 'Hotel reception and guest journey'} width={900} height={600} className="h-36 w-full object-cover" />
+              <div className="surface rounded-xl overflow-hidden">
+                <Image src={i === 0 ? 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80' : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=900&q=80'} alt={i === 0 ? 'Premium hotel room and revenue-driven experience' : 'Hotel reception and guest journey'} width={900} height={600} className="h-36 w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 <div className="px-5 py-4">
                   <p className="label-upper text-ghost mb-2">Visual positioning</p>
                   <p className="text-sub text-xs leading-relaxed">Stronger listing presentation and pricing clarity create a more bookings.</p>
                 </div>
-              </motion.div>
+              </div>
             </div>
           </div>
-        </motion.div>
+        </div>
       </Link>
     </motion.div>
   )
@@ -130,14 +126,14 @@ export function ServiceCards() {
     >
       {/* Section label */}
       <motion.div
-        className="flex items-center gap-4 mb-16"
+        className="mb-16"
         initial={{ opacity: 0, y: 16 }}
         animate={inView ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.55, ease: ease.out }}
       >
-        <span className="label-upper text-sub">What We Do</span>
-        <div className="flex-1 h-px bg-zinc-800" />
-        <span className="label-upper text-ghost">Two services, one mission</span>
+        <h2 className="headline text-ink">
+          What Do We <span className="text-[#66B159]">Offer</span>
+        </h2>
       </motion.div>
 
       <div className="flex flex-col gap-4">

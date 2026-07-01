@@ -24,7 +24,7 @@ export function MobilePreview() {
           transition={{ duration: 0.7, ease: ease.out }}
         >
           <h2 className="headline text-ink">
-            Take Control of Your Hotel Revenue with <span className="text-[#66B159]">Expert Guidance</span>
+            Take Control of Your Hotel Revenue with <span className="text-[#66B159]"><br />Expert Guidance</span>
           </h2>
         </motion.div>
 

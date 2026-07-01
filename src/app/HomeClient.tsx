@@ -14,7 +14,18 @@ import { ease } from '@/lib/utils'
 
 export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt: string }[] }) {
 
-  const tickerSpeed = 15
+  const [tickerSpeed, setTickerSpeed] = useState(40) 
+
+  useEffect(() => {
+    const handleResize = () => {
+      setTickerSpeed(window.innerWidth >= 768 ? 15 : 40)
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   const heroRef = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
   const headO = useTransform(scrollYProgress, [0, 0.65], [1, 0])
@@ -172,22 +183,6 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
               </div>
             ))}
           </motion.div>
-        </motion.div>
-
-        {/* Scroll hint */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.4, duration: 0.6 }}
-          style={{ opacity: headO }}
-        >
-          <motion.div
-            className="w-px h-10 bg-gradient-to-b from-zinc-700 to-transparent"
-            animate={{ scaleY: [0.3, 1, 0.3], opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <span className="label-upper text-ghost">Scroll</span>
         </motion.div>
       </section>
 
