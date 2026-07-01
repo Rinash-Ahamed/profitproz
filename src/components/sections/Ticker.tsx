@@ -14,7 +14,7 @@ const tickerKeyframes = `
   }
 `
 
-const TickerComponent = ({ logos, duration = 40 }: TickerProps) => {
+const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
   const duplicatedLogos = [...logos, ...logos]
 
   return (

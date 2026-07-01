@@ -14,18 +14,7 @@ import { ease } from '@/lib/utils'
 
 export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt: string }[] }) {
 
-  const [tickerSpeed, setTickerSpeed] = useState(40) 
-
-  useEffect(() => {
-    const handleResize = () => {
-      setTickerSpeed(window.innerWidth >= 768 ? 15 : 40)
-    }
-
-    handleResize()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [])
-
+  const tickerSpeed = 40
   const heroRef = useRef<HTMLElement>(null)
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
   const headO = useTransform(scrollYProgress, [0, 0.65], [1, 0])
@@ -113,8 +102,8 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           <motion.div
             key={activeMessage.lastLine}
             className="max-w-4xl flex flex-col items-start gap-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
             <h1
@@ -138,7 +127,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           >
           <a
             href="/contact"
-            className="inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
+            className="glow-green inline-flex items-center justify-center gap-2 bg-gradient-to-br from-[#66B159] to-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200 w-full sm:w-auto hover:brightness-110"
           >
               Get a Free Revenue Audit
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -167,7 +156,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
 
           {/* Trust row */}
           <motion.div
-            className="flex flex-wrap items-center gap-x-6 gap-y-3"
+            className="flex flex-wrap items-center gap-4 sm:gap-6"
             style={{ opacity: trustO }}
           >
             {[
@@ -176,13 +165,29 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
               { text: 'Launch support in 14 days' },
             ].map((t) => (
               <div key={t.text} className="flex items-center gap-2">
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="none" className="text-[#66B159]">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#66B159]">
                   <path d="M3 6l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="text-sub text-sm font-light">{t.text}</span>
+                <span className="text-ghost text-xs font-sans">{t.text}</span>
               </div>
             ))}
           </motion.div>
+        </motion.div>
+
+        {/* Scroll hint */}
+        <motion.div
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.4, duration: 0.6 }}
+          style={{ opacity: headO }}
+        >
+          <motion.div
+            className="w-px h-10 bg-gradient-to-b from-zinc-700 to-transparent"
+            animate={{ scaleY: [0.3, 1, 0.3], opacity: [0.4, 0.8, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <span className="label-upper text-ghost">Scroll</span>
         </motion.div>
       </section>
 
