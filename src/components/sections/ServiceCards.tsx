@@ -102,7 +102,7 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
 
               {/* Hotel image visual */}
               <div className="surface rounded-xl overflow-hidden">
-                <Image src={i === 0 ? 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=900&q=80' : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=900&q=80'} alt={i === 0 ? 'Premium hotel room and revenue-driven experience' : 'Hotel reception and guest journey'} width={900} height={600} className="h-36 w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                <Image src={i === 0 ? '/images/service-onboarding-visual.jpg' : '/images/service-revenue-visual.jpg'} alt={i === 0 ? 'Premium hotel room and revenue-driven experience' : 'Hotel reception and guest journey'} width={900} height={600} className="h-36 w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 <div className="px-5 py-4">
                   <p className="label-upper text-ghost mb-2">Visual positioning</p>
                   <p className="text-sub text-xs leading-relaxed">Stronger listing presentation and pricing clarity create a more bookings.</p>

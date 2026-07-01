@@ -43,7 +43,7 @@ export function HomeCTA() {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link
                     href="/contact"
-                    className="glow-green inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-7 py-3.5 rounded-lg transition-all duration-200"
+                    className="inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200"
                   >
                     Request Free Audit
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -52,7 +52,7 @@ export function HomeCTA() {
                   </Link>
                   <Link
                     href="/revenue"
-                    className="inline-flex items-center justify-center gap-2 surface-accent text-[#66B159] font-sans font-medium text-sm px-7 py-3.5 rounded-lg transition-colors duration-200 hover:border-[#66B159]/40"
+                    className="inline-flex items-center justify-center gap-2 bg-transparent border border-[#66B159] text-ink hover:bg-[#66B159]/10 font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
                   >
                     See Revenue Services
                   </Link>

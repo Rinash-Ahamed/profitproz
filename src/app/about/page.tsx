@@ -96,7 +96,7 @@ export default function AboutPage() {
             <p className="label-upper text-sub mb-3">Ready to see what’s possible?</p>
             <h3 className="headline text-ink">Let’s map your next revenue gain.</h3>
           </div>
-          <Link href="/contact" className="glow-green inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200">
+          <Link href="/contact" className="inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200">
             Book a Free Audit
           </Link>
         </motion.div>

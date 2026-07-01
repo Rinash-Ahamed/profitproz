@@ -138,7 +138,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           >
           <a
             href="/contact"
-            className="glow-green inline-flex items-center justify-center gap-2 bg-gradient-to-br from-[#66B159] to-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200 w-full sm:w-auto hover:brightness-110"
+            className="inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
           >
               Get a Free Revenue Audit
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">

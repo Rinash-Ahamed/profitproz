@@ -418,7 +418,7 @@ export default function ContactPage() {
                       type="button"
                       onClick={handleSubmit}
                       disabled={loading || !form.name || !form.email || !form.hotel || !form.service}
-                      className="w-full glow-green bg-[#66B159] hover:bg-[#73bd66] disabled:opacity-40 disabled:cursor-not-allowed text-[#FFFCFC] font-sans font-semibold text-sm py-3.5 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
+                      className="w-full bg-[#66B159] hover:bg-[#73bd66] disabled:opacity-40 disabled:cursor-not-allowed text-[#FFFCFC] font-sans font-semibold text-sm py-3.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                       whileTap={{ scale: 0.98 }}
                     >
                       <AnimatePresence mode="wait" initial={false}>
@@ -502,10 +502,10 @@ export default function ContactPage() {
               <p className="label-upper text-[#66B159] mb-4">Our track record</p>
               <div className="space-y-3">
                 {[
-                  { v: '500+', l: 'Hotels managed' },
+                  { v: '10+', l: 'Hotels managed' },
                   { v: '+38%', l: 'Avg RevPAR uplift' },
-                  { v: '7 days', l: 'OTA go-live time' },
-                  { v: '98%', l: 'Client retention' },
+                  { v: '3 days', l: 'OTA go-live time' },
+                  { v: '99%', l: 'Client retention' },
                 ].map((s) => (
                   <div key={s.l} className="flex items-center justify-between">
                     <span className="text-sub text-xs font-sans">{s.l}</span>
@@ -514,40 +514,6 @@ export default function ContactPage() {
                 ))}
               </div>
             </div>
-
-            {/* Images */}
-            <div className="grid grid-cols-1 gap-4">
-              {[
-                {
-                  src: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
-                  alt: 'Luxury hotel suite with premium interiors',
-                  href: 'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80',
-                },
-                {
-                  src: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-                  alt: 'Modern hotel reception and lobby',
-                  href: 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?auto=format&fit=crop&w=1200&q=80',
-                },
-                {
-                  src: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
-                  alt: 'Upscale resort view with hospitality atmosphere',
-                  href: 'https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?auto=format&fit=crop&w=1200&q=80',
-                },
-              ].map((item) => (
-                <a
-                  key={item.src}
-                  href={item.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group relative block h-48 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]"
-                >
-                  <Image
-                    src={item.src}
-                    alt={item.alt}
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
-                </a>
               ))}
             </div>
           </motion.div>
