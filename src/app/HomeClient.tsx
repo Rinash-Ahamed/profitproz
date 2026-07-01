@@ -1,6 +1,6 @@
 'use client'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'framer-motion'
 import Image from 'next/image'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
@@ -15,12 +15,15 @@ import { ease } from '@/lib/utils'
 export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt: string }[] }) {
 
   const tickerSpeed = 40
-  const heroRef = useRef<HTMLElement>(null)
-  const { scrollYProgress } = useScroll({ target: heroRef, offset: ['start start', 'end start'] })
-  const headO = useTransform(scrollYProgress, [0, 0.65], [1, 0])
-  const ctaO = useTransform(scrollYProgress, [0, 0.2, 0.45], [1, 0.94, 0.2])
-  const trustO = useTransform(scrollYProgress, [0, 0.25, 0.55], [1, 0.94, 0.2])
   const [messageIndex, setMessageIndex] = useState(0)
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const checkIsMobile = () => setIsMobile(window.innerWidth < 768)
+    checkIsMobile()
+    window.addEventListener('resize', checkIsMobile)
+    return () => window.removeEventListener('resize', checkIsMobile)
+  }, [])
 
   const heroMessages = useMemo(
     () => [
@@ -54,19 +57,27 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────── */}
-      <section ref={heroRef} className="relative min-h-[96vh] flex flex-col justify-center pt-20 overflow-hidden">
+      <section className="relative min-h-[96vh] flex flex-col justify-center pt-20 overflow-hidden">
 
         {/* Video Background */}
         <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="w-full h-full object-cover"
-            style={{ maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)' }}
-            src="/grow.mp4"
-          />
+          {isMobile ? (
+            <Image
+              src="/images/hero-background.jpg" // Placeholder: Add a suitable static image
+              alt="Abstract background"
+              fill
+              priority
+              className="w-full h-full object-cover"
+              style={{ maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)' }}
+            />
+          ) : (
+            <video
+              autoPlay loop muted playsInline
+              className="w-full h-full object-cover"
+              style={{ maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)' }}
+              src="/grow.mp4"
+            />
+          )}
           <div className="absolute inset-0 bg-zinc-1000/70" />
         </div>
 
@@ -83,10 +94,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         <div className="absolute top-[60%] right-[14%] w-1 h-1 rounded-full bg-[#66B159] pulse-dot" style={{ animationDelay: '1s' }} />
         <div className="absolute top-[42%] right-[34%] w-1 h-1 rounded-full bg-zinc-600 pulse-dot" style={{ animationDelay: '1.8s' }} />
 
-        <motion.div
-          style={{ opacity: headO }}
-          className="relative z-10 max-w-6xl mx-auto w-full px-6 md:px-10"
-        >
+        <div className="relative z-10 max-w-6xl mx-auto w-full px-6 md:px-10">
           {/* Live status pill */}
           <motion.div
             className="inline-flex items-center gap-2.5 glass-pill px-4 py-2 rounded-full mb-10"
@@ -102,8 +110,8 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           <motion.div
             key={activeMessage.lastLine}
             className="max-w-4xl flex flex-col items-start gap-4"
-            initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
             <h1
@@ -121,13 +129,10 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           </motion.div>
 
           {/* CTA row */}
-          <motion.div
-            className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-12 mt-8"
-            style={{ opacity: ctaO }}
-          >
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-12 mt-8">
           <a
             href="/contact"
-            className="glow-green inline-flex items-center justify-center gap-2 bg-gradient-to-br from-[#66B159] to-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-all duration-200 w-full sm:w-auto hover:brightness-110"
+            className="inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
           >
               Get a Free Revenue Audit
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -152,13 +157,10 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
             >
               Hotel Onboarding
             </a>
-          </motion.div>
+          </div>
 
           {/* Trust row */}
-          <motion.div
-            className="flex flex-wrap items-center gap-4 sm:gap-6"
-            style={{ opacity: trustO }}
-          >
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
             {[
               { text: 'Early-stage growth focus' },
               { text: 'No lock-in contracts' },
@@ -168,11 +170,11 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#66B159]">
                   <path d="M3 6l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                 </svg>
-                <span className="text-ghost text-xs font-sans">{t.text}</span>
+                <span className="text-sub text-sm font-sans">{t.text}</span>
               </div>
             ))}
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
 
         {/* Scroll hint */}
         <motion.div
@@ -180,7 +182,6 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.4, duration: 0.6 }}
-          style={{ opacity: headO }}
         >
           <motion.div
             className="w-px h-10 bg-gradient-to-b from-zinc-700 to-transparent"
