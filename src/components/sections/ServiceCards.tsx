@@ -102,7 +102,7 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
 
               {/* Hotel image visual */}
               <div className="surface rounded-xl overflow-hidden">
-                <Image src={i === 0 ? '/images/service-onboarding-visual.jpg' : '/images/service-revenue-visual.jpg'} alt={i === 0 ? 'Premium hotel room and revenue-driven experience' : 'Hotel reception and guest journey'} width={900} height={600} className="h-36 w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                <Image src={i === 0 ? '/images/service-revenue-visual.jpg' : '/images/service-onboarding-visual.jpg'} alt={i === 0 ? 'Premium hotel room and revenue-driven experience' : 'Hotel reception and guest journey'} width={900} height={600} className="h-36 w-full object-cover transition-transform duration-300 group-hover:scale-105" />
                 <div className="px-5 py-4">
                   <p className="label-upper text-ghost mb-2">Visual positioning</p>
                   <p className="text-sub text-xs leading-relaxed">Stronger listing presentation and pricing clarity create a more bookings.</p>
@@ -132,7 +132,7 @@ export function ServiceCards() {
         transition={{ duration: 0.55, ease: ease.out }}
       >
         <h2 className="headline text-ink">
-          What Do We <span className="text-[#66B159]">Offer</span>
+          What Do We Offer? <span className="text-[#66B159]">Discover Our Services</span>
         </h2>
       </motion.div>
 

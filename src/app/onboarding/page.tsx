@@ -348,7 +348,7 @@ export default function OnboardingPage() {
             The process is proven, the timeline is real, and we've done it for hotels across India - from 10-room boutiques to 200-room city hotels.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href="/contact" className="glow-green inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-all duration-200">
+            <Link href="/contact" className="inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-colors duration-200">
               Start My Onboarding
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Link>

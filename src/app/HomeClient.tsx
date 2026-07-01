@@ -113,8 +113,8 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           <motion.div
             key={activeMessage.lastLine}
             className="max-w-4xl flex flex-col items-start gap-4"
-            initial={{ opacity: 0, y: 20, filter: 'blur(4px)' }}
-            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
             <h1

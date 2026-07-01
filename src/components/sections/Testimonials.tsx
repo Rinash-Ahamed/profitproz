@@ -143,11 +143,16 @@ export function Testimonials() {
 
         <motion.p
           className="text-ghost text-xs font-sans mt-8 flex items-center gap-2"
-          initial={{ opacity: 0 }}
-          animate={inView ? { opacity: 1 } : {}}
-          transition={{ duration: 0.5, delay: 0.4 }}
+          initial={{ opacity: 0, x: 0 }}
+          animate={inView ? { opacity: 1, x: [0, -8, 0] } : { opacity: 0, x: 0 }}
+          transition={{
+            opacity: { duration: 0.5, delay: 0.4 },
+            x: { duration: 1.5, repeat: Infinity, ease: 'easeInOut', delay: 1.2 },
+          }}
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M12 7H2m4 4l-4-4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
           Drag to explore more testimonials
         </motion.p>
       </div>
