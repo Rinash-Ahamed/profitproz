@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff;">
           <div style="margin-bottom: 20px;">
-            <img src="/mainlogo.png" alt="ProfitPro logo" width="180" style="display: block;" />
+            <img src="/profitpro.png" alt="ProfitPro logo" width="180" style="display: block;" />
           </div>
 
           <h2 style="margin: 0 0 12px; color: #111827; font-size: 22px;">New contact form submission</h2>

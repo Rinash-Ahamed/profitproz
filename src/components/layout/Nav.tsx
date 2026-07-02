@@ -36,7 +36,7 @@ export function Nav() {
       transition={{ duration: 0.7, ease: ease.out, delay: 0.1 }}
     >
       <div
-        className={`flex items-center justify-between h-16 px-6 md:px-10 transition-colors duration-300 ${
+        className={`flex items-center justify-between h-24 px-6 md:px-10 transition-colors duration-300 ${
           scrolled
             ? `bg-zinc-950/90 border-b ${!open ? 'border-zinc-800' : 'border-transparent'}`
             : 'bg-transparent border-b border-transparent'
@@ -44,7 +44,7 @@ export function Nav() {
       >
         {/* Logo */}
         <Link href="/" className="flex items-center group flex-shrink-0">
-          <Image src="/profitpro.png" alt="ProfitPro logo" width={240} height={240} className="h-20 sm:h-[5rem] w-auto object-contain" />
+          <Image src="/profitpro.png" alt="ProfitPro logo" width={320} height={320} className="h-40 w-auto object-contain" />
         </Link>
 
         {/* Right side items */}
@@ -53,6 +53,7 @@ export function Nav() {
           <nav className="hidden md:flex items-center gap-1">
             {links.map((l) => {
               const isExternal = l.href.startsWith('http')
+              const isActive = path === l.href || (l.href === '/#testimonials' && path === '/')
               return isExternal ? (
                 <a
                   key={l.href}
@@ -68,7 +69,7 @@ export function Nav() {
                   key={l.href}
                   href={l.href}
                   className={`px-3.5 py-2 rounded-lg text-sm font-sans transition-colors duration-200 ${
-                    path === l.href ? 'text-ink' : 'text-sub hover:text-ink'
+                    isActive ? 'text-ink' : 'text-sub hover:text-ink'
                   }`}
                 >
                   {l.label}
@@ -123,6 +124,7 @@ export function Nav() {
             <div className="p-3 flex flex-col gap-0.5">
               {links.map((l) => {
                 const isExternal = l.href.startsWith('http')
+                const isActive = path === l.href || (l.href === '/#testimonials' && path === '/')
                 return isExternal ? (
                   <a
                     key={l.href}
@@ -140,7 +142,7 @@ export function Nav() {
                     href={l.href}
                     onClick={() => setOpen(false)}
                     className={`px-3.5 py-3 rounded-lg text-sm font-sans transition-colors duration-150 ${
-                      path === l.href ? 'text-ink' : 'text-sub hover:text-ink'
+                      isActive ? 'text-ink' : 'text-sub hover:text-ink'
                     }`}
                   >
                     {l.label}
