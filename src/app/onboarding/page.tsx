@@ -9,7 +9,7 @@ const stages = [
   {
     day: 'Day 1',
     title: 'Assessment & Account Setup',
-    icon: '◈',
+    icon: '◉',
     desc: 'We start with a thorough assessment of your property, then register and verify you on all major OTA platforms simultaneously. This includes handling paperwork, compliance, and extranet access.',
     tasks: [
       'Existing OTA audit and performance review',
@@ -23,7 +23,7 @@ const stages = [
   {
     day: 'Day 2',
     title: 'Content & Rate Configuration',
-    icon: '◎',
+    icon: '◉',
     desc: 'We write platform-specific descriptions, configure amenities, and sequence photos for maximum impact. Simultaneously, we build your rate structure, load seasonal pricing, and establish parity monitoring from day one.',
     tasks: [
       'SEO-optimised property descriptions for each platform',

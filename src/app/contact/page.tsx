@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { ease } from '@/lib/utils'
+import { useInView } from '@/hooks/useInView'
 
 /* ── Form state types ───────────────────────────────── */
 type FormData = {
@@ -131,6 +132,8 @@ export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, boolean>>>({})
+  const formSection = useInView(0.15)
+  const faqSection = useInView(0.15)
   const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -232,14 +235,14 @@ export default function ContactPage() {
       </section>
 
       {/* ── FORM + SIDEBAR ──────────────────────────── */}
-      <section ref={formSec.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
+      <section ref={formSection.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
         <div className="flex justify-center">
 
           {/* Form - 2 cols */}
           <motion.div
             className="w-full max-w-3xl"
             initial={{ opacity: 0, y: 24 }}
-            animate={formSec.inView ? { opacity: 1, y: 0 } : {}}
+            animate={formSection.inView ? { opacity: 1, y: 0 } : {}}
             transition={{ duration: 0.7, ease: ease.out }}
           >
             <AnimatePresence mode="wait">
@@ -436,11 +439,11 @@ export default function ContactPage() {
       </section>
 
       {/* ── FAQ ─────────────────────────────────────── */}
-      <section ref={faqSec.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-3xl mx-auto">
+      <section ref={faqSection.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-3xl mx-auto">
         <motion.div
           className="mb-10"
           initial={{ opacity: 0, y: 16 }}
-          animate={faqSec.inView ? { opacity: 1, y: 0 } : {}}
+          animate={faqSection.inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, ease: ease.out }}
         >
           <p className="label-upper text-sub mb-3">FAQ</p>
