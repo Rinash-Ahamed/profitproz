@@ -57,8 +57,7 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
             <div className="flex-1 min-w-0">
               <p className="label-upper text-[#66B159] mb-5">{service.tag}</p>
               <h2
-                className="text-ink mb-5 whitespace-pre-line"
-                style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, lineHeight: 1.05, letterSpacing: '-0.035em' }}
+                className="text-ink mb-5 whitespace-pre-line text-4xl md:text-5xl font-bold leading-tight tracking-tighter"
               >
                 {service.title}
               </h2>
@@ -94,19 +93,10 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
               {/* Metric card */}
               <div className="surface-accent rounded-xl px-5 py-5">
                 <p className="label-upper text-[#66B159] mb-2">{service.metric.label}</p>
-                <p className="text-ink font-sans font-bold tracking-tight mb-1" style={{ fontSize: '2.5rem', lineHeight: 1 }}>
+                <p className="text-ink font-sans font-bold tracking-tight leading-none text-5xl mb-1">
                   {service.metric.value}
                 </p>
                 <p className="text-ghost text-xs font-sans">{service.metric.sub}</p>
-              </div>
-
-              {/* Hotel image visual */}
-              <div className="surface rounded-xl overflow-hidden">
-                <Image src={i === 0 ? '/images/service-revenue-visual.jpg' : '/images/service-onboarding-visual.jpg'} alt={i === 0 ? 'Premium hotel room and revenue-driven experience' : 'Hotel reception and guest journey'} width={900} height={600} className="h-36 w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-                <div className="px-5 py-4">
-                  <p className="label-upper text-ghost mb-2">Visual positioning</p>
-                  <p className="text-sub text-xs leading-relaxed">Stronger listing presentation and pricing clarity create a more bookings.</p>
-                </div>
               </div>
             </div>
           </div>

@@ -4,7 +4,7 @@ import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { useInView } from '@/hooks/useInView'
 import { useCounter } from '@/hooks/useCounter'
-import { ease } from '@/lib/utils'
+import { ease, formatNumber } from '@/lib/utils'
 import Link from 'next/link'
 
 /* ── Services ───────────────────────────────────────── */
@@ -76,7 +76,7 @@ function KPI({ pre, n, suf, label, active }: { pre: string; n: number; suf: stri
     <div className="surface-accent rounded-xl p-6">
       <p className="label-upper text-sub mb-3">{label}</p>
       <p className="font-sans font-bold text-ink tracking-tight" style={{ fontSize: '2.6rem', lineHeight: 1 }}>
-        <span className="text-[#66B159]">{pre}</span>{v.toLocaleString()}<span className="text-[#66B159]">{suf}</span>
+        <span className="text-[#66B159]">{pre}</span>{formatNumber(v)}<span className="text-[#66B159]">{suf}</span>
       </p>
     </div>
   )

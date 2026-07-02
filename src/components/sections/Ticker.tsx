@@ -1,6 +1,6 @@
 'use client'
 import Image from 'next/image'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 
 type TickerProps = {
   logos: { src: string; alt: string }[]
@@ -16,6 +16,16 @@ const tickerKeyframes = `
 
 const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
   const duplicatedLogos = [...logos, ...logos]
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const updateViewport = () => setIsMobile(window.innerWidth < 768)
+    updateViewport()
+    window.addEventListener('resize', updateViewport)
+    return () => window.removeEventListener('resize', updateViewport)
+  }, [])
+
+  const effectiveDuration = isMobile ? Math.max(duration + 8, 36) : duration
 
   return (
     <div className="relative w-full overflow-hidden">
@@ -25,12 +35,17 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
 
       <style>{tickerKeyframes}</style>
       <div
-        className="flex items-center"
+        className="flex items-center flex-nowrap"
         style={{
-          animation: `ticker ${duration}s linear infinite`,
+          animation: `ticker ${effectiveDuration}s linear infinite`,
           width: 'max-content',
           willChange: 'transform',
           backfaceVisibility: 'hidden',
+          WebkitBackfaceVisibility: 'hidden',
+          transform: 'translate3d(0, 0, 0)',
+          WebkitTransform: 'translate3d(0, 0, 0)',
+          contain: 'paint layout',
+          transformOrigin: 'left center',
         } as React.CSSProperties}
       >
         {duplicatedLogos.map((logo, i) => (

@@ -1,8 +1,8 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import Image from 'next/image'
 import { Nav } from '@/components/layout/Nav'
+import Image from 'next/image'
 import { Footer } from '@/components/layout/Footer'
 import { Ticker } from '@/components/sections/Ticker'
 import { MobilePreview } from '@/components/sections/MobilePreview'
@@ -63,7 +63,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
           {isMobile ? (
             <Image
-              src="/images/hero-background.jpg" // Placeholder: Add a suitable static image
+              src="/images/hero-background.jpg" // Add a static background image here
               alt="Abstract background"
               fill
               priority
@@ -73,6 +73,8 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           ) : (
             <video
               autoPlay loop muted playsInline
+              preload="metadata"
+              poster="/images/hero-background.jpg" // Use a static image as a poster
               className="w-full h-full object-cover"
               style={{ maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)' }}
               src="/grow.mp4"
@@ -115,8 +117,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           >
             <h1
-              className="display-xl text-ink leading-[0.98] tracking-[-0.035em] max-w-4xl"
-              style={{ fontSize: 'clamp(2.5rem, 7vw, 6rem)' }}
+              className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-ink font-bold leading-none tracking-tighter max-w-4xl"
             >
               {activeMessage.titleLines.map((line, i) => <span key={i}>{line}<br /></span>)}
               <span style={{ color: activeMessage.theme.accent }}>{activeMessage.lastLine}</span>
@@ -176,20 +177,6 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           </div>
         </div>
 
-        {/* Scroll hint */}
-        <motion.div
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.4, duration: 0.6 }}
-        >
-          <motion.div
-            className="w-px h-10 bg-gradient-to-b from-zinc-700 to-transparent"
-            animate={{ scaleY: [0.3, 1, 0.3], opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-          />
-          <span className="label-upper text-ghost">Scroll</span>
-        </motion.div>
       </section>
 
       {/* ── LIVE TICKER ──────────────────────────────── */}
@@ -201,10 +188,14 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       )}
 
       {/* ── MOBILE PREVIEW ───────────────────────────── */}
-      <MobilePreview />
+      <div className="pt-2 md:pt-4">
+        <MobilePreview />
+      </div>
 
       {/* ── SERVICES ─────────────────────────────────── */}
-      <ServiceCards />
+      <div className="pt-24 md:pt-28">
+        <ServiceCards />
+      </div>
 
       {/* ── STATS ────────────────────────────────────── */}
       <Stats />

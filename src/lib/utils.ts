@@ -5,6 +5,12 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export function formatNumber(value: number, locale = 'en-IN') {
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
 // Luxury easing - used everywhere for consistency
 export const ease = {
   out: [0.16, 1, 0.3, 1] as [number, number, number, number],

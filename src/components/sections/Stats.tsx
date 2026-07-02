@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion'
 import { useInView } from '@/hooks/useInView'
 import { useCounter } from '@/hooks/useCounter'
-import { ease } from '@/lib/utils'
+import { ease, formatNumber } from '@/lib/utils'
 
 const data = [
   { pre: '', value: 10, suf: '+', label: 'Hotels Managed' },
@@ -26,7 +26,7 @@ function Stat({ item, active, i }: { item: typeof data[0]; active: boolean; i: n
       )}
       <div className="font-sans text-3xl md:text-4xl font-bold text-ink tracking-tight mb-1.5">
         <span className="text-[#66B159]">{item.pre}</span>
-        {n.toLocaleString()}
+        {formatNumber(n)}
         <span className="text-[#66B159]">{item.suf}</span>
       </div>
       <p className="label-upper text-ghost">{item.label}</p>

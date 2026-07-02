@@ -157,12 +157,28 @@ export default function ContactPage() {
     });
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) return;
-
+  
     setLoading(true)
-
-    await new Promise((r) => setTimeout(r, 1400))
-    setLoading(false)
-    setSubmitted(true)
+  
+    try {
+      const response = await fetch('/api/submit-contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+  
+      if (response.ok) {
+        setSubmitted(true);
+      } else {
+        console.error('API submission failed:', await response.json());
+        alert('Failed to submit form. Please try again later.'); // User feedback for API errors
+      }
+    } catch (error) {
+      console.error('Network or API error:', error);
+      alert('An unexpected error occurred. Please try again later.'); // User feedback for network errors
+    } finally {
+      setLoading(false);
+    }
   }
 
   const inputClass =
@@ -462,7 +478,7 @@ export default function ContactPage() {
           transition={{ duration: 0.6, ease: ease.out }}
         >
           <p className="label-upper text-sub mb-3">FAQ</p>
-          <h2 className="font-sans font-bold text-ink" style={{ fontSize: 'clamp(1.75rem, 4vw, 2.5rem)', letterSpacing: '-0.03em', lineHeight: 1.1 }}>
+          <h2 className="text-3xl md:text-4xl font-bold text-ink tracking-tight leading-tight">
             Questions we hear often
           </h2>
         </motion.div>
