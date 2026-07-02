@@ -1,9 +1,5 @@
 'use client'
-import { motion } from 'framer-motion'
 import Link from 'next/link'
-import Image from 'next/image'
-import { useInView } from '@/hooks/useInView'
-import { ease } from '@/lib/utils'
 
 const services = [
   {
@@ -40,17 +36,12 @@ const services = [
   },
 ]
 
-function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: number; inView: boolean }) {
+function ServiceCard({ service }: { service: typeof services[0] }) {
   return (
-    <motion.div
-      className="group"
-      initial={{ opacity: 0, y: 24 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: i * 0.15 }}
-    >
+    <div className="group">
       <Link href={service.href} className="block">
         <div
-          className="surface rounded-2xl p-8 md:p-10 group-hover:border-zinc-600 transition-colors duration-300"
+          className="surface rounded-2xl p-8 md:p-10 transition-colors duration-300 md:group-hover:border-zinc-600"
         >
           <div className="flex flex-col lg:flex-row lg:items-start gap-10">
             {/* Left */}
@@ -80,9 +71,9 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
               </div>
 
               {/* Arrow CTA */}
-              <div className="inline-flex items-center gap-2 text-[#66B159] text-sm font-sans font-medium group-hover:gap-3 transition-all duration-300">
+              <div className="inline-flex items-center gap-2 text-[#66B159] text-sm font-sans font-medium">
                 <span>Explore {service.title.replace('\n', ' ')}</span>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-300 group-hover:translate-x-1">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="md:transition-transform md:duration-300 md:group-hover:translate-x-1">
                   <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>
@@ -102,33 +93,25 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
           </div>
         </div>
       </Link>
-    </motion.div>
+    </div>
   )
 }
 
 export function ServiceCards() {
-  const { ref, inView } = useInView(0.08)
-
   return (
     <section
-      ref={ref as React.RefObject<HTMLElement>}
       className="py-24 md:py-32 px-6 md:px-10 max-w-6xl mx-auto"
     >
       {/* Section label */}
-      <motion.div
-        className="mb-16"
-        initial={{ opacity: 0, y: 16 }}
-        animate={inView ? { opacity: 1, y: 0 } : {}}
-        transition={{ duration: 0.55, ease: ease.out }}
-      >
+      <div className="mb-16">
         <h2 className="headline text-ink">
           What Do We Offer? <span className="text-[#66B159]">Discover Our Services</span>
         </h2>
-      </motion.div>
+      </div>
 
       <div className="flex flex-col gap-4">
-        {services.map((s, i) => (
-          <ServiceCard key={s.tag} service={s} i={i} inView={inView} />
+        {services.map((s) => (
+          <ServiceCard key={s.tag} service={s} />
         ))}
       </div>
     </section>
