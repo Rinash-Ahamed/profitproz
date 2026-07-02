@@ -95,7 +95,7 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
                 <p className="text-ghost text-xs font-sans">{service.metric.sub}</p>
               </div>
 
-              <div className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/70 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
+              <div className="hidden lg:block overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/70 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
                 <Image
                   src={service.image}
                   alt={service.imageAlt}
