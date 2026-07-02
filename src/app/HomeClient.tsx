@@ -170,12 +170,12 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       )}
 
       {/* ── MOBILE PREVIEW ───────────────────────────── */}
-      <div className="pt-2 md:pt-4">
+      <div className="pt-2 md:pt-3">
         <MobilePreview />
       </div>
 
       {/* ── SERVICES ─────────────────────────────────── */}
-      <div className="pt-24 md:pt-28">
+      <div className="-mt-6 md:-mt-8 pt-6 md:pt-8">
         <ServiceCards />
       </div>
 

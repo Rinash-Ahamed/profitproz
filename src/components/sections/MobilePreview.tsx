@@ -10,7 +10,7 @@ const mobileImages = [
 
 export function MobilePreview() {
   return (
-    <section className="py-24 md:py-32 px-6 md:px-10">
+    <section className="pt-10 pb-8 md:pt-16 md:pb-10 px-6 md:px-10">
       <div className="max-w-6xl mx-auto text-center">
         {/* Header */}
         <div>

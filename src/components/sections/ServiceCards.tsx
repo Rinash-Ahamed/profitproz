@@ -100,7 +100,7 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
 export function ServiceCards() {
   return (
     <section
-      className="py-24 md:py-32 px-6 md:px-10 max-w-6xl mx-auto"
+      className="pt-6 pb-20 md:pt-8 md:pb-24 px-6 md:px-10 max-w-6xl mx-auto"
     >
       {/* Section label */}
       <div className="mb-16">
