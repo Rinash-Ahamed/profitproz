@@ -38,18 +38,49 @@ export async function POST(request: NextRequest) {
     await transporter.sendMail({
       from: process.env.SMTP_FROM || process.env.SMTP_USER,
       to: 'support@profitproz.com',
-      subject: 'New contact form submission',
-      text: [
-        'New contact form submission:',
-        '',
-        `Name: ${name}`,
-        `Email: ${email || 'N/A'}`,
-        `Phone: ${phone}`,
-        `Hotel: ${hotel}`,
-        `Rooms: ${rooms || 'N/A'}`,
-        `Service: ${service}`,
-        `Message: ${message || 'N/A'}`,
-      ].join('\n'),
+      subject: `New enquiry from ${name}`,
+      text: `New enquiry from ${name} via the website.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px; background: #ffffff;">
+          <div style="margin-bottom: 20px;">
+            <img src="/mainlogo.png" alt="ProfitPro logo" width="180" style="display: block;" />
+          </div>
+
+          <h2 style="margin: 0 0 12px; color: #111827; font-size: 22px;">New contact form submission</h2>
+          <p style="margin: 0 0 18px; color: #6b7280;">A new inquiry was submitted from the website.</p>
+
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827; width: 120px;">Name</td>
+              <td style="padding: 8px 0; color: #374151;">${name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827;">Email</td>
+              <td style="padding: 8px 0; color: #374151;">${email || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827;">Phone</td>
+              <td style="padding: 8px 0; color: #374151;">${phone}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827;">Hotel</td>
+              <td style="padding: 8px 0; color: #374151;">${hotel}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827;">Rooms</td>
+              <td style="padding: 8px 0; color: #374151;">${rooms || 'N/A'}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827;">Service</td>
+              <td style="padding: 8px 0; color: #374151;">${service}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #111827; vertical-align: top;">Message</td>
+              <td style="padding: 8px 0; color: #374151; white-space: pre-wrap;">${message || 'N/A'}</td>
+            </tr>
+          </table>
+        </div>
+      `,
     })
 
     return NextResponse.json({ success: true, message: 'Form submitted successfully.' })
