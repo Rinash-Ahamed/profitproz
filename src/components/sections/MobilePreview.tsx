@@ -2,8 +2,8 @@
 import Image from 'next/image'
 
 const mobileImages = [
-  { src: '/mobile/mobo1.png', alt: 'revenue insights' },
-  { src: '/mobile/mobo2.png', alt: 'competitor rates' },
+  { src: '/mobile/mob1.png', alt: 'revenue insights' },
+  { src: '/mobile/mob2.png', alt: 'competitor rates' },
   { src: '/mobile/mobo3.png', alt: 'occupancy overview' },
   { src: '/mobile/mobo4.png', alt: 'dynamic pricing controls' },
 ]
