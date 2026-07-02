@@ -36,9 +36,9 @@ export function Nav() {
       transition={{ duration: 0.7, ease: ease.out, delay: 0.1 }}
     >
       <div
-        className={`flex items-center justify-between h-16 px-6 md:px-10 transition-colors duration-300 backdrop-blur-lg saturate-150 ${
+        className={`flex items-center justify-between h-16 px-6 md:px-10 transition-colors duration-300 ${
           scrolled
-            ? `bg-zinc-950/70 border-b ${!open ? 'border-zinc-800' : 'border-transparent'}`
+            ? `bg-zinc-950/90 border-b ${!open ? 'border-zinc-800' : 'border-transparent'}`
             : 'bg-transparent border-b border-transparent'
         }`}
       >
@@ -114,7 +114,7 @@ export function Nav() {
       <AnimatePresence>
         {open && (
           <motion.div
-            className="md:hidden bg-zinc-950/80 backdrop-blur-lg border-b border-zinc-800"
+            className="md:hidden bg-zinc-950/95 border-b border-zinc-800"
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}

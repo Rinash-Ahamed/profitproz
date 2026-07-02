@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Nav } from '@/components/layout/Nav'
-import Image from 'next/image'
 import { Footer } from '@/components/layout/Footer'
 import { Ticker } from '@/components/sections/Ticker'
 import { MobilePreview } from '@/components/sections/MobilePreview'
@@ -16,14 +15,6 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
 
   const tickerSpeed = 40
   const [messageIndex, setMessageIndex] = useState(0)
-  const [isMobile, setIsMobile] = useState(false)
-
-  useEffect(() => {
-    const checkIsMobile = () => setIsMobile(window.innerWidth < 768)
-    checkIsMobile()
-    window.addEventListener('resize', checkIsMobile)
-    return () => window.removeEventListener('resize', checkIsMobile)
-  }, [])
 
   const heroMessages = useMemo(
     () => [
@@ -57,30 +48,21 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────── */}
-      <section className="relative min-h-[96vh] flex flex-col justify-center pt-20 overflow-hidden">
+      <section className="relative min-h-[88svh] md:min-h-[96vh] flex flex-col justify-center pt-20 pb-12 md:pb-0 overflow-hidden">
 
         {/* Video Background */}
         <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
-          {isMobile ? (
-            <Image
-              src="/images/hero-background.jpg" // Add a static background image here
-              alt="Abstract background"
-              fill
-              priority
-              className="w-full h-full object-cover"
-              style={{ maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)' }}
-            />
-          ) : (
-            <video
-              autoPlay loop muted playsInline
-              preload="metadata"
-              poster="/images/hero-background.jpg" // Use a static image as a poster
-              className="w-full h-full object-cover"
-              style={{ maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)' }}
-              src="/grow.mp4"
-            />
-          )}
-          <div className="absolute inset-0 bg-zinc-1000/70" />
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="metadata"
+            className="h-full w-full object-cover [content-visibility:visible]"
+            style={{ maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)' }}
+            src="/grow.mp4"
+          />
+          <div className="absolute inset-0 bg-zinc-1000/60 md:bg-zinc-1000/70" />
         </div>
 
         <div

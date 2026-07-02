@@ -50,7 +50,7 @@ function ServiceCard({ service, i, inView }: { service: typeof services[0]; i: n
     >
       <Link href={service.href} className="block">
         <div
-          className="surface rounded-2xl p-8 md:p-10 group-hover:border-zinc-700 transition-all duration-300 group-hover:shadow-[inset_0_0_80px_rgba(102,177,89,0.1)]"
+          className="surface rounded-2xl p-8 md:p-10 group-hover:border-zinc-600 transition-colors duration-300"
         >
           <div className="flex flex-col lg:flex-row lg:items-start gap-10">
             {/* Left */}
