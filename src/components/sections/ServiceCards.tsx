@@ -41,7 +41,7 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
     <div className="group">
       <Link href={service.href} className="block">
         <div
-          className="surface rounded-2xl p-8 md:p-10 transition-colors duration-300 md:group-hover:border-zinc-600"
+          className="surface rounded-2xl p-8 md:p-10"
         >
           <div className="flex flex-col lg:flex-row lg:items-start gap-10">
             {/* Left */}
@@ -73,7 +73,7 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
               {/* Arrow CTA */}
               <div className="inline-flex items-center gap-2 text-[#66B159] text-sm font-sans font-medium">
                 <span>Explore {service.title.replace('\n', ' ')}</span>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="md:transition-transform md:duration-300 md:group-hover:translate-x-1">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                   <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>

@@ -17,10 +17,6 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-img, video {
-  content-visibility: auto;
-}
-
 * {
   will-change: auto;
 }
