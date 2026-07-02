@@ -49,6 +49,8 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
 
       {/* ── HERO ─────────────────────────────────────── */}
       <section className="relative min-h-[88svh] md:min-h-[96vh] flex flex-col justify-center pt-20 pb-12 md:pb-0 overflow-hidden">
+        <div className="ambient-glow left-[-8rem] top-[8rem] h-56 w-56" />
+        <div className="ambient-glow right-[-6rem] top-[16rem] h-72 w-72" style={{ animationDelay: '2s' }} />
 
         {/* Video Background */}
         <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
@@ -170,12 +172,12 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       )}
 
       {/* ── MOBILE PREVIEW ───────────────────────────── */}
-      <div className="pt-2 md:pt-3">
+      <div className="pt-2 md:pt-4">
         <MobilePreview />
       </div>
 
       {/* ── SERVICES ─────────────────────────────────── */}
-      <div className="-mt-6 md:-mt-8 pt-6 md:pt-8">
+      <div className="-mt-2 md:-mt-4 pt-2 md:pt-4">
         <ServiceCards />
       </div>
 

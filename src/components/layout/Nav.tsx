@@ -44,7 +44,7 @@ export function Nav() {
       >
         {/* Logo */}
         <Link href="/" className="flex items-center group flex-shrink-0">
-          <Image src="/profitpro.png" alt="ProfitPro logo" width={150} height={150} className="h-16 w-auto object-contain" />
+          <Image src="/profitpro.png" alt="ProfitPro logo" width={240} height={240} className="h-20 sm:h-[5rem] w-auto object-contain" />
         </Link>
 
         {/* Right side items */}

@@ -25,7 +25,7 @@ export function Footer() {
           {/* Brand column */}
           <div className="lg:col-span-1">
             <Link href="" className="block mb-5">
-              <Image src="/profitpro.png" alt="ProfitPro logo" width={150} height={150} className="h-16 w-auto object-contain" />
+              <Image src="/profitpro.png" alt="ProfitPro logo" width={240} height={240} className="h-20 w-auto object-contain" />
             </Link>
             <p className="text-sub text-sm leading-relaxed mb-6 max-w-[220px]">
               Hotel revenue management and full OTA distribution - handled end-to-end, so you earn more without the complexity.

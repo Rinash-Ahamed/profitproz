@@ -56,11 +56,11 @@ export function Testimonials() {
     <section
       id="testimonials"
       ref={ref as React.RefObject<HTMLElement>}
-      className="py-24 md:py-32 px-6 md:px-10 border-t border-zinc-800"
+      className="pt-16 pb-20 md:pt-20 md:pb-24 px-6 md:px-10 border-t border-zinc-800"
     >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <AnimatedSection className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-14" y={16} amount={0.1}>
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 md:mb-12">
           <div>
             <h2 className="headline text-ink">
               Heard directly from <span className="text-[#66B159]">hotel owners.</span>
@@ -77,7 +77,7 @@ export function Testimonials() {
             <span className="text-ink text-sm font-sans font-semibold">4.8</span>
             <span className="text-sub text-xs font-sans">from 80+ reviews</span>
           </div>
-        </AnimatedSection>
+        </div>
 
         {/* Horizontal Carousel */}
         <motion.div
@@ -92,12 +92,9 @@ export function Testimonials() {
             transition={{ duration: 0.8, ease: ease.out }}
           >
             {testimonials.map((t, i) => (
-              <motion.div
+              <div
                 key={t.author}
                 className="min-w-[90vw] sm:min-w-[450px] rounded-2xl border border-zinc-800 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-7 flex flex-col justify-between shadow-[0_20px_60px_rgba(0,0,0,0.2)]"
-                initial={{ opacity: 0, y: 22, scale: 0.98 }}
-                animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: i * 0.1 }}
               >
                 {/* Metric badge */}
                 <div className="flex items-center justify-between mb-5">
@@ -136,25 +133,17 @@ export function Testimonials() {
                     <p className="text-ghost text-xs font-sans">{t.role} · {t.hotel}</p>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </motion.div>
         </motion.div>
 
-        <motion.p
-          className="text-ghost text-xs font-sans mt-8 flex items-center gap-2"
-          initial={{ opacity: 0, x: 0 }}
-          animate={inView ? { opacity: 1, x: [0, -8, 0] } : { opacity: 0, x: 0 }}
-          transition={{
-            opacity: { duration: 0.5, delay: 0.4 },
-            x: { duration: 1.5, repeat: Infinity, ease: 'easeInOut', delay: 1.2 },
-          }}
-        >
+        <p className="text-ghost text-xs font-sans mt-6 flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M12 7H2m4 4l-4-4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Drag to explore more testimonials
-        </motion.p>
+        </p>
       </div>
     </section>
   )

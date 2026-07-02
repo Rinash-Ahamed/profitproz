@@ -111,6 +111,23 @@ body {
               0 12px 48px rgba(102, 177, 89, 0.35);
 }
 
+/* ─── Lightweight ambient background glow ───────────── */
+@keyframes ambient-glow {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.35; }
+  50% { transform: translate3d(3%, -2%, 0) scale(1.04); opacity: 0.55; }
+}
+
+.ambient-glow {
+  position: absolute;
+  inset: auto;
+  pointer-events: none;
+  border-radius: 9999px;
+  filter: blur(70px);
+  background: radial-gradient(circle, rgba(102, 177, 89, 0.22) 0%, rgba(102, 177, 89, 0) 70%);
+  animation: ambient-glow 10s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
 /* ─── Reveal clip ────────────────────────────────────── */
 .clip-reveal {
   clip-path: inset(0 100% 0 0);

@@ -1,4 +1,5 @@
 'use client'
+import Image from 'next/image'
 import Link from 'next/link'
 
 const services = [
@@ -16,6 +17,8 @@ const services = [
       'Go-Live Monitoring - ensure your listing is live and correct',
     ],
     metric: { label: 'Average go-live time', value: '3 Days', sub: 'across all major OTAs' },
+    image: '/service-onboarding.svg',
+    imageAlt: 'Hotel onboarding dashboard preview',
     dir: 1,
   },
   {
@@ -32,6 +35,8 @@ const services = [
       'Weekly Revenue Reports - clear, actionable, one page',
     ],
     metric: { label: 'Average RevPAR uplift', value: '+38%', sub: 'across our portfolio' },
+    image: '/service-revenue-v2.svg',
+    imageAlt: 'Revenue management dashboard preview',
     dir: -1,
   },
 ]
@@ -89,6 +94,16 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
                 </p>
                 <p className="text-ghost text-xs font-sans">{service.metric.sub}</p>
               </div>
+
+              <div className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/70 p-2 shadow-[0_12px_40px_rgba(0,0,0,0.22)]">
+                <Image
+                  src={service.image}
+                  alt={service.imageAlt}
+                  width={320}
+                  height={640}
+                  className="h-auto w-full rounded-xl object-cover"
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -100,10 +115,10 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
 export function ServiceCards() {
   return (
     <section
-      className="pt-6 pb-20 md:pt-8 md:pb-24 px-6 md:px-10 max-w-6xl mx-auto"
+      className="pt-8 pb-20 md:pt-10 md:pb-24 px-6 md:px-10 max-w-6xl mx-auto"
     >
       {/* Section label */}
-      <div className="mb-16">
+      <div className="mb-10 md:mb-12">
         <h2 className="headline text-ink">
           What Do We Offer? <span className="text-[#66B159]">Discover Our Services</span>
         </h2>
