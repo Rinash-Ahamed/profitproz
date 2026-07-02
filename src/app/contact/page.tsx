@@ -1,10 +1,8 @@
 'use client'
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import Image from 'next/image'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
-import { useInView } from '@/hooks/useInView'
 import { ease } from '@/lib/utils'
 
 /* ── Form state types ───────────────────────────────── */
@@ -52,16 +50,9 @@ const faqs = [
 
 function FAQItem({ item, i }: { item: typeof faqs[0]; i: number }) {
   const [open, setOpen] = useState(i === 0)
-  const { ref, inView } = useInView<HTMLDivElement>(0.2)
 
   return (
-    <motion.div
-      ref={ref}
-      className="border-b border-zinc-800"
-      initial={{ opacity: 0, y: 12 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.5, ease: ease.out, delay: i * 0.05 }}
-    >
+    <div className="border-b border-zinc-800">
       <button
         className="w-full flex items-center justify-between py-5 text-left group"
         onClick={() => setOpen(!open)}
@@ -92,7 +83,7 @@ function FAQItem({ item, i }: { item: typeof faqs[0]; i: number }) {
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   )
 }
 
@@ -140,10 +131,6 @@ export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, boolean>>>({})
-  const hero = useInView(0.1)
-  const formSec = useInView(0.05)
-  const faqSec = useInView(0.05)
-
   const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -189,9 +176,9 @@ export default function ContactPage() {
       <Nav />
 
       {/* ── HERO ────────────────────────────────────── */}
-      <section ref={hero.ref as React.RefObject<HTMLElement>} className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+      <section className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
         {/* Subtle animated background */}
-        <motion.div
+        <div
           className="absolute inset-0 -z-10 pointer-events-none"
           style={{
             backgroundImage: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(102, 177, 89, 0.1), transparent),
@@ -199,49 +186,28 @@ export default function ContactPage() {
                             radial-gradient(ellipse 50% 40% at 80% 100%, rgba(102, 177, 89, 0.08), transparent)`,
             backgroundRepeat: 'no-repeat',
           }}
-          initial={{ opacity: 0, scale: 1.1 }}
-          animate={hero.inView ? { opacity: 1, scale: 1 } : {}}
-          transition={{ duration: 1.2, ease: ease.out }}
         />
 
         <div>
-          <motion.div
-            className="flex items-center gap-3 mb-8"
-            initial={{ opacity: 0, y: 16 }}
-            animate={hero.inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, ease: ease.out, delay: 0.1 }}
-          >
+          <div className="flex items-center gap-3 mb-8">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Contact Us</span>
-          </motion.div>
+          </div>
 
           {/* Staggered headline */}
           <div className="mb-5">
-            <motion.h1
-              className="headline text-ink"
-              initial={{ opacity: 0, y: 20 }}
-              animate={hero.inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.9, ease: ease.out, delay: 0.2 }}
-            >
+            <h1 className="headline text-ink">
               Let's grow your <span className="text-[#66B159]">hotel revenue.</span>
-            </motion.h1>
+            </h1>
           </div>
 
-          <motion.p className="text-sub text-lg max-w-lg leading-relaxed"
-            initial={{ opacity: 0, y: 16 }}
-            animate={hero.inView ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, ease: ease.out, delay: 0.45 }}>
+          <p className="text-sub text-lg max-w-lg leading-relaxed">
             Start with a free audit - no commitment. We’re a new market entrant focused on helping hotels in Tamil Nadu unlock stronger revenue performance from day one.
-          </motion.p>
+          </p>
         </div>
 
         {/* Contact info cards */}
-        <motion.div
-          className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12"
-          initial={{ opacity: 0, y: 20 }}
-          animate={hero.inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease: ease.out, delay: 0.55 }}
-        >
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12">
           {contactCards.map((c) => {
             const Inner = (
               <div className="surface rounded-xl p-5 flex items-start gap-4 hover:border-zinc-600 transition-colors duration-200 h-full">
@@ -261,7 +227,7 @@ export default function ContactPage() {
               <div key={c.label}>{Inner}</div>
             )
           })}
-        </motion.div>
+        </div>
 
       </section>
 

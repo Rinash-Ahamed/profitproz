@@ -1,10 +1,7 @@
 'use client'
-import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
-import { useInView } from '@/hooks/useInView'
-import { ease } from '@/lib/utils'
 
 const pillars = [
   {
@@ -22,16 +19,12 @@ const pillars = [
 ]
 
 export default function AboutPage() {
-  const hero = useInView(0.1)
-  const story = useInView(0.1)
-
   return (
     <div className="min-h-screen bg-zinc-1000">
       <Nav />
 
-      <section ref={hero.ref as React.RefObject<HTMLElement>} className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
-        {/* Subtle animated background */}
-        <motion.div
+      <section className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+        <div
           className="absolute inset-0 -z-10 pointer-events-none"
           style={{
             backgroundImage: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(102, 177, 89, 0.1), transparent),
@@ -39,15 +32,8 @@ export default function AboutPage() {
                             radial-gradient(ellipse 50% 40% at 80% 100%, rgba(102, 177, 89, 0.08), transparent)`,
             backgroundRepeat: 'no-repeat',
           }}
-          initial={{ opacity: 0, scale: 1.1 }}
-          animate={hero.inView ? { opacity: 1, scale: 1 } : {}}
-          transition={{ duration: 1.2, ease: ease.out }}
         />
-        <motion.div
-          initial={{ opacity: 0, y: 24 }}
-          animate={hero.inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, ease: ease.out }}
-        >
+        <div>
           <div className="flex items-center gap-3 mb-8">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">About ProfitPro</span>
@@ -58,15 +44,12 @@ export default function AboutPage() {
           <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed">
             ProfitPro is a revenue and distribution partner for independent hotels that want sharper pricing, stronger OTA presence, and less operational complexity.
           </p>
-        </motion.div>
+        </div>
       </section>
 
-      <section ref={story.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
-        <motion.div
+      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
+        <div
           className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8"
-          initial={{ opacity: 0, y: 24 }}
-          animate={story.inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, ease: ease.out, delay: 0.1 }}
         >
           <div className="surface rounded-2xl p-8 md:p-10">
             <p className="label-upper text-[#66B159] mb-4">Why we exist</p>
@@ -84,13 +67,10 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
+        <div
           className="mt-8 surface rounded-2xl p-8 md:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
-          initial={{ opacity: 0, y: 24 }}
-          animate={story.inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, ease: ease.out, delay: 0.2 }}
         >
           <div>
             <p className="label-upper text-sub mb-3">Ready to see what’s possible?</p>
@@ -99,7 +79,7 @@ export default function AboutPage() {
           <Link href="/contact" className="inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200">
             Book a Free Audit
           </Link>
-        </motion.div>
+        </div>
       </section>
 
       <Footer />

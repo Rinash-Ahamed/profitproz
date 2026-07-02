@@ -1,10 +1,9 @@
 'use client'
-import { motion } from 'framer-motion'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { useInView } from '@/hooks/useInView'
 import { useCounter } from '@/hooks/useCounter'
-import { ease, formatNumber } from '@/lib/utils'
+import { formatNumber } from '@/lib/utils'
 import Link from 'next/link'
 
 /* ── Services ───────────────────────────────────────── */
@@ -83,20 +82,16 @@ function KPI({ pre, n, suf, label, active }: { pre: string; n: number; suf: stri
 }
 
 export default function RevenuePage() {
-  const hero  = useInView(0.1)
   const kpi   = useInView(0.2)
-  const svc   = useInView(0.08)
-  const proc  = useInView(0.08)
-  const cta   = useInView(0.2)
 
   return (
     <div className="min-h-screen bg-zinc-1000">
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────── */}
-      <section ref={hero.ref as React.RefObject<HTMLElement>} className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+      <section className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
         {/* Subtle animated background */}
-        <motion.div
+        <div
           className="absolute inset-0 -z-10 pointer-events-none"
           style={{
             backgroundImage: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(102, 177, 89, 0.1), transparent),
@@ -104,11 +99,8 @@ export default function RevenuePage() {
                             radial-gradient(ellipse 50% 40% at 80% 100%, rgba(102, 177, 89, 0.08), transparent)`,
             backgroundRepeat: 'no-repeat',
           }}
-          initial={{ opacity: 0, scale: 1.1 }}
-          animate={hero.inView ? { opacity: 1, scale: 1 } : {}}
-          transition={{ duration: 1.2, ease: ease.out }}
         />
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={hero.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.8, ease: ease.out }}>
+        <div>
           <div className="flex items-center gap-3 mb-8">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Revenue Management</span>
@@ -128,7 +120,7 @@ export default function RevenuePage() {
               Also need OTA setup ?
             </Link>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* ── KPIs ─────────────────────────────────────── */}
@@ -141,20 +133,17 @@ export default function RevenuePage() {
       </section>
 
       {/* ── SERVICES ─────────────────────────────────── */}
-      <section ref={svc.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-24">
-        <motion.div className="mb-12" initial={{ opacity: 0, y: 16 }} animate={svc.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
+      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-24">
+        <div className="mb-12">
           <p className="label-upper text-sub mb-3">What's Included</p>
           <h2 className="headline text-ink">Six disciplines <span className="text-[#66B159]">One Outcome</span></h2>
           <p className="text-sub text-sm max-w-xl mt-4 leading-relaxed">Revenue management isn't a single lever. It's six instruments played simultaneously. We conduct all of them.</p>
-        </motion.div>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {services.map((s, i) => (
-            <motion.div
+          {services.map((s) => (
+            <div
               key={s.title}
-              className="surface rounded-xl p-7 hover:border-zinc-600 transition-all duration-200 cursor-default group flex flex-col"
-              initial={{ opacity: 0, y: 20 }}
-              animate={svc.inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.55, ease: ease.out, delay: i * 0.07 }}
+              className="surface rounded-xl p-7 cursor-default group flex flex-col"
             >
               <h3 className="font-sans font-semibold text-ink text-sm mb-3">{s.title}</h3>
               <p className="text-sub text-xs leading-relaxed mb-5 flex-1">{s.description}</p>
@@ -162,32 +151,25 @@ export default function RevenuePage() {
                 <div className="w-1 h-1 rounded-full bg-[#66B159] flex-shrink-0" />
                 <span className="text-[#66B159] text-xs font-sans">{s.result}</span>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </section>
 
       {/* ── PROCESS ──────────────────────────────────── */}
-      <section ref={proc.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-4xl mx-auto">
-        <motion.div className="mb-12" initial={{ opacity: 0, y: 16 }} animate={proc.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
+      <section className="px-6 md:px-10 pb-24 max-w-4xl mx-auto">
+        <div className="mb-12">
           <p className="label-upper text-sub mb-3">How It Works</p>
           <h2 className="headline text-ink">Audit to performance in <span className="text-[#66B159]">three weeks.</span></h2>
-        </motion.div>
+        </div>
         <div className="relative">
           <div className="absolute left-[19px] top-5 bottom-5 w-px bg-zinc-800" />
           <div className="space-y-9">
-            {process.map((p, i) => (
-              <motion.div key={p.title} className="flex gap-6"
-                initial={{ opacity: 0, x: -16 }}
-                animate={proc.inView ? { opacity: 1, x: 0 } : {}}
-                transition={{ duration: 0.6, ease: ease.out, delay: i * 0.09 }}
-              >
+            {process.map((p) => (
+              <div key={p.title} className="flex gap-6">
                 <div className="relative z-10 w-10 h-10 rounded-full surface flex items-center justify-center flex-shrink-0">
-                  <motion.div
+                  <div
                     className="w-2.5 h-2.5 rounded-full bg-[#66B159]"
-                    initial={{ scale: 0 }}
-                    animate={proc.inView ? { scale: 1 } : {}}
-                    transition={{ duration: 0.4, ease: 'easeOut', delay: i * 0.09 + 0.3 }}
                   />
                 </div>
                 <div className="pt-2 pb-2">
@@ -197,19 +179,16 @@ export default function RevenuePage() {
                   </div>
                   <p className="text-sub text-sm leading-relaxed">{p.description}</p>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
       </section>
 
       {/* ── CTA ──────────────────────────────────────── */}
-      <section ref={cta.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
-        <motion.div
+      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
+        <div
           className="surface rounded-2xl p-12 md:p-16 text-center"
-          initial={{ opacity: 0, y: 24 }}
-          animate={cta.inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease: ease.out }}
         >
           <p className="label-upper text-[#66B159] mb-5">Free, No Obligation</p>
           <h2 className="headline text-ink mb-4">See what your revenue <span className="text-[#66B159]">could look like.</span></h2>
@@ -220,7 +199,7 @@ export default function RevenuePage() {
             Request Your Free Audit
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </Link>
-        </motion.div>
+        </div>
       </section>
 
       <Footer />

@@ -1,10 +1,7 @@
 'use client'
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
-import { useInView } from '@/hooks/useInView'
-import { ease } from '@/lib/utils'
 import Link from 'next/link'
 
 /* ── Journey stages ─────────────────────────────────── */
@@ -55,10 +52,6 @@ const stages = [
 
 export default function OnboardingPage() {
   const [active, setActive] = useState(0)
-  const hero    = useInView(0.1)
-  const journey = useInView(0.05)
-  const why     = useInView(0.1)
-  const cta     = useInView(0.2)
 
   const stage = stages[active]
 
@@ -67,9 +60,8 @@ export default function OnboardingPage() {
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────── */}
-      <section ref={hero.ref as React.RefObject<HTMLElement>} className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
-        {/* Subtle animated background */}
-        <motion.div
+      <section className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+        <div
           className="absolute inset-0 -z-10 pointer-events-none"
           style={{
             backgroundImage: `radial-gradient(ellipse 80% 60% at 50% -10%, rgba(102, 177, 89, 0.1), transparent),
@@ -77,11 +69,8 @@ export default function OnboardingPage() {
                             radial-gradient(ellipse 50% 40% at 80% 100%, rgba(102, 177, 89, 0.08), transparent)`,
             backgroundRepeat: 'no-repeat',
           }}
-          initial={{ opacity: 0, scale: 1.1 }}
-          animate={hero.inView ? { opacity: 1, scale: 1 } : {}}
-          transition={{ duration: 1.2, ease: ease.out }}
         />
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={hero.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.8, ease: ease.out }}>
+        <div>
           <div className="flex items-center gap-3 mb-8">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Hotel Onboarding</span>
@@ -117,16 +106,13 @@ export default function OnboardingPage() {
               Also need revenue management ?
             </Link>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* ── WHY IT'S HARD ────────────────────────────── */}
-      <section ref={why.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-20 max-w-6xl mx-auto">
-        <motion.div
+      <section className="px-6 md:px-10 pb-20 max-w-6xl mx-auto">
+        <div
           className="surface rounded-2xl p-8 md:p-10"
-          initial={{ opacity: 0, y: 20 }}
-          animate={why.inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.65, ease: ease.out }}
         >
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
             <div>
@@ -160,18 +146,18 @@ export default function OnboardingPage() {
               ))}
             </div>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       {/* ── JOURNEY ──────────────────────────────────── */}
-      <section ref={journey.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-20">
-        <motion.div className="mb-10" initial={{ opacity: 0, y: 16 }} animate={journey.inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
+      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-20">
+        <div className="mb-10">
           <p className="label-upper text-sub mb-3">The Process</p>
           <h2 className="headline text-ink">Three days <span className="text-[#66B159]">Step by step</span></h2>
-        </motion.div>
+        </div>
 
         {/* Progress bar */}
-        <motion.div className="flex gap-1 mb-8" initial={{ opacity: 0 }} animate={journey.inView ? { opacity: 1 } : {}} transition={{ duration: 0.5 }}>
+        <div className="flex gap-1 mb-8">
           {stages.map((_, i) => (
             <button
               key={i}
@@ -180,17 +166,14 @@ export default function OnboardingPage() {
               style={{ backgroundColor: i <= active ? '#66B159' : '#27272A' }}
               onClick={() => setActive(i)} />
           ))}
-        </motion.div>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
           {/* Stage list */}
           <div className="lg:col-span-2 space-y-1">
             {stages.map((s, i) => (
-              <motion.button key={s.title} className={`w-full text-left px-4 py-3.5 rounded-xl flex items-center gap-3 transition-all duration-200 ${active === i ? 'surface-accent' : 'hover:bg-zinc-900'}`}
+              <button key={s.title} className={`w-full text-left px-4 py-3.5 rounded-xl flex items-center gap-3 transition-colors duration-200 ${active === i ? 'surface-accent' : 'hover:bg-zinc-900'}`}
                 onClick={() => setActive(i)}
-                initial={{ opacity: 0, x: -12 }}
-                animate={journey.inView ? { opacity: 1, x: 0 } : {}}
-                transition={{ delay: i * 0.05 + 0.15, duration: 0.5, ease: ease.out }}
               >
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 text-sm"
                   style={{ backgroundColor: active === i ? 'rgba(102, 177, 89, 0.18)' : '#1C1C1F', color: active === i ? '#66B159' : '#52525B', border: active === i ? '1px solid rgba(102, 177, 89, 0.28)' : '1px solid #27272A' }}>
@@ -200,19 +183,13 @@ export default function OnboardingPage() {
                   <p className={`font-sans text-sm font-medium truncate ${active === i ? 'text-ink' : 'text-sub'}`}>{s.title}</p>
                   <p className="label-upper text-ghost">{s.day}</p>
                 </div>
-              </motion.button>
+              </button>
             ))}
           </div>
 
           {/* Stage detail */}
           <div className="lg:col-span-3">
-            <AnimatePresence mode="wait">
-              <motion.div key={stage.title} className="surface-accent rounded-2xl p-8 h-full flex flex-col"
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.35, ease: ease.out }}
-              >
+            <div key={stage.title} className="surface-accent rounded-2xl p-8 h-full flex flex-col">
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <div>
                     <p className="label-upper text-[#66B159] mb-1.5">{stage.day}</p>
@@ -247,19 +224,14 @@ export default function OnboardingPage() {
                     <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                 )}
-              </motion.div>
-            </AnimatePresence>
+            </div>
           </div>
         </div>
       </section>
 
       {/* ── CTA ──────────────────────────────────────── */}
-      <section ref={cta.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
-        <motion.div className="surface rounded-2xl p-12 md:p-16 text-center"
-          initial={{ opacity: 0, y: 24 }}
-          animate={cta.inView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.7, ease: ease.out }}
-        >
+      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
+        <div className="surface rounded-2xl p-12 md:p-16 text-center">
           <p className="label-upper text-[#66B159] mb-5">500+ Hotels Onboarded</p>
           <h2 className="headline text-ink mb-4">3 days to fully live <span className="text-[#66B159]">Let's begin today.</span></h2>
           <p className="text-sub text-sm max-w-md mx-auto mb-10 leading-relaxed">
@@ -274,7 +246,7 @@ export default function OnboardingPage() {
               Add Revenue Management
             </Link>
           </div>
-        </motion.div>
+        </div>
       </section>
 
       <Footer />
