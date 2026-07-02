@@ -14,7 +14,7 @@ const contactCards = [
     ),
     label: 'Email',
     value: 'support@profitproz.com',
-    sub: 'We reply within 4 hours',
+    sub: 'Our team will respond within 12 hours',
     href: 'mailto:support@profitproz.com',
   },
   {
@@ -74,7 +74,7 @@ export default function ContactPage() {
           </div>
 
           <p className="text-sub text-lg max-w-lg leading-relaxed">
-            Start with a free audit - no commitment. We’re a new market entrant focused on helping hotels in Tamil Nadu unlock stronger revenue performance from day one.
+            Begin with a complimentary revenue performance audit and receive tailored recommendations to maximize occupancy, ADR, and overall profitability.
           </p>
         </div>
 

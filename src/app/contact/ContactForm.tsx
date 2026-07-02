@@ -108,7 +108,7 @@ export function ContactForm() {
                   Message received
                 </motion.h3>
                 <motion.p className="text-sub text-sm max-w-xs leading-relaxed mb-8" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: ease.out, delay: 0.6 }}>
-                  We'll review your property details and get back to you within 4 hours with next steps.
+                  We'll review your property details and get back to you within 12 hours with next steps.
                 </motion.p>
                 <motion.button
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5, ease: ease.out, delay: 0.8 }}
