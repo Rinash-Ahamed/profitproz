@@ -37,7 +37,7 @@ const contactCards = [
     ),
     label: 'Office',
     value: 'Coimbatore, India',
-    sub: 'Serving hotels across India',
+    sub: 'Partnering with hotels across India',
     href: undefined,
   },
 ]

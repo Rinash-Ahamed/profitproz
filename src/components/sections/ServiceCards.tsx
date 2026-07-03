@@ -120,7 +120,7 @@ export function ServiceCards() {
       {/* Section label */}
       <div className="mb-10 md:mb-12">
         <h2 className="headline text-ink">
-          What Do We Offer? <span className="text-[#66B159]">Discover Our Services</span>
+          What We Offer? <span className="text-[#66B159]">Discover Our Services</span>
         </h2>
       </div>
 

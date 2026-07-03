@@ -6,7 +6,7 @@ import { useInView } from '@/hooks/useInView'
 const points = [
   { icon: '◉', heading: 'Free revenue audit', body: 'A full analysis of your pricing, OTA position, and competitor rates - delivered as a clear report.' },
   { icon: '◉', heading: 'No commitment needed', body: 'Read the audit, take the recommendations, and only engage us if it makes sense for your business.' },
-  { icon: '◉', heading: 'Results in 14 days', body: 'Most hotels see measurable improvement in occupancy or rate within the first two weeks.' },
+  { icon: '◉', heading: 'Results in a month', body: 'Many partner hotels begin seeing measurable gains in occupancy and average room rates within just a few weeks.' },
 ]
 
 export function HomeCTA() {
