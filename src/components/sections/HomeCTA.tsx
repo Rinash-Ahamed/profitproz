@@ -43,10 +43,10 @@ export function HomeCTA() {
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link
                     href="/contact"
-                    className="inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200"
+                    className="group inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200"
                   >
                     Request Free Audit
-                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-200 group-hover:translate-x-1">
                       <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </Link>

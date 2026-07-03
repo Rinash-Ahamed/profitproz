@@ -101,10 +101,10 @@ export function Nav() {
             {/* CTA */}
             <Link
               href="/contact"
-              className="hidden lg:flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] text-xs font-sans font-semibold px-4 py-2 rounded-lg transition-colors duration-200"
+              className="group hidden lg:flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] text-xs font-sans font-semibold px-4 py-2 rounded-lg transition-colors duration-200"
             >
               Free Audit
-              <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+              <svg width="11" height="11" viewBox="0 0 11 11" fill="none" className="transition-transform duration-200 group-hover:translate-x-0.5">
                 <path d="M1.5 5.5h8M6 2l3.5 3.5L6 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
             </Link>

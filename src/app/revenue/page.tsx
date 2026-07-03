@@ -112,9 +112,9 @@ export default function RevenuePage() {
             Most hotels price based on intuition and what worked last year. We replace that with a data-driven revenue engine - competitor rates tracked daily, demand signals captured in advance, and pricing adjusted to maximise what you earn every single night.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link href="/contact" className="inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200">
+            <Link href="/contact" className="group inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200">
               Get a Free Revenue Audit
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-200 group-hover:translate-x-1"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Link>
             <Link href="/onboarding" className="inline-flex items-center justify-center bg-transparent border border-[#66B159] text-ink hover:bg-[#66B159]/10 font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200">
               Also need OTA setup ?
@@ -195,9 +195,9 @@ export default function RevenuePage() {
           <p className="text-sub text-sm max-w-lg mx-auto mb-10 leading-relaxed">
             We'll audit your current pricing strategy, OTA positioning, and competitor rates - then show you the gap and exactly what we'd do to close it.
           </p>
-          <Link href="/contact" className="inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-colors duration-200">
+          <Link href="/contact" className="group inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-colors duration-200">
             Request Your Free Audit
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-200 group-hover:translate-x-1"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </Link>
         </div>
       </section>

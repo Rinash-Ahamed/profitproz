@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import Image from 'next/image'
+import { motion } from 'framer-motion'
 
 const services = [
   { label: 'Revenue Management', href: '/revenue' },
@@ -24,8 +25,13 @@ export function Footer() {
 
           {/* Brand column */}
           <div className="lg:col-span-1">
-            <Link href="" className="block mb-5">
-              <Image src="/profitpro.png" alt="ProfitPro logo" width={240} height={240} className="h-20 w-auto object-contain" />
+            <Link href="/" className="block mb-5">
+              <motion.div
+                animate={{ scale: [1, 1.02, 1] }}
+                transition={{ duration: 2.5, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' }}
+              >
+                <Image src="/profitpro.png" alt="ProfitPro logo" width={240} height={240} className="h-20 w-auto object-contain" />
+              </motion.div>
             </Link>
             <p className="text-sub text-sm leading-relaxed mb-6 max-w-[220px]">
               Hotel revenue management and full OTA distribution - handled end-to-end, so you earn more without the complexity.

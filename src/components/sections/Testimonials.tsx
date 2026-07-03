@@ -138,12 +138,16 @@ export function Testimonials() {
           </motion.div>
         </motion.div>
 
-        <p className="text-ghost text-xs font-sans mt-6 flex items-center gap-2">
+        <motion.p
+          className="text-ghost text-xs font-sans mt-6 flex items-center gap-2"
+          animate={{ x: [0, -4, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' }}
+        >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M12 7H2m4 4l-4-4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           Drag to explore more testimonials
-        </p>
+        </motion.p>
       </div>
     </section>
   )

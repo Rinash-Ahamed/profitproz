@@ -98,9 +98,9 @@ export default function OnboardingPage() {
           </div>
 
           <div className="flex flex-wrap gap-3">
-            <Link href="/contact" className="inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200">
+            <Link href="/contact" className="group inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200">
               Start Onboarding
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-200 group-hover:translate-x-1"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Link>
             <Link href="/revenue" className="inline-flex items-center justify-center bg-transparent border border-[#66B159] text-ink hover:bg-[#66B159]/10 font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200">
               Also need revenue management ?
@@ -218,10 +218,10 @@ export default function OnboardingPage() {
                 </div>
 
                 {active < stages.length - 1 && (
-                  <button className="mt-4 flex items-center gap-2 text-ghost hover:text-sub text-xs font-sans transition-colors duration-200"
+                  <button className="group mt-4 flex items-center gap-2 text-ghost hover:text-sub text-xs font-sans transition-colors duration-200"
                     onClick={() => setActive(active + 1)}>
                     <span>Next: {stages[active + 1].title}</span>
-                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="transition-transform duration-200 group-hover:translate-x-1"><path d="M2 6h8M6 2l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   </button>
                 )}
             </div>
@@ -237,10 +237,10 @@ export default function OnboardingPage() {
           <p className="text-sub text-sm max-w-md mx-auto mb-10 leading-relaxed">
             The process is proven, the timeline is real, and we've done it for hotels across India - from 10 room to 100+ room city hotels.
           </p>
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <Link href="/contact" className="inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-colors duration-200">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Link href="/contact" className="group inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-colors duration-200">
               Start My Onboarding
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-200 group-hover:translate-x-1"><path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
             </Link>
             <Link href="/revenue" className="inline-flex items-center justify-center bg-transparent border border-[#66B159] text-ink hover:bg-[#66B159]/10 font-sans text-sm px-6 py-3 rounded-lg transition-colors duration-200">
               Add Revenue Management

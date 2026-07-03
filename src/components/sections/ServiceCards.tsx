@@ -78,7 +78,7 @@ function ServiceCard({ service }: { service: typeof services[0] }) {
               {/* Arrow CTA */}
               <div className="inline-flex items-center gap-2 text-[#66B159] text-sm font-sans font-medium">
                 <span>Explore {service.title.replace('\n', ' ')}</span>
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-300 group-hover:translate-x-1">
                   <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </div>

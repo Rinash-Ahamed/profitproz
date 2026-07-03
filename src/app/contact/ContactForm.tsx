@@ -233,7 +233,7 @@ export function ContactForm() {
                     type="button"
                     onClick={handleSubmit}
                     disabled={loading || !form.name || !form.phone || !form.hotel || !form.service}
-                    className="w-full bg-[#66B159] hover:bg-[#73bd66] disabled:opacity-40 disabled:cursor-not-allowed text-[#FFFCFC] font-sans font-semibold text-sm py-3.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                    className="group w-full bg-[#66B159] hover:bg-[#73bd66] disabled:opacity-40 disabled:cursor-not-allowed text-[#FFFCFC] font-sans font-semibold text-sm py-3.5 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                     whileTap={{ scale: 0.98 }}
                   >
                     <AnimatePresence mode="wait" initial={false}>
@@ -249,7 +249,7 @@ export function ContactForm() {
                     ) : (
                       <>
                         Request Free Audit
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="transition-transform duration-200 group-hover:translate-x-1">
                           <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </>
