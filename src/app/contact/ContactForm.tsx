@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useInView } from '@/hooks/useInView'
 import { ease } from '@/lib/utils'
@@ -25,6 +25,13 @@ export function ContactForm() {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, boolean>>>({})
   const { ref, inView } = useInView(0.15)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (submitted) {
+      containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [submitted]);
 
   const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -70,6 +77,7 @@ export function ContactForm() {
     <section ref={ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
       <div className="flex justify-center">
         <motion.div
+          ref={containerRef}
           className="w-full max-w-3xl"
           initial={{ opacity: 0, y: 24 }}
           animate={inView ? { opacity: 1, y: 0 } : {}}
