@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "publish:check": "npm run type-check && npm run build",
+    "version:patch": "npm version patch --no-git-tag-version",
+    "version:minor": "npm version minor --no-git-tag-version",
+    "version:major": "npm version major --no-git-tag-version"
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.1",
