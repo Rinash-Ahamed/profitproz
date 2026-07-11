@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, hashPassword, verifySessionToken } from '@/lib/auth'
-import { getStaffById, logAdminAction, updateStaffPasswordAndFlag } from '@/lib/firestore'
+import { updateStaffPasswordAndFlag } from '@/lib/firestore'
 
 const INITIAL_STAFF_PASSWORD = 'Welcome@123'
 
@@ -19,27 +19,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   try {
-    const staffToReset = await getStaffById(staffId)
-
     const newPasswordHash = hashPassword(INITIAL_STAFF_PASSWORD)
     await updateStaffPasswordAndFlag(staffId, newPasswordHash)
-
-    if (staffToReset) {
-      await logAdminAction({
-        actorEmail: user.email,
-        action: 'PASSWORD_RESET',
-        targetId: staffId,
-        details: `Admin reset password for staff member: ${staffToReset.name} (${staffToReset.email}).`,
-      })
-    } else {
-      // Fallback if staff couldn't be fetched but reset was still attempted
-      await logAdminAction({
-        actorEmail: user.email,
-        action: 'PASSWORD_RESET',
-        targetId: staffId,
-        details: `Admin reset password for staff member with ID: ${staffId}.`,
-      })
-    }
 
     return NextResponse.json({
       message: 'Password reset successfully.',
