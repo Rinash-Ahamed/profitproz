@@ -2,6 +2,7 @@ import crypto from 'crypto'
 
 export type StaffRecord = {
   id: string
+  employeeId?: string
   name: string
   email: string
   passwordHash: string
@@ -10,6 +11,7 @@ export type StaffRecord = {
   phone?: string
   address?: string
   details?: string
+  department?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -93,6 +95,29 @@ async function getAccessToken() {
   return cachedAccessToken.token
 }
 
+async function runQuery(query: object) {
+  const config = getFirebaseConfig()
+  if (!config) {
+    throw new Error('Firestore is not configured.')
+  }
+  const accessToken = await getAccessToken()
+  const response = await fetch(`https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/(default)/documents:runQuery`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(query),
+  })
+
+  if (!response.ok) {
+    const error = await response.text()
+    throw new Error(`Firestore query failed: ${error}`)
+  }
+
+  return response.json()
+}
+
 async function firestoreRequest(path: string, init: RequestInit = {}) {
   const config = getFirebaseConfig()
 
@@ -155,6 +180,7 @@ function mapStaff(document: FirestoreDocument): StaffRecord {
 
   return {
     id: document.name.split('/').pop() || '',
+    employeeId: readString(fields.employeeId),
     name: readString(fields.name),
     email: readString(fields.email),
     passwordHash: readString(fields.passwordHash),
@@ -163,6 +189,7 @@ function mapStaff(document: FirestoreDocument): StaffRecord {
     phone: readString(fields.phone),
     address: readString(fields.address),
     details: readString(fields.details),
+    department: readString(fields.department),
     createdAt: fields.createdAt?.timestampValue,
     updatedAt: fields.updatedAt?.timestampValue,
   }
@@ -171,6 +198,7 @@ function mapStaff(document: FirestoreDocument): StaffRecord {
 function staffDocumentFields(staff: Omit<StaffRecord, 'id'>) {
   return {
     fields: {
+      employeeId: { stringValue: staff.employeeId || '' },
       name: { stringValue: staff.name },
       email: { stringValue: staff.email },
       passwordHash: { stringValue: staff.passwordHash },
@@ -179,6 +207,7 @@ function staffDocumentFields(staff: Omit<StaffRecord, 'id'>) {
       phone: { stringValue: staff.phone || '' },
       address: { stringValue: staff.address || '' },
       details: { stringValue: staff.details || '' },
+      department: { stringValue: staff.department || '' },
       createdAt: { timestampValue: staff.createdAt || new Date().toISOString() },
       updatedAt: { timestampValue: staff.updatedAt || new Date().toISOString() },
     },
@@ -223,21 +252,30 @@ export async function getStaffByEmail(email: string) {
     return null
   }
 
-  const response = await firestoreRequest(`/staff/${staffIdFromEmail(email)}`)
+  const results = await runQuery({
+    structuredQuery: {
+      from: [{ collectionId: 'staff' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'email' },
+          op: 'EQUAL',
+          value: { stringValue: email.trim().toLowerCase() },
+        },
+      },
+      limit: 1,
+    },
+  })
 
-  if (response.status === 404) {
-    return null
+  // The result of a query is an array of documents.
+  // We check if the first result has a `document` property.
+  if (Array.isArray(results) && results.length > 0 && results[0].document) {
+    return mapStaff(results[0].document)
   }
 
-  if (!response.ok) {
-    throw new Error('Unable to load staff account.')
-  }
-
-  return mapStaff((await response.json()) as FirestoreDocument)
+  return null
 }
 
-export async function createStaffAccount(input: { name: string; passwordHash: string }) {
-  const capitalizedName = toTitleCase(input.name.trim())
+export async function createStaffAccount(input: { name: string; passwordHash: string; employeeId: string; department: string }) {
   const generatedEmail = emailFromStaffName(input.name)
 
   const existingStaff = await getStaffByEmail(generatedEmail)
@@ -246,6 +284,7 @@ export async function createStaffAccount(input: { name: string; passwordHash: st
     throw new Error('STAFF_EXISTS')
   }
 
+  const capitalizedName = toTitleCase(input.name.trim())
   const now = new Date().toISOString()
   const response = await firestoreRequest(`/staff/${staffIdFromEmail(generatedEmail)}`, {
     method: 'PATCH',
@@ -253,12 +292,14 @@ export async function createStaffAccount(input: { name: string; passwordHash: st
       staffDocumentFields({
         name: capitalizedName,
         email: generatedEmail,
+        employeeId: input.employeeId,
         passwordHash: input.passwordHash,
         active: true,
         mustChangePassword: true,
         phone: '',
         address: '',
         details: '',
+        department: input.department,
         createdAt: now,
         updatedAt: now,
       })
@@ -270,6 +311,20 @@ export async function createStaffAccount(input: { name: string; passwordHash: st
   }
 
   return mapStaff((await response.json()) as FirestoreDocument)
+}
+
+export async function updateStaffAccount(id: string, updates: Partial<Omit<StaffRecord, 'id' | 'passwordHash'>>) {
+  const fieldsToUpdate: Record<string, FirestoreValue> = {
+    updatedAt: { timestampValue: new Date().toISOString() },
+  }
+
+  if (updates.name !== undefined) fieldsToUpdate.name = { stringValue: toTitleCase(updates.name) }
+  if (updates.email !== undefined) fieldsToUpdate.email = { stringValue: updates.email.toLowerCase() }
+  if (updates.employeeId !== undefined) fieldsToUpdate.employeeId = { stringValue: updates.employeeId }
+  if (updates.department !== undefined) fieldsToUpdate.department = { stringValue: updates.department }
+  if (updates.active !== undefined) fieldsToUpdate.active = { booleanValue: updates.active }
+
+  return mapStaff(await patchDocument('staff', id, fieldsToUpdate))
 }
 
 export async function updateStaffProfile(email: string, input: { phone: string; address: string; details: string }) {

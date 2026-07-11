@@ -68,10 +68,10 @@ export function LoginForm() {
                 <span className="label-upper text-white/80">Team access</span>
               </div>
               <h1 className="max-w-lg text-5xl font-bold leading-[1.02] tracking-tight text-white">
-                Revenue operations <span className="text-[#66B159]">start here...</span>
+                Revenue operations <span className="text-[#66B159]">start here</span>
               </h1>
               <p className="mt-5 max-w-md text-base leading-7 text-white/70">
-                Turn Portential Into Profit.
+                Turn Potential Into Profit.
               </p>
             </div>
           </div>
