@@ -378,7 +378,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <button
                             type="submit"
                             disabled={loading}
-                            className="glow-green mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none sm:w-auto sm:px-6"
+                            className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none sm:w-auto sm:px-6"
                           >
                             {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                             Add staff
@@ -501,7 +501,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   <button
                     type="submit"
                     disabled={loading}
-                    className="glow-green mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none sm:w-auto sm:px-6"
+                    className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none sm:w-auto sm:px-6"
                   >
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
                     Change password
@@ -617,7 +617,7 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: StaffRecord; onClos
 
           <div className="mt-8 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="flex h-11 items-center justify-center rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub transition-colors hover:border-zinc-600 hover:text-ink">Cancel</button>
-            <button type="submit" disabled={loading} className="glow-green flex h-11 w-28 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="submit" disabled={loading} className="flex h-11 w-28 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
             </button>
           </div>
