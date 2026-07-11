@@ -23,6 +23,7 @@ export function ContactForm() {
   const [form, setForm] = useState<FormData>(initialForm)
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [formError, setFormError] = useState('')
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, boolean>>>({})
   const { ref, inView } = useInView(0.15)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -30,8 +31,28 @@ export function ContactForm() {
   useEffect(() => {
     if (submitted) {
       containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      const timer = setTimeout(() => {
+        setSubmitted(false)
+        setForm(initialForm)
+      }, 3000)
+      return () => clearTimeout(timer)
     }
   }, [submitted]);
+
+  useEffect(() => {
+    if (Object.keys(errors).length === 0) return
+
+    const timer = setTimeout(() => setErrors({}), 3000)
+    return () => clearTimeout(timer)
+  }, [errors])
+
+  useEffect(() => {
+    if (!formError) return
+
+    const timer = setTimeout(() => setFormError(''), 3000)
+    return () => clearTimeout(timer)
+  }, [formError])
 
   const set = (k: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -45,6 +66,7 @@ export function ContactForm() {
       }
     });
     setErrors(newErrors);
+    setFormError('')
     if (Object.keys(newErrors).length > 0) return;
   
     setLoading(true)
@@ -60,11 +82,11 @@ export function ContactForm() {
         setSubmitted(true);
       } else {
         console.error('API submission failed:', await response.json());
-        alert('Failed to submit form. Please try again later.'); // User feedback for API errors
+        setFormError('Failed to submit form. Please try again later.');
       }
     } catch (error) {
       console.error('Network or API error:', error);
-      alert('An unexpected error occurred. Please try again later.'); // User feedback for network errors
+      setFormError('An unexpected error occurred. Please try again later.');
     } finally {
       setLoading(false);
     }
@@ -237,6 +259,12 @@ export function ContactForm() {
                   </div>
 
                   {/* Submit */}
+                  {formError && (
+                    <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                      {formError}
+                    </p>
+                  )}
+
                   <motion.button
                     type="button"
                     onClick={handleSubmit}

@@ -21,7 +21,6 @@ export default async function StaffPage() {
       user={user}
       version={getAppVersion()}
       title="Staff Workspace"
-      description="Staff access is active. Role-specific content can be added here next."
     />
   )
 }

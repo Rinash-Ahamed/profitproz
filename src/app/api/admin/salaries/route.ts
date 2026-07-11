@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifySessionToken } from '@/lib/auth'
-import { listExpenses, listSalaries, listStaffAccounts, saveSalary } from '@/lib/firestore'
+import { listExpenses, listSalaries, listStaffAccounts, saveSalary, toPublicStaff } from '@/lib/firestore'
 
 export async function GET() {
   const cookieStore = await cookies()
@@ -19,7 +19,7 @@ export async function GET() {
     return totals
   }, {})
 
-  return NextResponse.json({ staff, salaries, approvedExpensesByStaff })
+  return NextResponse.json({ staff: staff.map(toPublicStaff), salaries, approvedExpensesByStaff })
 }
 
 export async function POST(request: Request) {
@@ -30,14 +30,28 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
   }
 
-  const body = (await request.json()) as { staffEmail?: unknown; baseSalary?: unknown; notes?: unknown }
-  const staffEmail = typeof body.staffEmail === 'string' ? body.staffEmail.trim().toLowerCase() : ''
-  const baseSalary = Number(body.baseSalary)
-  const notes = typeof body.notes === 'string' ? body.notes : ''
+  let body: unknown
+
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ message: 'Invalid salary request.' }, { status: 400 })
+  }
+
+  const input = body as { staffEmail?: unknown; baseSalary?: unknown; notes?: unknown }
+  const staffEmail = typeof input.staffEmail === 'string' ? input.staffEmail.trim().toLowerCase() : ''
+  const baseSalary = Number(input.baseSalary)
+  const notes = typeof input.notes === 'string' ? input.notes : ''
 
   if (!staffEmail || !Number.isFinite(baseSalary) || baseSalary < 0) {
     return NextResponse.json({ message: 'Staff email and valid salary are required.' }, { status: 400 })
   }
 
-  return NextResponse.json({ salary: await saveSalary({ staffEmail, baseSalary, notes }) })
+  const staff = (await listStaffAccounts()).find((record) => record.email === staffEmail)
+
+  if (!staff) {
+    return NextResponse.json({ message: 'Staff member was not found.' }, { status: 404 })
+  }
+
+  return NextResponse.json({ salary: await saveSalary(staff.id, { staffEmail, baseSalary, notes }) })
 }

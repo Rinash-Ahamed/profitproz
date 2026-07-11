@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, createSessionToken, hashPassword, verifyPassword, verifySessionToken } from '@/lib/auth'
-import { getStaffByEmail, updateStaffPassword } from '@/lib/firestore'
+import { completeStaffOnboarding, getStaffByEmail, updateStaffPassword } from '@/lib/firestore'
 
 export async function POST(request: Request) {
   const cookieStore = await cookies()
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid password request.' }, { status: 400 })
   }
 
-  const { currentPassword, newPassword } = body as { currentPassword?: unknown; newPassword?: unknown }
+  const { currentPassword, newPassword, phone, address, details } = body as { currentPassword?: unknown; newPassword?: unknown; phone?: unknown; address?: unknown; details?: unknown }
 
   if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
     return NextResponse.json({ message: 'Current and new password are required.' }, { status: 400 })
@@ -29,13 +29,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'New password must be at least 8 characters.' }, { status: 400 })
   }
 
+  const profile = {
+    phone: typeof phone === 'string' ? phone.trim() : '',
+    address: typeof address === 'string' ? address.trim() : '',
+    details: typeof details === 'string' ? details.trim() : '',
+  }
+
   const staff = await getStaffByEmail(user.email)
 
   if (!staff || !verifyPassword(currentPassword, staff.passwordHash)) {
     return NextResponse.json({ message: 'Current password is incorrect.' }, { status: 401 })
   }
 
-  await updateStaffPassword(user.email, hashPassword(newPassword))
+  if (staff.mustChangePassword) {
+    if (!/^[0-9]{7,15}$/.test(profile.phone) || !profile.address || !profile.details) {
+      return NextResponse.json({ message: 'Enter a valid phone number (7 to 15 digits), address, and details.' }, { status: 400 })
+    }
+    await completeStaffOnboarding(staff.id, { passwordHash: hashPassword(newPassword), ...profile })
+  } else {
+    await updateStaffPassword(staff.id, hashPassword(newPassword))
+  }
 
   const response = NextResponse.json({ ok: true })
   response.cookies.set(

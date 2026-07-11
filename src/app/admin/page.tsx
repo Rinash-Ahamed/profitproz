@@ -21,7 +21,6 @@ export default async function AdminPage() {
       user={user}
       version={getAppVersion()}
       title="Admin Workspace"
-      description="Admin access is active. Role-specific content can be added here next."
     />
   )
 }

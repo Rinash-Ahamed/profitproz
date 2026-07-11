@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { getStaffByEmail } from './firestore'
+import { createAdminAccount, getAdminByEmail, getStaffByEmail, isFirestoreConfigured } from './firestore'
 
 export type UserRole = 'admin' | 'staff'
 
@@ -11,6 +11,7 @@ export type SessionUser = {
 
 type LoginUser = SessionUser & {
   password: string
+  shouldSeedFirestore?: boolean
 }
 
 const SESSION_COOKIE = 'profitpro_session'
@@ -41,11 +42,15 @@ function safeEqual(a: string, b: string) {
 export function getConfiguredUsers(): LoginUser[] {
   const users: LoginUser[] = []
 
-  if (process.env.ADMIN_LOGIN_EMAIL && process.env.ADMIN_LOGIN_PASSWORD) {
+  const adminEmail = process.env.ADMIN_EMAIL || process.env.ADMIN_LOGIN_EMAIL
+  const adminPassword = process.env.ADMIN_PASSWORD || process.env.ADMIN_LOGIN_PASSWORD
+
+  if (adminEmail && adminPassword) {
     users.push({
-      email: process.env.ADMIN_LOGIN_EMAIL,
-      password: process.env.ADMIN_LOGIN_PASSWORD,
+      email: adminEmail,
+      password: adminPassword,
       role: 'admin',
+      shouldSeedFirestore: true,
     })
   }
 
@@ -82,16 +87,44 @@ export function verifyPassword(password: string, storedPassword: string) {
 export async function authenticateUser(email: string, password: string): Promise<SessionUser | null> {
   const normalizedEmail = email.trim().toLowerCase()
 
+  if (isFirestoreConfigured()) {
+    const admin = await getAdminByEmail(normalizedEmail)
+
+    if (admin?.active && verifyPassword(password, admin.passwordHash)) {
+      return {
+        email: admin.email,
+        role: 'admin',
+      }
+    }
+  }
+
   for (const user of getConfiguredUsers()) {
     const emailMatches = user.email.trim().toLowerCase() === normalizedEmail
     const passwordMatches = safeEqual(password, user.password)
 
     if (emailMatches && passwordMatches) {
+      if (user.role === 'admin' && user.shouldSeedFirestore && isFirestoreConfigured()) {
+        try {
+          await createAdminAccount({
+            email: normalizedEmail,
+            passwordHash: hashPassword(password),
+          })
+        } catch (error) {
+          if (!(error instanceof Error) || error.message !== 'ADMIN_EXISTS') {
+            console.error('Failed to seed Firestore admin account:', error)
+          }
+        }
+      }
+
       return {
-        email: user.email,
+        email: normalizedEmail,
         role: user.role,
       }
     }
+  }
+
+  if (!isFirestoreConfigured()) {
+    return null
   }
 
   const staff = await getStaffByEmail(normalizedEmail)
