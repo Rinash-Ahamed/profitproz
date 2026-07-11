@@ -1,7 +1,12 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, hashPassword, verifySessionToken } from '@/lib/auth'
-import { createStaffAccount, isFirestoreConfigured, listStaffAccounts, saveSalary } from '@/lib/firestore'
+import {
+  createStaffAccount,
+  isFirestoreConfigured,
+  listStaffAccounts,
+  saveSalary,
+} from '@/lib/firestore'
 
 const INITIAL_STAFF_PASSWORD = 'Welcome@123'
 
@@ -25,14 +30,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
   }
 
-  let body: unknown
+  let body: {
+    name?: string
+    baseSalary?: number
+    employeeId?: string
+    department?: string
+  }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ message: 'Invalid staff request.' }, { status: 400 })
   }
 
-  const { name, baseSalary, employeeId, department } = body as { name?: unknown; baseSalary?: unknown; employeeId?: unknown; department?: unknown }
+  const { name, baseSalary, employeeId, department } = body
 
   if (typeof name !== 'string' || !name.trim()) {
     return NextResponse.json({ message: 'Staff name is required.' }, { status: 400 })
@@ -53,7 +63,6 @@ export async function POST(request: Request) {
   if (process.env.LOCAL_TESTING === 'true' || !isFirestoreConfigured()) {
     const reason = process.env.LOCAL_TESTING === 'true' ? 'LOCAL_TESTING flag is set' : 'Firestore not configured'
     console.log(`Mocking staff creation response for local testing. Reason: ${reason}.`)
-
     const mockName = name.trim().replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase())
     const mockEmail = `${name.trim().toLowerCase().replace(/\s+/g, '')}@profitproz.com`
 
@@ -91,12 +100,12 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === 'STAFF_EXISTS') {
       return NextResponse.json(
-        { message: 'A staff member with a similar name already exists, which would create a duplicate email. Please choose a different name.' },
+        { message: 'An account with this email already exists. Please choose a different name to generate a unique email.' },
         { status: 409 }
       )
     }
-
-    throw error
+    console.error('Failed to create staff:', error)
+    return NextResponse.json({ message: 'Failed to create staff member.' }, { status: 500 })
   }
 
   return NextResponse.json({

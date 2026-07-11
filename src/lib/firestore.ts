@@ -313,6 +313,17 @@ export async function createStaffAccount(input: { name: string; passwordHash: st
   return mapStaff((await response.json()) as FirestoreDocument)
 }
 
+export async function deleteStaffAccount(id: string) {
+  const response = await firestoreRequest(`/staff/${id}`, {
+    method: 'DELETE',
+  })
+
+  if (!response.ok && response.status !== 404) {
+    // Allow 404 as it means already deleted.
+    throw new Error('Unable to delete staff account.')
+  }
+}
+
 export async function updateStaffAccount(id: string, updates: Partial<Omit<StaffRecord, 'id' | 'passwordHash'>>) {
   const fieldsToUpdate: Record<string, FirestoreValue> = {
     updatedAt: { timestampValue: new Date().toISOString() },

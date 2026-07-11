@@ -1,11 +1,11 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Edit, KeyRound, Loader2, LogOut, Power, Trash2, User, UserPlus } from 'lucide-react'
+import { CheckCircle2, Edit, FileDown, Filter, KeyRound, Loader2, LogOut, Trash2, User, UserPlus, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
-import type { StaffRecord } from '@/lib/firestore'
+import type { StaffRecord, TimesheetRecord } from '@/lib/firestore'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
 
 type PortalHomeProps = {
@@ -13,6 +13,17 @@ type PortalHomeProps = {
   version: AppVersion
   title: string
   description: string
+}
+
+type PayrollRow = {
+  employeeName: string
+  employeeId: string
+  department: string
+  payrollPeriod: string
+  monthlySalary: number
+  workingDays: number
+  daysPresent: number
+  leaveDays: number
 }
 
 export function PortalHome({ user, version, title, description }: PortalHomeProps) {
@@ -28,6 +39,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   // Staff list state
   const [staffList, setStaffList] = useState<StaffRecord[]>([])
   const [editingStaff, setEditingStaff] = useState<StaffRecord | null>(null)
+  // Timesheet state
+  const [timesheetList, setTimesheetList] = useState<TimesheetRecord[]>([])
+  const [showTimesheetFilters, setShowTimesheetFilters] = useState(false)
+  const [timesheetFilterEmployee, setTimesheetFilterEmployee] = useState('all')
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('')
@@ -36,6 +51,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(''), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [message])
 
   useEffect(() => {
     if (user.role === 'admin' && activeTab === 'staff') {
@@ -48,6 +70,31 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           }
         })
         .catch(() => setError('Could not load staff list.'))
+        .finally(() => setLoading(false))
+    }
+    if (user.role === 'admin' && activeTab === 'timesheets') {
+      setLoading(true)
+      const promises = [fetch('/api/admin/timesheets')]
+      // Also fetch staff for the filter dropdown if not already loaded
+      if (staffList.length === 0) {
+        promises.push(fetch('/api/admin/staff'))
+      }
+
+      Promise.all(promises)
+        .then(async (responses) => {
+          const [timesheetRes, staffRes] = responses
+          const timesheetData = await timesheetRes.json()
+          if (timesheetData.timesheets) {
+            setTimesheetList(timesheetData.timesheets)
+          }
+          if (staffRes) {
+            const staffData = await staffRes.json()
+            if (staffData.staff) {
+              setStaffList(staffData.staff)
+            }
+          }
+        })
+        .catch(() => setError('Could not load data for this view.'))
         .finally(() => setLoading(false))
     }
   }, [activeTab, user.role])
@@ -90,27 +137,98 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }
   }
 
-  async function handleToggleStatus(staff: StaffRecord) {
-    const newStatus = !staff.active
-    const originalStatus = staff.active
+  async function handleDeleteStaff(staffId: string, staffName: string) {
+    if (!window.confirm(`Are you sure you want to delete ${staffName}? This action cannot be undone.`)) {
+      return
+    }
 
-    // Optimistically update UI
-    setStaffList(staffList.map((s) => (s.id === staff.id ? { ...s, active: newStatus } : s)))
+    // For now, a global loader is acceptable. A row-specific loader would be a UX enhancement.
+    setLoading(true)
+    setError('')
+    setMessage('')
 
     try {
-      const response = await fetch(`/api/admin/staff/${staff.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: newStatus }),
+      const response = await fetch(`/api/admin/staff/${staffId}`, {
+        method: 'DELETE',
       })
 
       if (!response.ok) {
-        throw new Error('Failed to update status.')
+        let errorMessage = 'Failed to delete staff member.'
+        try {
+          const data = await response.json()
+          errorMessage = data.message || errorMessage
+        } catch (e) {
+          errorMessage = response.statusText || errorMessage
+        }
+        throw new Error(errorMessage)
       }
-    } catch {
-      // Revert on failure
-      setStaffList(staffList.map((s) => (s.id === staff.id ? { ...s, active: originalStatus } : s)))
+
+      setStaffList((prev) => prev.filter((s) => s.id !== staffId))
+      setMessage('Staff member deleted.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred.')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  async function handleTimesheetStatusUpdate(timesheetId: string, status: 'approved' | 'rejected') {
+    const originalTimesheets = [...timesheetList]
+    // Optimistic UI update
+    setTimesheetList((prev) => prev.map((ts) => (ts.id === timesheetId ? { ...ts, status } : ts)))
+
+    try {
+      const response = await fetch(`/api/admin/timesheets/${timesheetId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+
+      if (!response.ok) {
+        // Revert on failure
+        setTimesheetList(originalTimesheets)
+        let errorMessage = 'Failed to update timesheet status.'
+        try {
+          const data = await response.json()
+          errorMessage = data.message || errorMessage
+        } catch (e) {
+          errorMessage = response.statusText || errorMessage
+        }
+        setError(errorMessage)
+      }
+    } catch (err) {
+      setTimesheetList(originalTimesheets)
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
+    }
+  }
+
+  function handleExportPayroll() {
+    if (mockPayroll.length === 0) {
+      alert('No payroll data to export.')
+      return
+    }
+
+    const headers: (keyof PayrollRow)[] = ['employeeName', 'employeeId', 'department', 'payrollPeriod', 'monthlySalary', 'workingDays', 'daysPresent', 'leaveDays']
+    const headerRow = 'Employee Name,Employee ID,Department,Payroll Period,Monthly Salary,Working Days,Days Present,Leave Days'
+
+    const csvRows = mockPayroll.map(row =>
+      headers.map(header => {
+        const value = row[header]
+        // Handle values that might contain commas by enclosing them in double quotes
+        return typeof value === 'string' && value.includes(',') ? `"${value}"` : value
+      }).join(',')
+    )
+
+    const csvContent = [headerRow, ...csvRows].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    link.setAttribute('href', url)
+    link.setAttribute('download', 'payroll-report-june-2024.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
@@ -128,16 +246,21 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       const data = (await response.json()) as { message?: string }
 
       if (!response.ok) {
-        setError(data.message || 'Unable to change password.')
-        return
+        let errorMessage = 'Unable to change password.'
+        try {
+          errorMessage = data.message || errorMessage
+        } catch (e) {
+          errorMessage = response.statusText || errorMessage
+        }
+        throw new Error(errorMessage)
       }
 
       setCurrentPassword('')
       setNewPassword('')
       setMessage('Password updated. You can continue using the Staff workspace.')
       window.location.reload()
-    } catch {
-      setError('Unable to change password right now.')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred.')
     } finally {
       setLoading(false)
     }
@@ -150,6 +273,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   const inputClass =
     'h-12 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 text-sm text-ink placeholder:text-ghost transition-colors focus:border-[#66B159] focus:outline-none focus:ring-1 focus:ring-[#66B159]/40'
+
+  const filteredTimesheets = useMemo(() => {
+    if (timesheetFilterEmployee === 'all') {
+      return timesheetList
+    }
+    return timesheetList.filter(ts => ts.staffEmail === timesheetFilterEmployee)
+  }, [timesheetList, timesheetFilterEmployee])
 
   return (
     <main className="relative flex min-h-screen flex-col overflow-hidden bg-zinc-1000 px-6 py-8 text-ink sm:px-10">
@@ -290,7 +420,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
             </div>
           )}
 
-          <div className={`mt-10 w-full ${user.role === 'admin' && activeTab === 'staff' ? 'max-w-6xl' : 'max-w-3xl'}`}>
+          <div className={`mt-10 w-full ${user.role === 'admin' && (activeTab === 'staff' || activeTab === 'timesheets' || activeTab === 'payroll') ? 'max-w-7xl' : 'max-w-3xl'}`}>
             {user.role === 'admin'
               ? {
                   dashboard: (
@@ -393,14 +523,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                   <th className="px-6 py-4 font-medium text-sub">Name</th>
                                   <th className="px-6 py-4 font-medium text-sub">Employee ID</th>
                                   <th className="px-6 py-4 font-medium text-sub">Department</th>
-                                  <th className="px-6 py-4 font-medium text-sub">Status</th>
                                   <th className="px-6 py-4 font-medium text-sub">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {loading ? (
                                   <tr>
-                                    <td colSpan={5} className="py-10 text-center text-sub">
+                                    <td colSpan={4} className="py-10 text-center text-sub">
                                       <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </td>
                                   </tr>
@@ -414,20 +543,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                       <td className="px-6 py-4 text-sub">{staff.employeeId || 'N/A'}</td>
                                       <td className="px-6 py-4 text-sub">{staff.department || 'N/A'}</td>
                                       <td className="px-6 py-4">
-                                        <span
-                                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                                            staff.active ? 'bg-[#66B159]/10 text-[#83d377]' : 'bg-zinc-700/50 text-zinc-400'
-                                          }`}
-                                        >
-                                          <span className={`h-1.5 w-1.5 rounded-full ${staff.active ? 'bg-[#66B159]' : 'bg-zinc-500'}`} />
-                                          {staff.active ? 'Active' : 'Inactive'}
-                                        </span>
-                                      </td>
-                                      <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                          <button type="button" onClick={() => setEditingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors"><Edit className="h-4 w-4" /></button>
-                                          <button type="button" onClick={() => handleToggleStatus(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors"><Power className="h-4 w-4" /></button>
-                                          <button type="button" onClick={() => window.confirm(`Are you sure you want to delete ${staff.name}?`)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors"><Trash2 className="h-4 w-4" /></button>
+                                          <button type="button" onClick={() => setEditingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors" aria-label={`Edit ${staff.name}`}><Edit className="h-4 w-4" /></button>
+                                          <button type="button" onClick={() => handleDeleteStaff(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Delete ${staff.name}`}><Trash2 className="h-4 w-4" /></button>
                                         </div>
                                       </td>
                                     </tr>
@@ -441,15 +559,120 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     </div>
                   ),
                   timesheets: (
-                    <div className="surface rounded-lg p-6 sm:p-7">
-                      <p className="text-lg font-semibold text-ink">Timesheet Management</p>
-                      <p className="mt-1 text-sm text-sub">Work in progress. A tool to review, approve, and reject staff timesheets will be built here.</p>
+                    <div className="surface rounded-lg">
+                      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
+                        <div>
+                          <p className="text-lg font-semibold text-ink">Timesheet Management</p>
+                          <p className="mt-1 text-sm text-sub">Review and approve submitted timesheets.</p>
+                        </div>
+                        <div className="relative flex items-center gap-2">
+                          <button type="button" onClick={() => setShowTimesheetFilters(v => !v)} className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub transition-colors hover:border-zinc-600 hover:text-ink">
+                            <Filter className="h-4 w-4" />
+                            Filter
+                          </button>
+                          {showTimesheetFilters && (
+                            <div className="absolute right-0 top-full z-10 mt-2 w-64 rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-2xl">
+                              <label htmlFor="timesheet-employee-filter" className="label-upper mb-2 block text-ghost">
+                                Employee
+                              </label>
+                              <select
+                                id="timesheet-employee-filter"
+                                value={timesheetFilterEmployee}
+                                onChange={(e) => setTimesheetFilterEmployee(e.target.value)}
+                                className="h-10 w-full rounded-lg border border-zinc-600 bg-zinc-800 px-3 text-sm text-ink"
+                              >
+                                <option value="all">All Employees</option>
+                                {staffList.map(staff => (
+                                  <option key={staff.id} value={staff.email}>{staff.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="border-b border-zinc-700 text-left">
+                            <tr>
+                              <th className="px-6 py-4 font-medium text-sub">Employee</th>
+                              <th className="px-6 py-4 font-medium text-sub">Date</th>
+                              <th className="px-6 py-4 font-medium text-sub">Hours</th>
+                              <th className="px-6 py-4 font-medium text-sub">Status</th>
+                              <th className="px-6 py-4 font-medium text-sub">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {loading ? (
+                              <tr><td colSpan={5} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
+                            ) : (
+                              filteredTimesheets.map((ts) => (
+                                <tr key={ts.id} className="border-b border-zinc-800 last:border-none">
+                                  <td className="px-6 py-4 text-ink">{ts.staffEmail}</td>
+                                  <td className="px-6 py-4 text-sub">{ts.workDate}</td>
+                                  <td className="px-6 py-4 text-sub">{ts.hours}</td>
+                                  <td className="px-6 py-4"><StatusBadge status={ts.status} /></td>
+                                  <td className="px-6 py-4">
+                                    {ts.status === 'pending' ? (
+                                      <div className="flex items-center gap-2">
+                                        <button onClick={() => handleTimesheetStatusUpdate(ts.id, 'approved')} className="flex h-8 items-center gap-1.5 rounded-md bg-green-500/10 px-2.5 text-xs text-green-400 transition-colors hover:bg-green-500/20"><CheckCircle2 className="h-3.5 w-3.5" />Approve</button>
+                                        <button onClick={() => handleTimesheetStatusUpdate(ts.id, 'rejected')} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs text-red-400 transition-colors hover:bg-red-500/20"><XCircle className="h-3.5 w-3.5" />Reject</button>
+                                      </div>
+                                    ) : <span className="text-xs text-ghost">No actions</span>}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   ),
                   payroll: (
-                    <div className="surface rounded-lg p-6 sm:p-7">
-                      <p className="text-lg font-semibold text-ink">Payroll Processing</p>
-                      <p className="mt-1 text-sm text-sub">Work in progress. A module to calculate and export payroll based on approved timesheets will be built here.</p>
+                    <div className="surface rounded-lg">
+                      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
+                        <div>
+                          <p className="text-lg font-semibold text-ink">Payroll Processing</p>
+                          <p className="mt-1 text-sm text-sub">Generate payroll reports for salaried employees.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button type="button" className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 text-sm text-sub transition-colors hover:bg-zinc-800">
+                            June 2024
+                          </button>
+                          <button type="button" onClick={handleExportPayroll} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66]">
+                            <FileDown className="h-4 w-4" />
+                            Export CSV
+                          </button>
+                        </div>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="border-b border-zinc-700 text-left">
+                            <tr>
+                              <th className="px-6 py-4 font-medium text-sub">Employee</th>
+                              <th className="px-6 py-4 font-medium text-sub">Department</th>
+                              <th className="px-6 py-4 font-medium text-sub">Salary</th>
+                              <th className="px-6 py-4 font-medium text-sub">Working Days</th>
+                              <th className="px-6 py-4 font-medium text-sub">Present</th>
+                              <th className="px-6 py-4 font-medium text-sub">Leave</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {mockPayroll.map((p) => (
+                              <tr key={p.employeeId} className="border-b border-zinc-800 last:border-none">
+                                <td className="px-6 py-4">
+                                  <p className="font-medium text-ink">{p.employeeName}</p>
+                                  <p className="text-xs text-sub">{p.employeeId}</p>
+                                </td>
+                                <td className="px-6 py-4 text-sub">{p.department}</td>
+                                <td className="px-6 py-4 text-sub">₹{p.monthlySalary.toLocaleString('en-IN')}</td>
+                                <td className="px-6 py-4 text-sub">{p.workingDays}</td>
+                                <td className="px-6 py-4 text-sub">{p.daysPresent}</td>
+                                <td className="px-6 py-4 text-sub">{p.leaveDays}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   ),
                 }[activeTab]
@@ -535,6 +758,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   )
 }
 
+const mockPayroll: PayrollRow[] = [
+  { employeeName: 'John Doe', employeeId: 'PP12345', department: 'Tech', payrollPeriod: 'May 2024', monthlySalary: 50000, workingDays: 22, daysPresent: 21, leaveDays: 1 },
+  { employeeName: 'Jane Smith', employeeId: 'PP67890', department: 'Sales', payrollPeriod: 'May 2024', monthlySalary: 60000, workingDays: 22, daysPresent: 22, leaveDays: 0 },
+  { employeeName: 'Peter Jones', employeeId: 'PP54321', department: 'Marketing', payrollPeriod: 'May 2024', monthlySalary: 55000, workingDays: 22, daysPresent: 20, leaveDays: 2 },
+]
+
 function EditStaffModal({ staff, onClose, onSave }: { staff: StaffRecord; onClose: () => void; onSave: (staff: StaffRecord) => void }) {
   const [name, setName] = useState(staff.name)
   const [email, setEmail] = useState(staff.email)
@@ -573,7 +802,13 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: StaffRecord; onClos
       const data = (await response.json()) as { message?: string; staff?: StaffRecord }
 
       if (!response.ok || !data.staff) {
-        throw new Error(data.message || 'Failed to update staff member.')
+        let errorMessage = 'Failed to update staff member.'
+        try {
+          errorMessage = data?.message || errorMessage
+        } catch (e) {
+          errorMessage = response.statusText || errorMessage
+        }
+        throw new Error(errorMessage)
       }
 
       onSave(data.staff)
@@ -624,5 +859,18 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: StaffRecord; onClos
         </form>
       </div>
     </div>
+  )
+}
+
+const StatusBadge = ({ status }: { status: 'pending' | 'approved' | 'rejected' }) => {
+  const statusStyles = {
+    pending: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    approved: 'bg-green-500/10 text-green-400 border-green-500/20',
+    rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
+  }
+  return (
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${statusStyles[status]}`}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
   )
 }
