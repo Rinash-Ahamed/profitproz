@@ -44,6 +44,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [showTimesheetFilters, setShowTimesheetFilters] = useState(false)
   const [timesheetFilterEmployee, setTimesheetFilterEmployee] = useState('all')
   const [timesheetWorkDate, setTimesheetWorkDate] = useState('')
+  const [timesheetWeekEnd, setTimesheetWeekEnd] = useState('')
   const [timesheetWorkedDates, setTimesheetWorkedDates] = useState<string[]>([])
   const [timesheetLocation, setTimesheetLocation] = useState<'remote' | 'office'>('remote')
   const [timesheetNotes, setTimesheetNotes] = useState('')
@@ -53,7 +54,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [expenseType, setExpenseType] = useState<'travel' | 'food' | 'fuel' | 'other'>('travel')
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseNotes, setExpenseNotes] = useState('')
-  const [expenseReceipt, setExpenseReceipt] = useState<File | null>(null)
+  const [expenseReceiptUrl, setExpenseReceiptUrl] = useState('')
   const [expenseSettings, setExpenseSettings] = useState<ExpenseFieldSettings>({ cityRequired: true, descriptionRequired: true, receiptRequired: true })
 
   // Password change state
@@ -351,7 +352,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       const response = await fetch('/api/staff/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ city: expenseCity, expenseType, description: expenseNotes, amount: Number(expenseAmount), receiptName: expenseReceipt?.name || '', receiptDataUrl: expenseReceipt ? await readReceipt(expenseReceipt) : '' }),
+        body: JSON.stringify({ city: expenseCity, expenseType, description: expenseNotes, amount: Number(expenseAmount), receiptUrl: expenseReceiptUrl }),
       })
       const data = (await response.json()) as { message?: string; expense?: ExpenseRecord }
 
@@ -363,7 +364,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       setExpenseCity('')
       setExpenseAmount('')
       setExpenseNotes('')
-      setExpenseReceipt(null)
+      setExpenseReceiptUrl('')
       setExpenseList((prev) => [data.expense!, ...prev])
       setMessage('Expense submitted for admin approval.')
     } catch {
@@ -393,6 +394,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       }
 
       setTimesheetWorkDate('')
+      setTimesheetWeekEnd('')
       setTimesheetWorkedDates([])
       setTimesheetNotes('')
       setTimesheetList((prev) => [data.timesheet!, ...prev])
@@ -443,16 +445,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     } finally {
       setLoading(false)
     }
-  }
-
-  function readReceipt(file: File) {
-    return new Promise<string>((resolve, reject) => {
-      if (file.size > 500000) return reject(new Error('Receipt must be smaller than 500 KB.'))
-      const reader = new FileReader()
-      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-      reader.onerror = () => reject(new Error('Unable to read receipt.'))
-      reader.readAsDataURL(file)
-    })
   }
 
   function handleExportPayroll() {
@@ -536,14 +528,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }
     return timesheetList.filter(ts => ts.staffEmail === timesheetFilterEmployee)
   }, [timesheetList, timesheetFilterEmployee])
-
-  const timesheetWeekEnd = useMemo(() => {
-    if (!timesheetWorkDate) return ''
-    const start = new Date(`${timesheetWorkDate}T00:00:00`)
-    if (Number.isNaN(start.getTime())) return ''
-    start.setDate(start.getDate() + 6)
-    return start.toISOString().slice(0, 10)
-  }, [timesheetWorkDate])
 
   const weekDays = useMemo(() => {
     if (!timesheetWorkDate) return []
@@ -1057,7 +1041,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                   <td className="px-6 py-4">
                                     <p className="font-medium capitalize text-ink">{expense.expenseType || expense.title}</p>
                                     <p className="mt-1 text-xs text-sub">{expense.city || 'No city'}{expense.description ? ` · ${expense.description}` : ''}</p>
-                                    {expense.receiptName ? expense.receiptDataUrl ? <a href={expense.receiptDataUrl} download={expense.receiptName} className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View receipt: {expense.receiptName}</a> : <p className="mt-1 text-xs font-medium text-[#66B159]">Receipt: {expense.receiptName}</p> : <p className="mt-1 text-xs text-sub">No receipt attached</p>}
+                                    {expense.receiptUrl || expense.receiptDataUrl ? <a href={expense.receiptUrl || expense.receiptDataUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View receipt</a> : <p className="mt-1 text-xs text-sub">No receipt reference</p>}
                                   </td>
                                   <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
                                   <td className="px-6 py-4"><StatusBadge status={expense.status} /></td>
@@ -1146,7 +1130,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         <p className="text-base font-semibold text-ink">Expense Claim Fields</p>
                         <p className="mt-2 text-sm leading-6 text-sub">Choose which fields staff must complete when submitting an expense.</p>
                         <div className="mt-5 space-y-3">
-                          {([['cityRequired', 'City'], ['descriptionRequired', 'Description'], ['receiptRequired', 'Receipt attachment']] as const).map(([field, label]) => (
+                          {([['cityRequired', 'City'], ['descriptionRequired', 'Description'], ['receiptRequired', 'Receipt link']] as const).map(([field, label]) => (
                             <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-ink">
                               {label}
                               <input type="checkbox" checked={expenseSettings[field]} onChange={(event) => setExpenseSettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" />
@@ -1311,9 +1295,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           />
                         </div>
                         <div className="mt-4">
-                          <label htmlFor="expenseReceipt" className="label-upper mb-2 block text-ghost">Attach receipt{expenseSettings.receiptRequired ? ' *' : ''}</label>
-                          <input id="expenseReceipt" type="file" accept="image/*,application/pdf" required={expenseSettings.receiptRequired} onChange={(event) => setExpenseReceipt(event.target.files?.[0] || null)} className="block w-full text-sm text-sub file:mr-4 file:rounded-md file:border-0 file:bg-[#66B159]/15 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#36722f]" />
-                          <p className="mt-2 text-xs text-sub">Image or PDF, up to 500 KB.</p>
+                          <label htmlFor="expenseReceipt" className="label-upper mb-2 block text-ghost">Receipt link{expenseSettings.receiptRequired ? ' *' : ''}</label>
+                          <input id="expenseReceipt" type="url" inputMode="url" value={expenseReceiptUrl} required={expenseSettings.receiptRequired} onChange={(event) => setExpenseReceiptUrl(event.target.value)} className={inputClass} placeholder="Google Drive or receipt reference URL" />
+                          <p className="mt-2 text-xs text-sub">Use a shareable Drive link or other secure receipt URL. Files are not stored in Firebase.</p>
                         </div>
 
                         {message && <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p>}
@@ -1352,7 +1336,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                   <tr key={expense.id} className="border-b border-zinc-800 last:border-none">
                                     <td className="px-6 py-4">
                                       <p className="font-medium text-ink">{expense.expenseType}</p>
-                                      <p className="text-xs text-sub">{expense.city || 'No city'}{expense.receiptName ? ` · ${expense.receiptName}` : ''}</p>
+                                      <p className="text-xs text-sub">{expense.city || 'No city'}{expense.receiptUrl ? ' · Receipt link added' : ''}</p>
                                     </td>
                                     <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
                                     <td className="px-6 py-4"><StatusBadge status={expense.status} /></td>
@@ -1381,7 +1365,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           </div>
                           <div>
                             <label htmlFor="timesheetWeekEnd" className="label-upper mb-2 block text-ghost">Week ends (Saturday)</label>
-                            <input id="timesheetWeekEnd" type="date" value={timesheetWeekEnd} className={`${inputClass} cursor-not-allowed opacity-70`} readOnly />
+                            <input id="timesheetWeekEnd" type="date" value={timesheetWeekEnd} onChange={(event) => setTimesheetWeekEnd(event.target.value)} className={inputClass} required />
                           </div>
                           <div>
                             <label htmlFor="timesheetLocation" className="label-upper mb-2 block text-ghost">Work location</label>

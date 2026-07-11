@@ -306,6 +306,7 @@ export type ExpenseRecord = {
   amount: number
   notes: string
   receiptName: string
+  receiptUrl?: string
   receiptDataUrl?: string
   status: 'pending' | 'approved' | 'rejected'
   createdAt?: string
@@ -362,6 +363,7 @@ function mapDocToExpense(doc: DocumentSnapshot): ExpenseRecord {
     amount: data.amount || 0,
     notes: data.notes || '',
     receiptName: data.receiptName || '',
+    receiptUrl: data.receiptUrl || '',
     receiptDataUrl: data.receiptDataUrl || '',
     status: readStatus(data.status),
     createdAt: mapTimestamp(data.createdAt),
@@ -421,7 +423,7 @@ export async function listExpenses(staffEmail?: string) {
   return snapshot.docs.map(mapDocToExpense)
 }
 
-export async function createExpense(input: { staffEmail: string; staffName: string; title: string; city: string; expenseType: ExpenseRecord['expenseType']; description: string; amount: number; receiptName: string; receiptDataUrl?: string }): Promise<ExpenseRecord> {
+export async function createExpense(input: { staffEmail: string; staffName: string; title: string; city: string; expenseType: ExpenseRecord['expenseType']; description: string; amount: number; receiptName: string; receiptUrl?: string }): Promise<ExpenseRecord> {
   if (!db) throw new Error('Firestore not configured')
 
   const docRef = db.collection(COLLECTIONS.EXPENSES).doc() // auto-generate ID
@@ -436,7 +438,7 @@ export async function createExpense(input: { staffEmail: string; staffName: stri
     amount: input.amount,
     notes: input.description.trim(),
     receiptName: input.receiptName.trim(),
-    receiptDataUrl: input.receiptDataUrl || '',
+    receiptUrl: input.receiptUrl || '',
     status: 'pending' as const,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
@@ -444,16 +446,8 @@ export async function createExpense(input: { staffEmail: string; staffName: stri
 
   const batch = db.batch()
   batch.set(docRef, newExpenseData)
-  // Evidence is retained separately from audit logs and is intentionally never pruned or cleared.
-  if (input.receiptDataUrl) {
-    batch.set(db.collection(COLLECTIONS.EXPENSE_RECEIPTS).doc(docRef.id), {
-      expenseId: docRef.id,
-      staffEmail: input.staffEmail.trim().toLowerCase(),
-      receiptName: input.receiptName.trim(),
-      receiptDataUrl: input.receiptDataUrl,
-      createdAt: FieldValue.serverTimestamp(),
-    })
-  }
+  // Receipt evidence uses a link/reference, not binary data, to keep Firestore storage low.
+  if (input.receiptUrl) batch.set(db.collection(COLLECTIONS.EXPENSE_RECEIPTS).doc(docRef.id), { expenseId: docRef.id, staffEmail: input.staffEmail.trim().toLowerCase(), receiptName: input.receiptName.trim(), receiptUrl: input.receiptUrl, createdAt: FieldValue.serverTimestamp() })
   await batch.commit()
   const newDoc = await docRef.get()
   if (!newDoc.exists) {

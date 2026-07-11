@@ -201,7 +201,7 @@ body {
 }
 
 /* Staff submissions use bright paper surfaces against the dark workspace. */
-.portal-app .staff-dashboard > .grid > .surface,
+.portal-app .staff-dashboard .surface,
 .portal-app .staff-work-card {
   background: #fbfcf8;
   border: 1px solid rgba(255, 255, 255, 0.72);
@@ -209,25 +209,38 @@ body {
 }
 
 .portal-app .staff-work-card .text-ink,
-.portal-app .staff-dashboard > .grid > .surface .text-ink {
+.portal-app .staff-dashboard .text-ink {
   color: #1a1d1b !important;
 }
 
 .portal-app .staff-work-card .text-sub,
-.portal-app .staff-dashboard > .grid > .surface .text-sub {
+.portal-app .staff-dashboard .text-sub {
   color: #5d665f !important;
 }
 
 .portal-app .staff-work-card .text-ghost,
-.portal-app .staff-dashboard > .grid > .surface .text-ghost {
+.portal-app .staff-dashboard .text-ghost {
   color: #778078 !important;
 }
 
 .portal-app .staff-work-card input,
-.portal-app .staff-work-card textarea {
+.portal-app .staff-work-card textarea,
+.portal-app .staff-work-card select,
+.portal-app .staff-dashboard select {
   color: #1a1d1b;
   background: #f1f3ee !important;
   border-color: rgba(26, 29, 27, 0.14) !important;
+}
+
+.portal-app .staff-dashboard .bg-white,
+.portal-app .staff-work-card .bg-white {
+  background-color: #f1f3ee !important;
+}
+
+.portal-app .staff-dashboard option,
+.portal-app .staff-work-card option {
+  background-color: #fbfcf8;
+  color: #1a1d1b;
 }
 
 .portal-app .staff-work-card .border-zinc-800,

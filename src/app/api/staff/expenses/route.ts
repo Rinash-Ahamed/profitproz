@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   }
   const user = userOrResponse
 
-  let body: { city?: unknown; expenseType?: unknown; description?: unknown; amount?: unknown; receiptName?: unknown; receiptDataUrl?: unknown }
+  let body: { city?: unknown; expenseType?: unknown; description?: unknown; amount?: unknown; receiptUrl?: unknown }
   try {
     body = await request.json()
   } catch (error) {
@@ -49,21 +49,20 @@ export async function POST(request: NextRequest) {
   const expenseType = body.expenseType === 'travel' || body.expenseType === 'food' || body.expenseType === 'fuel' || body.expenseType === 'other' ? body.expenseType : ''
   const description = typeof body.description === 'string' ? body.description.trim() : ''
   const amount = Number(body.amount)
-  const receiptName = typeof body.receiptName === 'string' ? body.receiptName.trim() : ''
-  const receiptDataUrl = typeof body.receiptDataUrl === 'string' ? body.receiptDataUrl : ''
+  const receiptUrl = typeof body.receiptUrl === 'string' ? body.receiptUrl.trim() : ''
   const settings = await getExpenseFieldSettings()
 
-  if (!expenseType || !Number.isFinite(amount) || amount <= 0 || (settings.cityRequired && !city) || (settings.descriptionRequired && !description) || (settings.receiptRequired && !receiptName)) {
+  if (!expenseType || !Number.isFinite(amount) || amount <= 0 || (settings.cityRequired && !city) || (settings.descriptionRequired && !description) || (settings.receiptRequired && !receiptUrl)) {
     return NextResponse.json({ message: 'Complete all required expense fields and enter a valid total.' }, { status: 400 })
   }
-  if (receiptDataUrl.length > 700000) {
-    return NextResponse.json({ message: 'Receipt is too large. Please attach a file smaller than 500 KB.' }, { status: 400 })
+  if (receiptUrl) {
+    try { new URL(receiptUrl) } catch { return NextResponse.json({ message: 'Enter a valid receipt link.' }, { status: 400 }) }
   }
 
   try {
     const staff = await getStaffByEmail(user.email)
     const title = `${expenseType.charAt(0).toUpperCase() + expenseType.slice(1)} expense`
-    const expense = await createExpense({ staffEmail: user.email, staffName: staff?.name || user.email, title, city, expenseType, description, amount, receiptName, receiptDataUrl })
+    const expense = await createExpense({ staffEmail: user.email, staffName: staff?.name || user.email, title, city, expenseType, description, amount, receiptName: receiptUrl ? 'External receipt link' : '', receiptUrl })
 
     // Fire-and-forget email notification with error logging.
     // In a larger system, this would be offloaded to a queue.
