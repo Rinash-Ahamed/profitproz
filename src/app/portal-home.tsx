@@ -1,11 +1,11 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { FormEvent, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { CheckCircle2, ClipboardList, Edit, FileDown, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Settings, Trash2, User, UserPlus, Users, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
-import type { ExpenseFieldSettings, ExpenseRecord, PublicStaffRecord, TimesheetRecord } from '@/lib/firestore'
+import type { ExpenseFieldSettings, ExpenseRecord, PublicStaffRecord, SalaryRecord, TimesheetRecord } from '@/lib/firestore'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
 
 type PortalHomeProps = {
@@ -21,9 +21,7 @@ type PayrollRow = {
   department: string
   payrollPeriod: string
   monthlySalary: number
-  workingDays: number
-  daysPresent: number
-  leaveDays: number
+  approvedWorkDays: number
 }
 
 export function PortalHome({ user, version, title, description }: PortalHomeProps) {
@@ -38,6 +36,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffSalary, setStaffSalary] = useState('')
   // Staff list state
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
+  const [salaryList, setSalaryList] = useState<SalaryRecord[]>([])
   const [editingStaff, setEditingStaff] = useState<PublicStaffRecord | null>(null)
   // Timesheet state
   const [timesheetList, setTimesheetList] = useState<TimesheetRecord[]>([])
@@ -63,6 +62,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [profilePhone, setProfilePhone] = useState('')
   const [profileAddress, setProfileAddress] = useState('')
   const [profileDetails, setProfileDetails] = useState('')
+  const [emergencyContactName, setEmergencyContactName] = useState('')
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState('')
 
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
@@ -148,6 +149,19 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           if (data.settings) setExpenseSettings(data.settings)
         })
         .catch(() => setError('Could not load expenses.'))
+        .finally(() => setLoading(false))
+    }
+
+    if (activeTab === 'payroll') {
+      setLoading(true)
+      Promise.all([fetch('/api/admin/salaries'), fetch('/api/admin/timesheets')])
+        .then(async ([salaryRes, timesheetRes]) => {
+          const [salaryData, timesheetData] = await Promise.all([salaryRes.json(), timesheetRes.json()])
+          if (salaryData.staff) setStaffList(salaryData.staff)
+          if (salaryData.salaries) setSalaryList(salaryData.salaries)
+          if (timesheetData.timesheets) setTimesheetList(timesheetData.timesheets)
+        })
+        .catch(() => setError('Could not load payroll data.'))
         .finally(() => setLoading(false))
     }
   }, [activeTab, user.role])
@@ -448,15 +462,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   function handleExportPayroll() {
-    if (mockPayroll.length === 0) {
-      alert('No payroll data to export.')
+    if (payrollRows.length === 0) {
+      setError('No payroll data is available to export.')
       return
     }
 
-    const headers: (keyof PayrollRow)[] = ['employeeName', 'employeeId', 'department', 'payrollPeriod', 'monthlySalary', 'workingDays', 'daysPresent', 'leaveDays']
-    const headerRow = 'Employee Name,Employee ID,Department,Payroll Period,Monthly Salary,Working Days,Days Present,Leave Days'
+    const headers: (keyof PayrollRow)[] = ['employeeName', 'employeeId', 'department', 'payrollPeriod', 'monthlySalary', 'approvedWorkDays']
+    const headerRow = 'Employee Name,Employee ID,Department,Payroll Period,Monthly Salary,Approved Work Days'
 
-    const csvRows = mockPayroll.map(row =>
+    const csvRows = payrollRows.map(row =>
       headers.map(header => {
         const value = row[header]
         // Handle values that might contain commas by enclosing them in double quotes
@@ -486,7 +500,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       const response = await fetch('/api/staff/change-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword, newPassword, phone: profilePhone, address: profileAddress, details: profileDetails }),
+        body: JSON.stringify({ currentPassword, newPassword, phone: profilePhone, address: profileAddress, details: profileDetails, emergencyContactName, emergencyContactPhone }),
       })
       const data = (await response.json()) as { message?: string }
 
@@ -505,6 +519,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       setProfilePhone('')
       setProfileAddress('')
       setProfileDetails('')
+      setEmergencyContactName('')
+      setEmergencyContactPhone('')
       setMessage('Password updated. You can continue using the Staff workspace.')
       window.location.reload()
     } catch (err) {
@@ -540,6 +556,28 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     })
   }, [timesheetWorkDate])
 
+  const payrollRows = useMemo<PayrollRow[]>(() => {
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth()
+    const period = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+
+    return staffList.map((staff) => {
+      const monthlySalary = salaryList.find((salary) => salary.staffEmail === staff.email)?.baseSalary || 0
+      const workedDates = new Set(
+        timesheetList
+          .filter((timesheet) => timesheet.staffEmail === staff.email && timesheet.status === 'approved')
+          .flatMap((timesheet) => timesheet.workedDates.length ? timesheet.workedDates : [timesheet.workDate])
+          .filter((date) => {
+            const parsed = new Date(`${date}T00:00:00`)
+            return parsed.getFullYear() === currentYear && parsed.getMonth() === currentMonth
+          })
+      )
+
+      return { employeeName: staff.name, employeeId: staff.employeeId || 'N/A', department: staff.department || 'N/A', payrollPeriod: period, monthlySalary, approvedWorkDays: workedDates.size }
+    })
+  }, [salaryList, staffList, timesheetList])
+
   const pendingTimesheets = timesheetList.filter((timesheet) => timesheet.status === 'pending')
   const pendingExpenses = expenseList.filter((expense) => expense.status === 'pending')
   const approvedExpenseTotal = expenseList
@@ -550,9 +588,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     .slice(0, 5)
 
   return (
-    <main className="portal-app relative flex min-h-screen flex-col overflow-hidden bg-[#0a0b0c] px-6 py-8 text-ink sm:px-10">
+    <main className={`portal-app ${user.role === 'admin' ? 'admin-workspace' : ''} relative flex min-h-screen flex-col overflow-hidden bg-[#0a0b0c] px-6 py-8 text-ink sm:px-10`}>
       <div className="ambient-glow left-[-8rem] top-[8rem] h-56 w-56" />
       <div className="ambient-glow right-[-6rem] bottom-[8rem] h-72 w-72" style={{ animationDelay: '2s' }} />
+      <div className="portal-data-bars" aria-hidden="true">
+        {Array.from({ length: 12 }, (_, index) => <span key={index} style={{ '--bar-index': index } as CSSProperties} />)}
+      </div>
 
       <header className="relative z-20 mx-auto flex w-full max-w-7xl items-center justify-between gap-8">
         <div className="flex flex-1 items-center justify-start">
@@ -769,7 +810,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
             {user.role === 'admin'
               ? {
                    dashboard: (
-                    <div className="space-y-6">
+                    <div className="admin-dashboard space-y-6">
                       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <DashboardMetric icon={<Users className="h-5 w-5" />} label="Active staff" value={staffList.length} detail="People in your workspace" />
                         <DashboardMetric icon={<ClipboardList className="h-5 w-5" />} label="Timesheets to review" value={pendingTimesheets.length} detail="Awaiting a decision" />
@@ -918,6 +959,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                        <td className="px-6 py-4">
                                          <p className="text-sm text-ink">{staff.phone || 'Profile setup pending'}</p>
                                          <p className="mt-1 max-w-56 truncate text-xs text-sub">{staff.address || 'No address yet'}</p>
+                                         {staff.emergencyContactName ? <p className="mt-1 max-w-56 truncate text-xs text-sub">Emergency: {staff.emergencyContactName} ({staff.emergencyContactPhone})</p> : null}
                                          {staff.details ? <p className="mt-1 max-w-56 truncate text-xs text-sub">{staff.details}</p> : null}
                                        </td>
                                        <td className="px-6 py-4 text-sub">{staff.department || 'N/A'}</td>
@@ -1066,11 +1108,11 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
                         <div>
                           <p className="text-lg font-semibold text-ink">Payroll Processing</p>
-                          <p className="mt-1 text-sm text-sub">Generate payroll reports for salaried employees.</p>
+                          <p className="mt-1 text-sm text-sub">Monthly salary is paid in full. Approved timesheets are shown for reference only.</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button type="button" className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 text-sm text-sub transition-colors hover:bg-zinc-800">
-                            June 2024
+                            Current month
                           </button>
                           <button type="button" onClick={handleExportPayroll} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66]">
                             <FileDown className="h-4 w-4" />
@@ -1085,13 +1127,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                               <th className="px-6 py-4 font-medium text-sub">Employee</th>
                               <th className="px-6 py-4 font-medium text-sub">Department</th>
                               <th className="px-6 py-4 font-medium text-sub">Salary</th>
-                              <th className="px-6 py-4 font-medium text-sub">Working Days</th>
-                              <th className="px-6 py-4 font-medium text-sub">Present</th>
-                              <th className="px-6 py-4 font-medium text-sub">Leave</th>
+                              <th className="px-6 py-4 font-medium text-sub">Approved work days</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {mockPayroll.map((p) => (
+                            {payrollRows.length === 0 ? (
+                              <tr><td colSpan={4} className="py-10 text-center text-sub">No staff payroll records available yet.</td></tr>
+                            ) : payrollRows.map((p) => (
                               <tr key={p.employeeId} className="border-b border-zinc-800 last:border-none">
                                 <td className="px-6 py-4">
                                   <p className="font-medium text-ink">{p.employeeName}</p>
@@ -1099,9 +1141,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                 </td>
                                 <td className="px-6 py-4 text-sub">{p.department}</td>
                                 <td className="px-6 py-4 text-sub">₹{p.monthlySalary.toLocaleString('en-IN')}</td>
-                                <td className="px-6 py-4 text-sub">{p.workingDays}</td>
-                                <td className="px-6 py-4 text-sub">{p.daysPresent}</td>
-                                <td className="px-6 py-4 text-sub">{p.leaveDays}</td>
+                                <td className="px-6 py-4 text-sub">{p.approvedWorkDays}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1207,6 +1247,16 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     <div>
                       <label htmlFor="profileAddress" className="label-upper mb-2 block text-ghost">Address</label>
                       <input id="profileAddress" value={profileAddress} onChange={(event) => setProfileAddress(event.target.value)} className={inputClass} placeholder="Your current address" required />
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="emergencyContactName" className="label-upper mb-2 block text-ghost">Emergency contact name</label>
+                      <input id="emergencyContactName" value={emergencyContactName} onChange={(event) => setEmergencyContactName(event.target.value)} className={inputClass} placeholder="Name of emergency contact" required />
+                    </div>
+                    <div>
+                      <label htmlFor="emergencyContactPhone" className="label-upper mb-2 block text-ghost">Emergency contact phone</label>
+                      <input id="emergencyContactPhone" type="tel" inputMode="numeric" pattern="[0-9]{7,15}" maxLength={15} value={emergencyContactPhone} onChange={(event) => setEmergencyContactPhone(event.target.value.replace(/\D/g, ''))} className={inputClass} placeholder="Digits only" required />
                     </div>
                   </div>
                   <div className="mt-4">
@@ -1470,12 +1520,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     </main>
   )
 }
-
-const mockPayroll: PayrollRow[] = [
-  { employeeName: 'John Doe', employeeId: 'PP12345', department: 'Tech', payrollPeriod: 'May 2024', monthlySalary: 50000, workingDays: 22, daysPresent: 21, leaveDays: 1 },
-  { employeeName: 'Jane Smith', employeeId: 'PP67890', department: 'Sales', payrollPeriod: 'May 2024', monthlySalary: 60000, workingDays: 22, daysPresent: 22, leaveDays: 0 },
-  { employeeName: 'Peter Jones', employeeId: 'PP54321', department: 'Marketing', payrollPeriod: 'May 2024', monthlySalary: 55000, workingDays: 22, daysPresent: 20, leaveDays: 2 },
-]
 
 function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; onClose: () => void; onSave: (staff: PublicStaffRecord) => void }) {
   const [name, setName] = useState(staff.name)

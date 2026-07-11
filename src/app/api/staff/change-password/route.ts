@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid password request.' }, { status: 400 })
   }
 
-  const { currentPassword, newPassword, phone, address, details } = body as { currentPassword?: unknown; newPassword?: unknown; phone?: unknown; address?: unknown; details?: unknown }
+  const { currentPassword, newPassword, phone, address, details, emergencyContactName, emergencyContactPhone } = body as { currentPassword?: unknown; newPassword?: unknown; phone?: unknown; address?: unknown; details?: unknown; emergencyContactName?: unknown; emergencyContactPhone?: unknown }
 
   if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
     return NextResponse.json({ message: 'Current and new password are required.' }, { status: 400 })
@@ -33,6 +33,8 @@ export async function POST(request: Request) {
     phone: typeof phone === 'string' ? phone.trim() : '',
     address: typeof address === 'string' ? address.trim() : '',
     details: typeof details === 'string' ? details.trim() : '',
+    emergencyContactName: typeof emergencyContactName === 'string' ? emergencyContactName.trim() : '',
+    emergencyContactPhone: typeof emergencyContactPhone === 'string' ? emergencyContactPhone.trim() : '',
   }
 
   const staff = await getStaffByEmail(user.email)
@@ -42,8 +44,8 @@ export async function POST(request: Request) {
   }
 
   if (staff.mustChangePassword) {
-    if (!/^[0-9]{7,15}$/.test(profile.phone) || !profile.address || !profile.details) {
-      return NextResponse.json({ message: 'Enter a valid phone number (7 to 15 digits), address, and details.' }, { status: 400 })
+    if (!/^[0-9]{7,15}$/.test(profile.phone) || !/^[0-9]{7,15}$/.test(profile.emergencyContactPhone) || !profile.address || !profile.details || !profile.emergencyContactName) {
+      return NextResponse.json({ message: 'Complete your contact, emergency contact, address, and details fields.' }, { status: 400 })
     }
     await completeStaffOnboarding(staff.id, { passwordHash: hashPassword(newPassword), ...profile })
   } else {

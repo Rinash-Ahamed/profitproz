@@ -13,6 +13,8 @@ export type StaffRecord = {
   phone?: string
   address?: string
   details?: string
+  emergencyContactName?: string
+  emergencyContactPhone?: string
   department?: string
   createdAt?: string
   updatedAt?: string
@@ -96,6 +98,8 @@ function mapDocToStaff(doc: DocumentSnapshot): StaffRecord {
     phone: data.phone || '',
     address: data.address || '',
     details: data.details || '',
+    emergencyContactName: data.emergencyContactName || '',
+    emergencyContactPhone: data.emergencyContactPhone || '',
     department: data.department || '',
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
@@ -201,6 +205,8 @@ export async function createStaffAccount(input: { name: string; passwordHash: st
       phone: '',
       address: '',
       details: '',
+      emergencyContactName: '',
+      emergencyContactPhone: '',
       department: input.department,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -523,7 +529,7 @@ export async function updateTimesheetStatus(id: string, status: 'approved' | 're
   return mapDocToTimesheet(updatedDoc)
 }
 
-export async function completeStaffOnboarding(staffId: string, input: { passwordHash: string; phone: string; address: string; details: string }): Promise<StaffRecord> {
+export async function completeStaffOnboarding(staffId: string, input: { passwordHash: string; phone: string; address: string; details: string; emergencyContactName: string; emergencyContactPhone: string }): Promise<StaffRecord> {
   if (!db) throw new Error('Firestore not configured')
   const docRef = db.collection(COLLECTIONS.STAFF).doc(staffId)
   await docRef.update({
@@ -531,6 +537,8 @@ export async function completeStaffOnboarding(staffId: string, input: { password
     phone: input.phone.trim(),
     address: input.address.trim(),
     details: input.details.trim(),
+    emergencyContactName: input.emergencyContactName.trim(),
+    emergencyContactPhone: input.emergencyContactPhone.trim(),
     mustChangePassword: false,
     updatedAt: FieldValue.serverTimestamp(),
   })
