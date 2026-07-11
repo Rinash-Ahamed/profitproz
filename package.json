@@ -1,17 +1,13 @@
 {
   "name": "profitpro",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit",
-    "publish:check": "npm run type-check && npm run build",
-    "version:patch": "npm version patch --no-git-tag-version",
-    "version:minor": "npm version minor --no-git-tag-version",
-    "version:major": "npm version major --no-git-tag-version"
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@types/nodemailer": "^8.0.1",
@@ -21,22 +17,21 @@
     "gsap": "^3.13.0",
     "lenis": "^1.3.11",
     "lucide-react": "^0.542.0",
-    "next": "latest",
+    "next": "^16.2.9",
     "nodemailer": "^9.0.3",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "tailwind-merge": "^3.3.1",
     "tailwindcss-animate": "^1.0.7"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
-    "@types/gsap": "^3.0.0",
     "@types/node": "^24.6.0",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.36.0",
-    "eslint-config-next": "latest",
+    "eslint-config-next": "^16.2.9",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.9.3"
