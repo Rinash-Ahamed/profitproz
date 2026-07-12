@@ -1,6 +1,6 @@
 {
   "name": "profitpro",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
@@ -12,6 +12,7 @@
   "dependencies": {
     "@types/nodemailer": "^8.0.1",
     "clsx": "^2.1.1",
+    "firebase-admin": "^14.1.0",
     "framer-motion": "^12.23.24",
     "googleapis": "^173.0.0",
     "gsap": "^3.13.0",
@@ -26,7 +27,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
-    "@types/gsap": "^3.0.0",
     "@types/node": "^24.6.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
