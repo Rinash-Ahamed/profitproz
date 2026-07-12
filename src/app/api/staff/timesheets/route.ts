@@ -8,7 +8,7 @@ export async function GET() {
   const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
 
   if (!user || user.role !== 'staff') {
-    return NextResponse.json({ message: 'Staff access is required.' }, { status: 403 })
+    return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
   }
 
   return NextResponse.json({ timesheets: await listTimesheets(user.email) })
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
 
   if (!user || user.role !== 'staff') {
-    return NextResponse.json({ message: 'Staff access is required.' }, { status: 403 })
+    return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
   }
 
   const body = (await request.json()) as { weekStart?: unknown; weekEnd?: unknown; workedDates?: unknown; workLocation?: unknown; notes?: unknown }

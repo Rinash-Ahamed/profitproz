@@ -24,7 +24,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const { id } = await context.params
 
   if (!id) {
-    return NextResponse.json({ message: 'Staff ID is required.' }, { status: 400 })
+    return NextResponse.json({ message: 'Employee ID is required.' }, { status: 400 })
   }
 
   let body: unknown
@@ -46,7 +46,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (typeof input.name === 'string') {
     const name = input.name.trim()
-    if (!name) return NextResponse.json({ message: 'Staff name cannot be empty.' }, { status: 400 })
+    if (!name) return NextResponse.json({ message: 'Employee name cannot be empty.' }, { status: 400 })
     updates.name = name
   }
 
@@ -84,7 +84,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       actorEmail: user.email,
       action: 'STAFF_UPDATE',
       targetId: id,
-      details: `Admin updated staff member: ${staff.name} (${staff.email}).`,
+      details: `Admin updated employee: ${staff.name} (${staff.email}).`,
       changes: before
         ? Object.fromEntries(
             Object.entries(updates).map(([field, value]) => [field, { from: before[field as keyof typeof before], to: value }])
@@ -95,7 +95,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ staff: toPublicStaff(staff) })
   } catch (error) {
     console.error(`Failed to update staff ${id}:`, error)
-    return NextResponse.json({ message: 'Failed to update staff member.' }, { status: 500 })
+    return NextResponse.json({ message: 'Failed to update employee.' }, { status: 500 })
   }
 }
 
@@ -109,14 +109,14 @@ export async function DELETE(_request: Request, context: RouteContext) {
   const { id } = await context.params
 
   if (!id) {
-    return NextResponse.json({ message: 'Staff ID is required.' }, { status: 400 })
+    return NextResponse.json({ message: 'Employee ID is required.' }, { status: 400 })
   }
 
   try {
     const staff = await getStaffById(id)
 
     if (!staff) {
-      return NextResponse.json({ message: 'Staff member was not found.' }, { status: 404 })
+      return NextResponse.json({ message: 'Employee was not found.' }, { status: 404 })
     }
 
     await deleteStaffAccount(id)
@@ -124,12 +124,12 @@ export async function DELETE(_request: Request, context: RouteContext) {
       actorEmail: user.email,
       action: 'STAFF_DELETE',
       targetId: id,
-      details: `Admin deleted staff member: ${staff.name} (${staff.email}).`,
+      details: `Admin deleted employee: ${staff.name} (${staff.email}).`,
     })
 
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error(`Failed to delete staff ${id}:`, error)
-    return NextResponse.json({ message: 'Failed to delete staff member.' }, { status: 500 })
+    return NextResponse.json({ message: 'Failed to delete employee.' }, { status: 500 })
   }
 }

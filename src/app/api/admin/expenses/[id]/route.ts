@@ -29,14 +29,14 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ message: 'Invalid expense request.' }, { status: 400 })
   }
 
-  const { status } = body as { status?: unknown }
+  const { status, decisionNote } = body as { status?: unknown; decisionNote?: unknown }
 
   if (status !== 'approved' && status !== 'rejected') {
     return NextResponse.json({ message: 'A valid expense status is required.' }, { status: 400 })
   }
 
   try {
-    return NextResponse.json({ expense: await updateExpenseStatus(id, status) })
+    return NextResponse.json({ expense: await updateExpenseStatus(id, status, typeof decisionNote === 'string' ? decisionNote : '') })
   } catch (error) {
     console.error(`Failed to update expense ${id}:`, error)
     return NextResponse.json({ message: 'Failed to update expense.' }, { status: 500 })

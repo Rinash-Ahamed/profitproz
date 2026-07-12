@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, createSessionToken, hashPassword, verifyPassword, verifySessionToken } from '@/lib/auth'
-import { completeStaffOnboarding, getStaffByEmail, updateStaffPassword } from '@/lib/firestore'
+import { authConfig, createSessionToken, getPasswordValidationMessage, hashPassword, verifyPassword, verifySessionToken } from '@/lib/auth'
+import { completeStaffOnboarding, getSecuritySettings, getStaffByEmail, updateStaffPassword } from '@/lib/firestore'
 
 export async function POST(request: Request) {
   const cookieStore = await cookies()
@@ -25,9 +25,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Current and new password are required.' }, { status: 400 })
   }
 
-  if (newPassword.length < 8) {
-    return NextResponse.json({ message: 'New password must be at least 8 characters.' }, { status: 400 })
-  }
+  const security = await getSecuritySettings()
+  const passwordError = getPasswordValidationMessage(newPassword, security)
+  if (passwordError) return NextResponse.json({ message: passwordError }, { status: 400 })
 
   const profile = {
     phone: typeof phone === 'string' ? phone.trim() : '',
@@ -59,12 +59,12 @@ export async function POST(request: Request) {
       email: user.email,
       role: 'staff',
       mustChangePassword: false,
-    }),
+    }, security.sessionHours * 60 * 60),
     {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
-      maxAge: authConfig.maxAge,
+      maxAge: security.sessionHours * 60 * 60,
       path: '/',
     }
   )

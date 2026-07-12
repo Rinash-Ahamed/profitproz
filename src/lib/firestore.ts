@@ -16,6 +16,7 @@ export type StaffRecord = {
   emergencyContactName?: string
   emergencyContactPhone?: string
   department?: string
+  annualCtc?: number
   createdAt?: string
   updatedAt?: string
 }
@@ -55,6 +56,7 @@ const COLLECTIONS = {
   EXPENSES: 'expenses',
   EXPENSE_RECEIPTS: 'expense_receipts',
   TIMESHEETS: 'timesheets',
+  LEAVE_REQUESTS: 'leave_requests',
   SALARIES: 'salaries',
   AUDIT_LOG: 'audit_log',
   SETTINGS: 'settings',
@@ -101,6 +103,7 @@ function mapDocToStaff(doc: DocumentSnapshot): StaffRecord {
     emergencyContactName: data.emergencyContactName || '',
     emergencyContactPhone: data.emergencyContactPhone || '',
     department: data.department || '',
+    annualCtc: typeof data.annualCtc === 'number' ? data.annualCtc : 0,
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
@@ -181,9 +184,18 @@ export async function createAdminAccount(input: { email: string; passwordHash: s
   return mapDocToAdmin(finalDoc)
 }
 
-export async function createStaffAccount(input: { name: string; passwordHash: string; employeeId: string; department: string }): Promise<StaffRecord> {
+export async function updateAdminPassword(id: string, passwordHash: string): Promise<AdminRecord> {
   if (!db) throw new Error('Firestore not configured')
-  const generatedEmail = emailFromStaffName(input.name)
+  const docRef = db.collection(COLLECTIONS.ADMINS).doc(id)
+  await docRef.update({ passwordHash, updatedAt: FieldValue.serverTimestamp() })
+  const updatedDoc = await docRef.get()
+  if (!updatedDoc.exists) throw new Error('Admin account not found after update.')
+  return mapDocToAdmin(updatedDoc)
+}
+
+export async function createStaffAccount(input: { name: string; email?: string; passwordHash: string; employeeId: string; department: string; annualCtc: number }): Promise<StaffRecord> {
+  if (!db) throw new Error('Firestore not configured')
+  const generatedEmail = input.email?.trim().toLowerCase() || emailFromStaffName(input.name)
   const staffCollection = db.collection(COLLECTIONS.STAFF)
 
   const newDocRef = await db.runTransaction(async (transaction) => {
@@ -208,6 +220,7 @@ export async function createStaffAccount(input: { name: string; passwordHash: st
       emergencyContactName: '',
       emergencyContactPhone: '',
       department: input.department,
+      annualCtc: input.annualCtc,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     }
@@ -223,7 +236,12 @@ export async function createStaffAccount(input: { name: string; passwordHash: st
 }
 
 export async function deleteStaffAccount(id: string) {
-  if (db) await db.collection(COLLECTIONS.STAFF).doc(id).delete()
+  if (!db) return
+  const batch = db.batch()
+  batch.delete(db.collection(COLLECTIONS.STAFF).doc(id))
+  // Salary documents use the employee document ID, so remove both atomically.
+  batch.delete(db.collection(COLLECTIONS.SALARIES).doc(id))
+  await batch.commit()
 }
 
 export async function updateStaffAccount(id: string, updates: Partial<Omit<StaffRecord, 'id' | 'passwordHash'>>): Promise<StaffRecord> {
@@ -251,7 +269,7 @@ export async function updateStaffAccount(id: string, updates: Partial<Omit<Staff
   return mapDocToStaff(updatedDoc)
 }
 
-export async function updateStaffProfile(staffId: string, input: { phone: string; address: string; details: string }): Promise<StaffRecord> {
+export async function updateStaffProfile(staffId: string, input: { phone: string; address: string; details: string; emergencyContactName: string; emergencyContactPhone: string }): Promise<StaffRecord> {
   if (!db) throw new Error('Firestore not configured')
   const docRef = db.collection(COLLECTIONS.STAFF).doc(staffId)
 
@@ -259,6 +277,8 @@ export async function updateStaffProfile(staffId: string, input: { phone: string
     phone: input.phone.trim(),
     address: input.address.trim(),
     details: input.details.trim(),
+    emergencyContactName: input.emergencyContactName.trim(),
+    emergencyContactPhone: input.emergencyContactPhone.trim(),
     updatedAt: FieldValue.serverTimestamp(),
   })
 
@@ -315,6 +335,9 @@ export type ExpenseRecord = {
   receiptUrl?: string
   receiptDataUrl?: string
   status: 'pending' | 'approved' | 'rejected'
+  decisionNote?: string
+  approvedAt?: string
+  rejectedAt?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -340,6 +363,9 @@ export type TimesheetRecord = {
   hours: number
   notes: string
   status: 'pending' | 'approved' | 'rejected'
+  decisionNote?: string
+  approvedAt?: string
+  rejectedAt?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -372,6 +398,9 @@ function mapDocToExpense(doc: DocumentSnapshot): ExpenseRecord {
     receiptUrl: data.receiptUrl || '',
     receiptDataUrl: data.receiptDataUrl || '',
     status: readStatus(data.status),
+    decisionNote: data.decisionNote || '',
+    approvedAt: mapTimestamp(data.approvedAt),
+    rejectedAt: mapTimestamp(data.rejectedAt),
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
@@ -394,6 +423,9 @@ function mapDocToTimesheet(doc: DocumentSnapshot): TimesheetRecord {
     hours: data.hours || 0,
     notes: data.notes || '',
     status: readStatus(data.status),
+    decisionNote: data.decisionNote || '',
+    approvedAt: mapTimestamp(data.approvedAt),
+    rejectedAt: mapTimestamp(data.rejectedAt),
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
@@ -462,11 +494,14 @@ export async function createExpense(input: { staffEmail: string; staffName: stri
   return mapDocToExpense(newDoc)
 }
 
-export async function updateExpenseStatus(id: string, status: 'approved' | 'rejected'): Promise<ExpenseRecord> {
+export async function updateExpenseStatus(id: string, status: 'approved' | 'rejected', decisionNote = ''): Promise<ExpenseRecord> {
   if (!db) throw new Error('Firestore not configured')
   const docRef = db.collection(COLLECTIONS.EXPENSES).doc(id)
   await docRef.update({
     status: status,
+    decisionNote: decisionNote.trim(),
+    approvedAt: status === 'approved' ? FieldValue.serverTimestamp() : null,
+    rejectedAt: status === 'rejected' ? FieldValue.serverTimestamp() : null,
     updatedAt: FieldValue.serverTimestamp(),
   })
   const updatedDoc = await docRef.get()
@@ -515,11 +550,14 @@ export async function createTimesheet(input: { staffEmail: string; weekStart: st
   return mapDocToTimesheet(newDoc)
 }
 
-export async function updateTimesheetStatus(id: string, status: 'approved' | 'rejected'): Promise<TimesheetRecord> {
+export async function updateTimesheetStatus(id: string, status: 'approved' | 'rejected', decisionNote = ''): Promise<TimesheetRecord> {
   if (!db) throw new Error('Firestore not configured')
   const docRef = db.collection(COLLECTIONS.TIMESHEETS).doc(id)
   await docRef.update({
     status: status,
+    decisionNote: decisionNote.trim(),
+    approvedAt: status === 'approved' ? FieldValue.serverTimestamp() : null,
+    rejectedAt: status === 'rejected' ? FieldValue.serverTimestamp() : null,
     updatedAt: FieldValue.serverTimestamp(),
   })
   const updatedDoc = await docRef.get()
@@ -527,6 +565,17 @@ export async function updateTimesheetStatus(id: string, status: 'approved' | 're
     throw new Error('Document not found after update.')
   }
   return mapDocToTimesheet(updatedDoc)
+}
+
+export type LeaveRequestRecord = {
+  id: string
+  staffEmail: string
+  startDate: string
+  endDate: string
+  reason: string
+  status: 'pending' | 'approved' | 'rejected'
+  decisionNote?: string
+  createdAt?: string
 }
 
 export async function completeStaffOnboarding(staffId: string, input: { passwordHash: string; phone: string; address: string; details: string; emergencyContactName: string; emergencyContactPhone: string }): Promise<StaffRecord> {
@@ -565,6 +614,25 @@ export async function saveExpenseFieldSettings(input: ExpenseFieldSettings): Pro
   return getExpenseFieldSettings()
 }
 
+export async function getSecuritySettings(): Promise<SecuritySettings> {
+  if (!db) return defaultSecuritySettings
+  const snapshot = await db.collection(COLLECTIONS.SETTINGS).doc('security').get()
+  if (!snapshot.exists) return defaultSecuritySettings
+  const data = snapshot.data() || {}
+  return {
+    sessionHours: [1, 4, 8, 12, 24].includes(data.sessionHours) ? data.sessionHours as SecuritySettings['sessionHours'] : 24,
+    minPasswordLength: typeof data.minPasswordLength === 'number' ? Math.min(64, Math.max(8, data.minPasswordLength)) : 8,
+    requireUppercase: data.requireUppercase === true,
+    requireNumber: data.requireNumber === true,
+  }
+}
+
+export async function saveSecuritySettings(input: SecuritySettings): Promise<SecuritySettings> {
+  if (!db) throw new Error('Firestore not configured')
+  await db.collection(COLLECTIONS.SETTINGS).doc('security').set({ ...input, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+  return getSecuritySettings()
+}
+
 export async function listSalaries() {
   if (!db) return []
   const snapshot = await db.collection(COLLECTIONS.SALARIES).get()
@@ -598,7 +666,15 @@ export type ExpenseFieldSettings = {
   receiptRequired: boolean
 }
 
+export type SecuritySettings = {
+  sessionHours: 1 | 4 | 8 | 12 | 24
+  minPasswordLength: number
+  requireUppercase: boolean
+  requireNumber: boolean
+}
+
 const defaultExpenseFieldSettings: ExpenseFieldSettings = { cityRequired: true, descriptionRequired: true, receiptRequired: true }
+const defaultSecuritySettings: SecuritySettings = { sessionHours: 24, minPasswordLength: 8, requireUppercase: false, requireNumber: false }
 
 async function deleteAuditLogSnapshot(snapshot: FirebaseFirestore.QuerySnapshot) {
   if (!db || snapshot.empty) return 0
@@ -672,4 +748,31 @@ export async function logAdminAction(input: {
     // Log an error but don't throw, as the primary action succeeded.
     console.error('Failed to write to audit log:', error)
   }
+}
+
+export async function listLeaveRequests(staffEmail?: string): Promise<LeaveRequestRecord[]> {
+  if (!db) return []
+  let query: Query = db.collection(COLLECTIONS.LEAVE_REQUESTS)
+  if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
+  const snapshot = await query.get()
+  return snapshot.docs.map((doc) => {
+    const data = doc.data()
+    return { id: doc.id, staffEmail: data.staffEmail || '', startDate: data.startDate || '', endDate: data.endDate || '', reason: data.reason || '', status: data.status === 'approved' || data.status === 'rejected' ? data.status : 'pending', decisionNote: data.decisionNote || '', createdAt: mapTimestamp(data.createdAt) }
+  })
+}
+
+export async function createLeaveRequest(input: Omit<LeaveRequestRecord, 'id' | 'status' | 'decisionNote' | 'createdAt'>) {
+  if (!db) throw new Error('Firestore not configured')
+  const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc()
+  await docRef.set({ ...input, staffEmail: input.staffEmail.trim().toLowerCase(), reason: input.reason.trim(), status: 'pending', createdAt: FieldValue.serverTimestamp() })
+  return (await listLeaveRequests(input.staffEmail)).find((leave) => leave.id === docRef.id)!
+}
+
+export async function updateLeaveRequestStatus(id: string, status: 'approved' | 'rejected', decisionNote = '') {
+  if (!db) throw new Error('Firestore not configured')
+  const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc(id)
+  await docRef.update({ status, decisionNote: decisionNote.trim(), updatedAt: FieldValue.serverTimestamp() })
+  const doc = await docRef.get()
+  const data = doc.data() || {}
+  return { id: doc.id, staffEmail: data.staffEmail || '', startDate: data.startDate || '', endDate: data.endDate || '', reason: data.reason || '', status: data.status, decisionNote: data.decisionNote || '', createdAt: mapTimestamp(data.createdAt) } as LeaveRequestRecord
 }

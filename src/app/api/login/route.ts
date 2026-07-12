@@ -1,8 +1,13 @@
 import { NextResponse } from 'next/server'
 import { authConfig, authenticateUser, createSessionToken, getConfiguredUsers, getRoleRedirect } from '@/lib/auth'
-import { isFirestoreConfigured } from '@/lib/firestore'
+import { getSecuritySettings, isFirestoreConfigured } from '@/lib/firestore'
+
+const loginAttempts = new Map<string, { count: number; resetAt: number }>()
 
 export async function POST(request: Request) {
+  const clientKey = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local'
+  const attempt = loginAttempts.get(clientKey)
+  if (attempt && attempt.resetAt > Date.now() && attempt.count >= 8) return NextResponse.json({ message: 'Too many login attempts. Please try again later.' }, { status: 429 })
   let body: unknown
 
   try {
@@ -34,8 +39,13 @@ export async function POST(request: Request) {
   }
 
   if (!user) {
+    loginAttempts.set(clientKey, { count: (attempt?.resetAt && attempt.resetAt > Date.now() ? attempt.count : 0) + 1, resetAt: Date.now() + 15 * 60 * 1000 })
     return NextResponse.json({ message: 'Invalid email or password.' }, { status: 401 })
   }
+
+  loginAttempts.delete(clientKey)
+  const security = await getSecuritySettings()
+  const maxAge = security.sessionHours * 60 * 60
 
   const response = NextResponse.json({
     role: user.role,
@@ -43,11 +53,11 @@ export async function POST(request: Request) {
     redirectTo: getRoleRedirect(user),
   })
 
-  response.cookies.set(authConfig.cookieName, createSessionToken(user), {
+  response.cookies.set(authConfig.cookieName, createSessionToken(user, maxAge), {
     httpOnly: true,
     sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
-    maxAge: authConfig.maxAge,
+    maxAge,
     path: '/',
   })
 

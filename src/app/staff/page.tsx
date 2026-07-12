@@ -20,7 +20,7 @@ export default async function StaffPage() {
     <PortalHome
       user={user}
       version={getAppVersion()}
-      title="Staff Workspace"
+      title="Employee Workspace"
     />
   )
 }

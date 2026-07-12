@@ -1,5 +1,5 @@
 import crypto from 'crypto'
-import { createAdminAccount, getAdminByEmail, getStaffByEmail, isFirestoreConfigured } from './firestore'
+import { createAdminAccount, getAdminByEmail, getStaffByEmail, isFirestoreConfigured, type SecuritySettings } from './firestore'
 
 export type UserRole = 'admin' | 'staff'
 
@@ -25,7 +25,9 @@ export const authConfig = {
 }
 
 function getAuthSecret() {
-  return process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'profitpro-local-dev-secret'
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
+  if (!secret && process.env.NODE_ENV === 'production') throw new Error('AUTH_SECRET is required in production.')
+  return secret || 'profitpro-local-dev-secret'
 }
 
 function safeEqual(a: string, b: string) {
@@ -84,6 +86,22 @@ export function verifyPassword(password: string, storedPassword: string) {
   return safeEqual(hash, storedHash)
 }
 
+export function getPasswordValidationMessage(password: string, settings: SecuritySettings) {
+  if (password.length < settings.minPasswordLength) {
+    return `New password must be at least ${settings.minPasswordLength} characters.`
+  }
+
+  if (settings.requireUppercase && !/[A-Z]/.test(password)) {
+    return 'New password must include an uppercase letter.'
+  }
+
+  if (settings.requireNumber && !/\d/.test(password)) {
+    return 'New password must include a number.'
+  }
+
+  return null
+}
+
 export async function authenticateUser(email: string, password: string): Promise<SessionUser | null> {
   const normalizedEmail = email.trim().toLowerCase()
 
@@ -140,13 +158,13 @@ export async function authenticateUser(email: string, password: string): Promise
   return null
 }
 
-export function createSessionToken(user: SessionUser) {
+export function createSessionToken(user: SessionUser, maxAge = authConfig.maxAge) {
   const payload = Buffer.from(
     JSON.stringify({
       email: user.email,
       role: user.role,
       mustChangePassword: user.mustChangePassword || false,
-      exp: Math.floor(Date.now() / 1000) + authConfig.maxAge,
+      exp: Math.floor(Date.now() / 1000) + maxAge,
     })
   ).toString('base64url')
 
