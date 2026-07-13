@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       employeeId: staffEmployeeId,
       department: staffDepartment,
       annualCtc: ctc,
-      passwordHash: hashPassword(INITIAL_STAFF_PASSWORD),
+      passwordHash: await hashPassword(INITIAL_STAFF_PASSWORD),
     })
 
     await saveSalary(staff.id, {

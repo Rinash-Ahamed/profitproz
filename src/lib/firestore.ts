@@ -34,20 +34,44 @@ export type AdminRecord = {
 
 const projectId = process.env.FIREBASE_PROJECT_ID
 const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')
+
+function normalizePrivateKey(value?: string) {
+  if (!value) return undefined
+
+  let normalized = value.trim()
+  const hasMatchingQuotes =
+    (normalized.startsWith('"') && normalized.endsWith('"')) ||
+    (normalized.startsWith("'") && normalized.endsWith("'"))
+
+  if (hasMatchingQuotes) normalized = normalized.slice(1, -1)
+
+  return normalized
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n/g, '\n')
+}
+
+const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
 
 const isConfigured = !!(projectId && clientEmail && privateKey)
 
+let initializationError: unknown = null
+
 if (isConfigured && !getApps().length) {
-  initializeApp({
-    credential: cert({ projectId, clientEmail, privateKey }),
-  })
+  try {
+    initializeApp({
+      credential: cert({ projectId, clientEmail, privateKey }),
+    })
+  } catch (error) {
+    initializationError = error
+    console.error('Firebase Admin initialization failed. Check the Firebase credentials configured for this environment.', error)
+  }
 }
 
-const db = isConfigured ? getFirestore() : null
+const db = isConfigured && !initializationError ? getFirestore() : null
 
 export function isFirestoreConfigured() {
-  return isConfigured
+  return !!db
 }
 
 function ensureDb() {
@@ -60,7 +84,7 @@ function ensureDb() {
       .filter(Boolean)
       .join(', ')
 
-    const message = missingVars ? `Missing environment variables: ${missingVars}` : 'Variables seem present, but initialization failed.'
+    const message = missingVars ? `Missing environment variables: ${missingVars}` : 'Firebase credentials are present, but Firebase Admin initialization failed.'
     throw new Error(`Firestore not configured. ${message}`)
   }
   return db
