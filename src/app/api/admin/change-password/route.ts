@@ -17,9 +17,9 @@ export async function POST(request: Request) {
   if (!currentPassword || passwordError) return NextResponse.json({ message: passwordError || 'Enter your current password.' }, { status: 400 })
 
   const admin = await getAdminByEmail(user.email)
-  if (!admin || !verifyPassword(currentPassword, admin.passwordHash)) return NextResponse.json({ message: 'Current password is incorrect.' }, { status: 401 })
+  if (!admin || !await verifyPassword(currentPassword, admin.passwordHash)) return NextResponse.json({ message: 'Current password is incorrect.' }, { status: 401 })
 
-  await updateAdminPassword(admin.id, hashPassword(newPassword))
+  await updateAdminPassword(admin.id, await hashPassword(newPassword))
   await logAdminAction({ actorEmail: user.email, action: 'ADMIN_PASSWORD_CHANGE', targetId: admin.id, details: 'Admin changed their password.' })
   return NextResponse.json({ ok: true })
 }

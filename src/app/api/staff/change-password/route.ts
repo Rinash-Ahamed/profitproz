@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
   const staff = await getStaffByEmail(user.email)
 
-  if (!staff || !verifyPassword(currentPassword, staff.passwordHash)) {
+  if (!staff || !await verifyPassword(currentPassword, staff.passwordHash)) {
     return NextResponse.json({ message: 'Current password is incorrect.' }, { status: 401 })
   }
 
@@ -47,9 +47,9 @@ export async function POST(request: Request) {
     if (!/^[0-9]{7,15}$/.test(profile.phone) || !/^[0-9]{7,15}$/.test(profile.emergencyContactPhone) || !profile.address || !profile.details || !profile.emergencyContactName) {
       return NextResponse.json({ message: 'Complete your contact, emergency contact, address, and details fields.' }, { status: 400 })
     }
-    await completeStaffOnboarding(staff.id, { passwordHash: hashPassword(newPassword), ...profile })
+    await completeStaffOnboarding(staff.id, { passwordHash: await hashPassword(newPassword), ...profile })
   } else {
-    await updateStaffPassword(staff.id, hashPassword(newPassword))
+    await updateStaffPassword(staff.id, await hashPassword(newPassword))
   }
 
   const response = NextResponse.json({ ok: true })

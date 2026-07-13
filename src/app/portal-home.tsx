@@ -135,18 +135,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         .finally(() => setLoading(false))
     }
 
-    if (activeTab === 'dashboard') {
-      setLoading(true)
-      Promise.all([fetch('/api/staff/expenses'), fetch('/api/staff/timesheets')])
-        .then(async ([expenseRes, timesheetRes]) => {
-          const [expenseData, timesheetData] = await Promise.all([expenseRes.json(), timesheetRes.json()])
-          if (expenseData.expenses) setExpenseList(expenseData.expenses)
-          if (timesheetData.timesheets) setTimesheetList(timesheetData.timesheets)
-        })
-        .catch(() => setError('Could not load your dashboard data.'))
-        .finally(() => setLoading(false))
-    }
-
     if (activeTab === 'expenses') {
       setLoading(true)
       fetch('/api/admin/expenses')
@@ -177,6 +165,16 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     if (activeTab === 'leaves') {
       setLoading(true)
       fetch('/api/admin/leaves').then((res) => res.json()).then((data) => { if (data.leaves) setLeaveList(data.leaves) }).catch(() => setError('Could not load leave requests.')).finally(() => setLoading(false))
+    }
+
+    if (activeTab === 'settings') {
+      Promise.all([fetch('/api/admin/expense-settings'), fetch('/api/admin/security-settings')])
+        .then(async ([expenseRes, securityRes]) => {
+          const [expenseData, securityData] = await Promise.all([expenseRes.json(), securityRes.json()])
+          if (expenseData.settings) setExpenseSettings(expenseData.settings)
+          if (securityData.settings) setSecuritySettings(securityData.settings)
+        })
+        .catch(() => setError('Could not load expense settings.'))
     }
   }, [activeTab, user.role])
 
@@ -214,15 +212,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       fetch('/api/staff/leaves').then((res) => res.json()).then((data) => { if (data.leaves) setLeaveList(data.leaves) }).catch(() => setError('Could not load your leave requests.')).finally(() => setLoading(false))
     }
 
-    if (activeTab === 'settings') {
-      Promise.all([fetch('/api/admin/expense-settings'), fetch('/api/admin/security-settings')])
-        .then(async ([expenseRes, securityRes]) => {
-          const [expenseData, securityData] = await Promise.all([expenseRes.json(), securityRes.json()])
-          if (expenseData.settings) setExpenseSettings(expenseData.settings)
-          if (securityData.settings) setSecuritySettings(securityData.settings)
-        })
-        .catch(() => setError('Could not load expense settings.'))
-    }
   }, [activeTab, user.mustChangePassword, user.role])
 
   async function logout() {

@@ -30,6 +30,14 @@ function getAuthSecret() {
   return secret || 'profitpro-local-dev-secret'
 }
 
+export function getAuthConfigurationError() {
+  if (process.env.NODE_ENV === 'production' && !process.env.AUTH_SECRET && !process.env.NEXTAUTH_SECRET) {
+    return 'Server authentication is not configured. Add AUTH_SECRET to the deployment environment and redeploy.'
+  }
+
+  return null
+}
+
 function safeEqual(a: string, b: string) {
   const left = Buffer.from(a)
   const right = Buffer.from(b)
@@ -67,23 +75,30 @@ export function getConfiguredUsers(): LoginUser[] {
   return users
 }
 
-export function hashPassword(password: string, salt = crypto.randomBytes(16).toString('hex')) {
-  const hash = crypto.pbkdf2Sync(password, salt, PASSWORD_ITERATIONS, PASSWORD_KEY_LENGTH, 'sha256').toString('hex')
+function derivePasswordKey(password: string, salt: string, iterations: number) {
+  return new Promise<Buffer>((resolve, reject) => {
+    crypto.pbkdf2(password, salt, iterations, PASSWORD_KEY_LENGTH, 'sha256', (error, derivedKey) => {
+      if (error) reject(error)
+      else resolve(derivedKey)
+    })
+  })
+}
+
+export async function hashPassword(password: string, salt = crypto.randomBytes(16).toString('hex')) {
+  const hash = (await derivePasswordKey(password, salt, PASSWORD_ITERATIONS)).toString('hex')
   return `${PASSWORD_ITERATIONS}:${salt}:${hash}`
 }
 
-export function verifyPassword(password: string, storedPassword: string) {
+export async function verifyPassword(password: string, storedPassword: string) {
   const [iterations, salt, storedHash] = storedPassword.split(':')
 
   if (!iterations || !salt || !storedHash) {
     return safeEqual(password, storedPassword)
   }
 
-  const hash = crypto
-    .pbkdf2Sync(password, salt, Number(iterations), PASSWORD_KEY_LENGTH, 'sha256')
-    .toString('hex')
+  const hash = await derivePasswordKey(password, salt, Number(iterations))
 
-  return safeEqual(hash, storedHash)
+  return safeEqual(hash.toString('hex'), storedHash)
 }
 
 export function getPasswordValidationMessage(password: string, settings: SecuritySettings) {
@@ -108,7 +123,7 @@ export async function authenticateUser(email: string, password: string): Promise
   if (isFirestoreConfigured()) {
     const admin = await getAdminByEmail(normalizedEmail)
 
-    if (admin?.active && verifyPassword(password, admin.passwordHash)) {
+    if (admin?.active && await verifyPassword(password, admin.passwordHash)) {
       return {
         email: admin.email,
         role: 'admin',
@@ -125,7 +140,7 @@ export async function authenticateUser(email: string, password: string): Promise
         try {
           await createAdminAccount({
             email: normalizedEmail,
-            passwordHash: hashPassword(password),
+            passwordHash: await hashPassword(password),
           })
         } catch (error) {
           if (!(error instanceof Error) || error.message !== 'ADMIN_EXISTS') {
@@ -147,7 +162,7 @@ export async function authenticateUser(email: string, password: string): Promise
 
   const staff = await getStaffByEmail(normalizedEmail)
 
-  if (staff?.active && verifyPassword(password, staff.passwordHash)) {
+  if (staff?.active && await verifyPassword(password, staff.passwordHash)) {
     return {
       email: staff.email,
       role: 'staff',

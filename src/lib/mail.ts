@@ -1,16 +1,19 @@
 import nodemailer from 'nodemailer'
 
-export async function sendMail(input: { fromName: string; to: string; replyTo?: string; subject: string; text: string; html: string }) {
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT || 587),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
+const transporter = nodemailer.createTransport({
+  pool: true,
+  maxConnections: 3,
+  maxMessages: 100,
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT || 587),
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,
+  },
+})
 
+export async function sendMail(input: { fromName: string; to: string; replyTo?: string; subject: string; text: string; html: string }) {
   return transporter.sendMail({
     from: `"${input.fromName}" <${process.env.SMTP_FROM || 'admin@profitproz.com'}>`,
     to: input.to,

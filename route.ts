@@ -19,7 +19,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 
   try {
-    const newPasswordHash = hashPassword(INITIAL_STAFF_PASSWORD)
+    const newPasswordHash = await hashPassword(INITIAL_STAFF_PASSWORD)
     await updateStaffPasswordAndFlag(staffId, newPasswordHash)
 
     return NextResponse.json({

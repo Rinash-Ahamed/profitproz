@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { authConfig, authenticateUser, createSessionToken, getConfiguredUsers, getRoleRedirect } from '@/lib/auth'
+import { authConfig, authenticateUser, createSessionToken, getAuthConfigurationError, getConfiguredUsers, getRoleRedirect } from '@/lib/auth'
 import { getSecuritySettings, isFirestoreConfigured } from '@/lib/firestore'
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>()
@@ -22,6 +22,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Email and password are required.' }, { status: 400 })
   }
 
+  const authConfigurationError = getAuthConfigurationError()
+  if (authConfigurationError) {
+    console.error(authConfigurationError)
+    return NextResponse.json({ message: authConfigurationError }, { status: 503 })
+  }
+
   if (getConfiguredUsers().length === 0 && !isFirestoreConfigured()) {
     return NextResponse.json(
       { message: 'Login is not configured yet. Add Admin credentials and Firebase settings to the environment.' },
@@ -29,37 +35,35 @@ export async function POST(request: Request) {
     )
   }
 
-  let user
-
   try {
-    user = await authenticateUser(email, password)
+    const user = await authenticateUser(email, password)
+
+    if (!user) {
+      loginAttempts.set(clientKey, { count: (attempt?.resetAt && attempt.resetAt > Date.now() ? attempt.count : 0) + 1, resetAt: Date.now() + 15 * 60 * 1000 })
+      return NextResponse.json({ message: 'Invalid email or password.' }, { status: 401 })
+    }
+
+    loginAttempts.delete(clientKey)
+    const security = await getSecuritySettings()
+    const maxAge = security.sessionHours * 60 * 60
+
+    const response = NextResponse.json({
+      role: user.role,
+      mustChangePassword: user.mustChangePassword || false,
+      redirectTo: getRoleRedirect(user),
+    })
+
+    response.cookies.set(authConfig.cookieName, createSessionToken(user, maxAge), {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge,
+      path: '/',
+    })
+
+    return response
   } catch (error) {
     console.error('Login failed unexpectedly:', error)
-    return NextResponse.json({ message: 'Something went wrong.' }, { status: 500 })
+    return NextResponse.json({ message: 'The server could not complete login. Check the deployment logs and Firebase environment variables.' }, { status: 500 })
   }
-
-  if (!user) {
-    loginAttempts.set(clientKey, { count: (attempt?.resetAt && attempt.resetAt > Date.now() ? attempt.count : 0) + 1, resetAt: Date.now() + 15 * 60 * 1000 })
-    return NextResponse.json({ message: 'Invalid email or password.' }, { status: 401 })
-  }
-
-  loginAttempts.delete(clientKey)
-  const security = await getSecuritySettings()
-  const maxAge = security.sessionHours * 60 * 60
-
-  const response = NextResponse.json({
-    role: user.role,
-    mustChangePassword: user.mustChangePassword || false,
-    redirectTo: getRoleRedirect(user),
-  })
-
-  response.cookies.set(authConfig.cookieName, createSessionToken(user, maxAge), {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
-    maxAge,
-    path: '/',
-  })
-
-  return response
 }

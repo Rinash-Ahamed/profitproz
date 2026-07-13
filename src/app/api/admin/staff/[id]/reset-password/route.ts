@@ -30,7 +30,7 @@ export async function PATCH(_request: Request, context: RouteContext) {
       return NextResponse.json({ message: 'Staff member was not found.' }, { status: 404 })
     }
 
-    await updateStaffPasswordAndFlag(staffId, hashPassword(INITIAL_STAFF_PASSWORD))
+    await updateStaffPasswordAndFlag(staffId, await hashPassword(INITIAL_STAFF_PASSWORD))
     await logAdminAction({
       actorEmail: user.email,
       action: 'PASSWORD_RESET',
