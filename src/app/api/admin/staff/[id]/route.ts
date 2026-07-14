@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifySessionToken } from '@/lib/auth'
+import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { deleteStaffAccount, getStaffById, logAdminAction, toPublicStaff, updateStaffAccount } from '@/lib/firestore'
 
 type RouteContext = {
@@ -9,7 +9,7 @@ type RouteContext = {
 
 async function requireAdmin() {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
 
   return user?.role === 'admin' ? user : null
 }
@@ -46,25 +46,25 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (typeof input.name === 'string') {
     const name = input.name.trim()
-    if (!name) return NextResponse.json({ message: 'Employee name cannot be empty.' }, { status: 400 })
+    if (!name || name.length > 160) return NextResponse.json({ message: 'Enter a valid employee name.' }, { status: 400 })
     updates.name = name
   }
 
   if (typeof input.email === 'string') {
     const email = input.email.trim().toLowerCase()
-    if (!email || !email.includes('@')) return NextResponse.json({ message: 'A valid email is required.' }, { status: 400 })
+    if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ message: 'A valid email is required.' }, { status: 400 })
     updates.email = email
   }
 
   if (typeof input.employeeId === 'string') {
     const employeeId = input.employeeId.trim()
-    if (!employeeId) return NextResponse.json({ message: 'Employee ID cannot be empty.' }, { status: 400 })
+    if (!employeeId || employeeId.length > 50) return NextResponse.json({ message: 'Enter a valid employee ID.' }, { status: 400 })
     updates.employeeId = employeeId
   }
 
   if (typeof input.department === 'string') {
     const department = input.department.trim()
-    if (!department) return NextResponse.json({ message: 'Department cannot be empty.' }, { status: 400 })
+    if (!department || department.length > 100) return NextResponse.json({ message: 'Enter a valid department.' }, { status: 400 })
     updates.department = department
   }
 

@@ -6,10 +6,11 @@ export async function POST() {
 
   response.cookies.set(authConfig.cookieName, '', {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'strict',
     secure: process.env.NODE_ENV === 'production',
     maxAge: 0,
     path: '/',
+    priority: 'high',
   })
 
   return response

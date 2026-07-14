@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifySessionToken } from '@/lib/auth'
-import { listExpenses, listSalaries, listStaffAccounts, saveSalary, toPublicStaff } from '@/lib/firestore'
+import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
+import { listExpenses, listSalaries, listStaffAccounts, logAdminAction, saveSalary, toPublicStaff } from '@/lib/firestore'
 
 export async function GET() {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
 
   if (!user || user.role !== 'admin') {
     return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
@@ -24,7 +24,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
 
   if (!user || user.role !== 'admin') {
     return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
   const baseSalary = Number(input.baseSalary)
   const notes = typeof input.notes === 'string' ? input.notes : ''
 
-  if (!staffEmail || !Number.isFinite(baseSalary) || baseSalary < 0) {
+  if (!staffEmail || staffEmail.length > 254 || !Number.isFinite(baseSalary) || baseSalary < 0 || baseSalary > 100_000_000 || notes.length > 2000) {
     return NextResponse.json({ message: 'Staff email and valid salary are required.' }, { status: 400 })
   }
 
@@ -53,5 +53,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Staff member was not found.' }, { status: 404 })
   }
 
-  return NextResponse.json({ salary: await saveSalary(staff.id, { staffEmail, baseSalary, notes }) })
+  const salary = await saveSalary(staff.id, { staffEmail, baseSalary, notes })
+  await logAdminAction({ actorEmail: user.email, action: 'SALARY_UPDATE', targetId: staff.id, details: `Salary updated for ${staff.email}.` })
+  return NextResponse.json({ salary })
 }

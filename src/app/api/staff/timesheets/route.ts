@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifySessionToken } from '@/lib/auth'
+import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { createTimesheet, listTimesheets } from '@/lib/firestore'
 
 export async function GET() {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
@@ -16,16 +16,17 @@ export async function GET() {
 
 export async function POST(request: Request) {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
   }
 
-  const body = (await request.json()) as { weekStart?: unknown; weekEnd?: unknown; workedDates?: unknown; workLocation?: unknown; notes?: unknown }
+  let body: { weekStart?: unknown; weekEnd?: unknown; workedDates?: unknown; workLocation?: unknown; notes?: unknown }
+  try { body = await request.json() } catch { return NextResponse.json({ message: 'Invalid timesheet request.' }, { status: 400 }) }
   const weekStart = typeof body.weekStart === 'string' ? body.weekStart : ''
   const weekEnd = typeof body.weekEnd === 'string' ? body.weekEnd : ''
-  const workedDates = Array.isArray(body.workedDates) ? body.workedDates.filter((date): date is string => typeof date === 'string') : []
+  const workedDates = Array.isArray(body.workedDates) ? [...new Set(body.workedDates.filter((date): date is string => typeof date === 'string'))] : []
   const workLocation = body.workLocation === 'office' ? 'office' : body.workLocation === 'remote' ? 'remote' : ''
   const notes = typeof body.notes === 'string' ? body.notes : ''
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   const end = new Date(`${weekEnd}T00:00:00`)
   const isSundayToSaturday = !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start.getDay() === 0 && Math.round((end.getTime() - start.getTime()) / 86400000) === 6
 
-  if (!weekStart || !weekEnd || !workLocation || workedDates.length === 0 || !isSundayToSaturday) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart) || !/^\d{4}-\d{2}-\d{2}$/.test(weekEnd) || !workLocation || workedDates.length === 0 || workedDates.length > 7 || notes.length > 2000 || !isSundayToSaturday) {
     return NextResponse.json({ message: 'Select a Sunday-to-Saturday week, at least one worked day, and a work location.' }, { status: 400 })
   }
 

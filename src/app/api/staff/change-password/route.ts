@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, createSessionToken, getPasswordValidationMessage, hashPassword, verifyPassword, verifySessionToken } from '@/lib/auth'
+import { authConfig, createSessionToken, getPasswordValidationMessage, hashPassword, verifyPassword, verifyActiveSessionToken } from '@/lib/auth'
 import { completeStaffOnboarding, getSecuritySettings, getStaffByEmail, updateStaffPassword } from '@/lib/firestore'
 
 export async function POST(request: Request) {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff', allowMustChangePassword: true })
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Staff access is required.' }, { status: 403 })
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
 
   const { currentPassword, newPassword, phone, address, details, emergencyContactName, emergencyContactPhone } = body as { currentPassword?: unknown; newPassword?: unknown; phone?: unknown; address?: unknown; details?: unknown; emergencyContactName?: unknown; emergencyContactPhone?: unknown }
 
-  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
+  if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || currentPassword.length > 1024 || newPassword.length > 1024) {
     return NextResponse.json({ message: 'Current and new password are required.' }, { status: 400 })
   }
 
@@ -43,13 +43,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Current password is incorrect.' }, { status: 401 })
   }
 
+  let updatedStaff: Awaited<ReturnType<typeof updateStaffPassword>>
   if (staff.mustChangePassword) {
-    if (!/^[0-9]{7,15}$/.test(profile.phone) || !/^[0-9]{7,15}$/.test(profile.emergencyContactPhone) || !profile.address || !profile.details || !profile.emergencyContactName) {
+    if (!/^[0-9]{7,15}$/.test(profile.phone) || !/^[0-9]{7,15}$/.test(profile.emergencyContactPhone) || !profile.address || profile.address.length > 500 || !profile.details || profile.details.length > 2000 || !profile.emergencyContactName || profile.emergencyContactName.length > 100) {
       return NextResponse.json({ message: 'Complete your contact, emergency contact, address, and details fields.' }, { status: 400 })
     }
-    await completeStaffOnboarding(staff.id, { passwordHash: await hashPassword(newPassword), ...profile })
+    updatedStaff = await completeStaffOnboarding(staff.id, { passwordHash: await hashPassword(newPassword), ...profile })
   } else {
-    await updateStaffPassword(staff.id, await hashPassword(newPassword))
+    updatedStaff = await updateStaffPassword(staff.id, await hashPassword(newPassword))
   }
 
   const response = NextResponse.json({ ok: true })
@@ -59,13 +60,15 @@ export async function POST(request: Request) {
       email: user.email,
       role: 'staff',
       mustChangePassword: false,
+      sessionVersion: updatedStaff.sessionVersion,
     }, security.sessionHours * 60 * 60),
     {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'strict',
       secure: process.env.NODE_ENV === 'production',
       maxAge: security.sessionHours * 60 * 60,
       path: '/',
+      priority: 'high',
     }
   )
 

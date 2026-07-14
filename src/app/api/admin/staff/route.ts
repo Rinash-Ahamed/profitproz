@@ -1,13 +1,16 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, hashPassword, verifySessionToken } from '@/lib/auth'
+import crypto from 'node:crypto'
+import { authConfig, hashPassword, verifyActiveSessionToken } from '@/lib/auth'
 import { createStaffAccount, listStaffAccounts, logAdminAction, saveSalary, toPublicStaff } from '@/lib/firestore'
 
-const INITIAL_STAFF_PASSWORD = 'Welcome@123'
+function createTemporaryPassword() {
+  return crypto.randomBytes(24).toString('base64url')
+}
 
 async function requireAdmin() {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
 
   return user?.role === 'admin' ? user : null
 }
@@ -54,22 +57,23 @@ export async function POST(request: Request) {
   const staffDepartment = typeof department === 'string' ? department.trim() : ''
   const ctc = Number(annualCtc)
 
-  if (!first || !last || !staffEmployeeId || !staffDepartment) {
+  if (!first || first.length > 80 || !last || last.length > 80 || !staffEmployeeId || staffEmployeeId.length > 50 || !staffDepartment || staffDepartment.length > 100) {
     return NextResponse.json({ message: 'First name, last name, employee ID, and department are required.' }, { status: 400 })
   }
 
-  if (!Number.isFinite(ctc) || ctc <= 0) {
+  if (!Number.isFinite(ctc) || ctc <= 0 || ctc > 1_000_000_000) {
     return NextResponse.json({ message: 'Annual CTC must be a valid positive number.' }, { status: 400 })
   }
 
   try {
+    const temporaryPassword = createTemporaryPassword()
     const staff = await createStaffAccount({
       name: staffName,
       email: `${first.toLowerCase().replace(/\s+/g, '')}@profitproz.com`,
       employeeId: staffEmployeeId,
       department: staffDepartment,
       annualCtc: ctc,
-      passwordHash: await hashPassword(INITIAL_STAFF_PASSWORD),
+      passwordHash: await hashPassword(temporaryPassword),
     })
 
     await saveSalary(staff.id, {
@@ -85,7 +89,7 @@ export async function POST(request: Request) {
       details: `Admin created employee: ${staff.name} (${staff.email}).`,
     })
 
-    return NextResponse.json({ staff: toPublicStaff(staff), initialPassword: INITIAL_STAFF_PASSWORD }, { status: 201 })
+    return NextResponse.json({ staff: toPublicStaff(staff), initialPassword: temporaryPassword }, { status: 201 })
   } catch (error) {
     if (error instanceof Error && error.message === 'STAFF_EXISTS') {
       return NextResponse.json({ message: 'An employee with this generated email already exists.' }, { status: 409 })

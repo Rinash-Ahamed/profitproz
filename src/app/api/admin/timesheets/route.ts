@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifySessionToken } from '@/lib/auth'
+import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { listTimesheets } from '@/lib/firestore'
 
 export async function GET() {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
 
   if (!user || user.role !== 'admin') {
     return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })

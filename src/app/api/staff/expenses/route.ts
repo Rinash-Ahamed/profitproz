@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
-import { authConfig, verifySessionToken, SessionUser } from '@/lib/auth'
+import { authConfig, verifyActiveSessionToken, SessionUser } from '@/lib/auth'
 import { createExpense, getExpenseFieldSettings, getStaffByEmail, listExpenses } from '@/lib/firestore'
 import { getExpenseNotificationHtml, sendMail } from '@/lib/mail'
 
@@ -8,7 +8,7 @@ import { getExpenseNotificationHtml, sendMail } from '@/lib/mail'
 async function getAuthenticatedStaffUser(): Promise<SessionUser | NextResponse> {
   const cookieStore = await cookies()
   const token = cookieStore.get(authConfig.cookieName)?.value
-  const user = verifySessionToken(token)
+  const user = await verifyActiveSessionToken(token, { role: 'staff' })
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Forbidden: Staff access is required.' }, { status: 403 })
@@ -52,11 +52,16 @@ export async function POST(request: NextRequest) {
   const receiptUrl = typeof body.receiptUrl === 'string' ? body.receiptUrl.trim() : ''
   const settings = await getExpenseFieldSettings()
 
-  if (!expenseType || !Number.isFinite(amount) || amount <= 0 || (settings.cityRequired && !city) || (settings.descriptionRequired && !description) || (settings.receiptRequired && !receiptUrl)) {
+  if (!expenseType || !Number.isFinite(amount) || amount <= 0 || amount > 10_000_000 || city.length > 100 || description.length > 2000 || receiptUrl.length > 2048 || (settings.cityRequired && !city) || (settings.descriptionRequired && !description) || (settings.receiptRequired && !receiptUrl)) {
     return NextResponse.json({ message: 'Complete all required expense fields and enter a valid total.' }, { status: 400 })
   }
   if (receiptUrl) {
-    try { new URL(receiptUrl) } catch { return NextResponse.json({ message: 'Enter a valid receipt link.' }, { status: 400 }) }
+    try {
+      const parsedReceiptUrl = new URL(receiptUrl)
+      if (parsedReceiptUrl.protocol !== 'https:' || parsedReceiptUrl.username || parsedReceiptUrl.password) throw new Error('UNSAFE_URL')
+    } catch {
+      return NextResponse.json({ message: 'Enter a valid HTTPS receipt link.' }, { status: 400 })
+    }
   }
 
   try {

@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifySessionToken } from '@/lib/auth'
+import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { getStaffByEmail, toPublicStaff, updateStaffProfile } from '@/lib/firestore'
 
 export async function GET() {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Staff access is required.' }, { status: 403 })
@@ -22,7 +22,7 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Staff access is required.' }, { status: 403 })
@@ -51,7 +51,7 @@ export async function PATCH(request: Request) {
     emergencyContactPhone: typeof input.emergencyContactPhone === 'string' ? input.emergencyContactPhone.trim() : '',
   }
 
-  if (!/^[0-9]{7,15}$/.test(profileInput.phone) || !/^[0-9]{7,15}$/.test(profileInput.emergencyContactPhone) || !profileInput.address || !profileInput.details || !profileInput.emergencyContactName) {
+  if (!/^[0-9]{7,15}$/.test(profileInput.phone) || !/^[0-9]{7,15}$/.test(profileInput.emergencyContactPhone) || !profileInput.address || profileInput.address.length > 500 || !profileInput.details || profileInput.details.length > 2000 || !profileInput.emergencyContactName || profileInput.emergencyContactName.length > 100) {
     return NextResponse.json({ message: 'Enter valid contact, emergency contact, address, and details fields.' }, { status: 400 })
   }
 
