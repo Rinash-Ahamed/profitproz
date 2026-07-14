@@ -4,22 +4,33 @@ import { sendMail } from '@/lib/mail'
 
 export const runtime = 'nodejs'
 
+function optionalString(value: unknown, maxLength: number) {
+  if (value === undefined || value === null || value === '') return ''
+  if (typeof value !== 'string') return null
+  const normalized = value.trim()
+  return normalized.length <= maxLength ? normalized : null
+}
+
 export async function POST(request: NextRequest) {
   let body: Record<string, unknown> | null = null
 
   try {
     body = await request.json()
-    const { name, email, phone, hotel, rooms, service, message } = body as {
-      name?: string
-      email?: string
-      phone?: string
-      hotel?: string
-      rooms?: string
-      service?: string
-      message?: string
-    }
+    const input = body as Record<string, unknown>
+    const name = optionalString(input.name, 100)
+    const email = optionalString(input.email, 254)
+    const phone = optionalString(input.phone, 20)
+    const hotel = optionalString(input.hotel, 150)
+    const rooms = optionalString(input.rooms, 10)
+    const service = optionalString(input.service, 100)
+    const message = optionalString(input.message, 2000)
 
-    if (!name || !phone || !hotel || !service) {
+    if (
+      !name || !phone || !hotel || !service ||
+      rooms === null || message === null || email === null ||
+      !/^\+?[0-9 ()-]{7,20}$/.test(phone) ||
+      (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    ) {
       return NextResponse.json(
         { success: false, message: 'Required fields are missing.' },
         { status: 400 }
@@ -42,7 +53,6 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         message: 'Failed to send the form submission.',
-        error: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     )

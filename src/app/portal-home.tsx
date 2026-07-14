@@ -60,7 +60,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [expenseNotes, setExpenseNotes] = useState('')
   const [expenseReceiptUrl, setExpenseReceiptUrl] = useState('')
   const [expenseSettings, setExpenseSettings] = useState<ExpenseFieldSettings>({ cityRequired: true, descriptionRequired: true, receiptRequired: true })
-  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 24, minPasswordLength: 8, requireUppercase: false, requireNumber: false })
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false })
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('')
@@ -244,6 +244,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       setStaffDepartment('')
       setStaffCtc('')
       setMessage('Employee added successfully.')
+      if (data.initialPassword) {
+        window.prompt('Copy this one-time temporary password and share it through a secure channel:', data.initialPassword)
+      }
       // Refresh staff list with the new record from the API response
       setStaffList((prev) => [...prev, data.staff].sort((a, b) => (a.name || '').localeCompare(b.name || '')))
     } catch {
@@ -289,7 +292,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function handleResetPassword(staffId: string, staffName: string) {
-    if (!window.confirm(`Are you sure you want to reset the password for ${staffName}? Their password will be set to "Welcome@123" and they will be required to change it on next login.`)) {
+    if (!window.confirm(`Reset the password for ${staffName}? A new one-time temporary password will be generated and all existing sessions will be revoked.`)) {
       return
     }
 
@@ -308,7 +311,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         throw new Error(data.message || 'Failed to reset password.')
       }
 
-      setMessage(`Password for ${staffName} has been reset. Please share the initial password with them securely.`)
+      setMessage(`Password for ${staffName} has been reset and existing sessions were revoked.`)
+      if (typeof data.initialPassword === 'string') {
+        window.prompt('Copy this one-time temporary password and share it through a secure channel:', data.initialPassword)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.')
     } finally {
@@ -955,7 +961,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             </div>
                             <div>
                               <p className="text-lg font-semibold text-ink">Add new employee</p>
-                              <p className="mt-1 text-sm text-sub">New employees start with Welcome@123 and must change it after first login.</p>
+                              <p className="mt-1 text-sm text-sub">New employees receive a random one-time password and must change it after first login.</p>
                             </div>
                           </div>
 
@@ -1262,12 +1268,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <form className="surface rounded-lg p-6 sm:p-7" onSubmit={changeAdminPassword}>
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#66B159]/10 text-[#66B159]"><KeyRound className="h-5 w-5" /></div>
-                          <div><p className="text-base font-semibold text-ink">Change admin password</p><p className="mt-1 text-sm text-sub">Use at least 8 characters.</p></div>
+                          <div><p className="text-base font-semibold text-ink">Change admin password</p><p className="mt-1 text-sm text-sub">Use at least 12 characters.</p></div>
                         </div>
                         <div className="mt-5 space-y-4">
                           <div><label htmlFor="adminCurrentPassword" className="label-upper mb-2 block text-ghost">Current password</label><input id="adminCurrentPassword" type="password" value={adminCurrentPassword} onChange={(event) => setAdminCurrentPassword(event.target.value)} className={inputClass} required /></div>
-                          <div><label htmlFor="adminNewPassword" className="label-upper mb-2 block text-ghost">New password</label><input id="adminNewPassword" type="password" minLength={8} value={adminNewPassword} onChange={(event) => setAdminNewPassword(event.target.value)} className={inputClass} required /></div>
-                          <div><label htmlFor="adminConfirmPassword" className="label-upper mb-2 block text-ghost">Confirm new password</label><input id="adminConfirmPassword" type="password" minLength={8} value={adminConfirmPassword} onChange={(event) => setAdminConfirmPassword(event.target.value)} className={inputClass} required /></div>
+                          <div><label htmlFor="adminNewPassword" className="label-upper mb-2 block text-ghost">New password</label><input id="adminNewPassword" type="password" minLength={12} value={adminNewPassword} onChange={(event) => setAdminNewPassword(event.target.value)} className={inputClass} required /></div>
+                          <div><label htmlFor="adminConfirmPassword" className="label-upper mb-2 block text-ghost">Confirm new password</label><input id="adminConfirmPassword" type="password" minLength={12} value={adminConfirmPassword} onChange={(event) => setAdminConfirmPassword(event.target.value)} className={inputClass} required /></div>
                         </div>
                         <button type="submit" disabled={loading} className="mt-5 flex h-10 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Update password</button>
                       </form>
@@ -1276,7 +1282,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         <p className="text-base font-semibold text-ink">Security Policy</p>
                         <div className="mt-5 space-y-4">
                           <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Session duration</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select></div>
-                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="8" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 8 }))} className={inputClass} /></div>
+                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="12" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 12 }))} className={inputClass} /></div>
                           {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
                         </div>
                         <button type="button" onClick={saveSecuritySettings} disabled={loading} className="mt-5 flex h-10 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save security policy</button>
@@ -1322,7 +1328,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         value={currentPassword}
                         onChange={(event) => setCurrentPassword(event.target.value)}
                         className={inputClass}
-                        placeholder="Welcome@123"
+                        placeholder="Temporary password"
                         required
                       />
                     </div>
@@ -1336,7 +1342,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         value={newPassword}
                         onChange={(event) => setNewPassword(event.target.value)}
                         className={inputClass}
-                        placeholder="At least 8 characters"
+                        placeholder="At least 12 characters"
                         required
                       />
                     </div>

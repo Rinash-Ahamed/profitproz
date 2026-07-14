@@ -1,11 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifySessionToken } from '@/lib/auth'
+import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { clearAuditLogs, logAdminAction, pruneOldAuditLogs } from '@/lib/firestore'
 
 async function requireAdmin() {
   const cookieStore = await cookies()
-  const user = verifySessionToken(cookieStore.get(authConfig.cookieName)?.value)
+  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
 
   return user?.role === 'admin' ? user : null
 }
@@ -26,6 +26,10 @@ export async function DELETE() {
 
   if (!user) {
     return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
+  }
+
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_AUDIT_LOG_CLEAR !== 'true') {
+    return NextResponse.json({ message: 'Audit log deletion is disabled.' }, { status: 403 })
   }
 
   const deleted = await clearAuditLogs()

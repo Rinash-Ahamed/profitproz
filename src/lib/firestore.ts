@@ -1,6 +1,7 @@
 import { getApps, initializeApp, cert } from 'firebase-admin/app'
 import { getFirestore, Timestamp, FieldValue, DocumentSnapshot, Query } from 'firebase-admin/firestore'
 import crypto from 'crypto'
+import 'server-only'
 
 export type StaffRecord = {
   id: string
@@ -10,6 +11,7 @@ export type StaffRecord = {
   passwordHash: string
   active: boolean
   mustChangePassword: boolean
+  sessionVersion: number
   phone?: string
   address?: string
   details?: string
@@ -21,13 +23,14 @@ export type StaffRecord = {
   updatedAt?: string
 }
 
-export type PublicStaffRecord = Omit<StaffRecord, 'passwordHash'>
+export type PublicStaffRecord = Omit<StaffRecord, 'passwordHash' | 'sessionVersion'>
 
 export type AdminRecord = {
   id: string
   email: string
   passwordHash: string
   active: boolean
+  sessionVersion: number
   createdAt?: string
   updatedAt?: string
 }
@@ -56,19 +59,21 @@ const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
 const isConfigured = !!(projectId && clientEmail && privateKey)
 
 let initializationError: unknown = null
+const FIREBASE_APP_NAME = 'profitpro-server'
+let firebaseApp = getApps().find((app) => app.name === FIREBASE_APP_NAME)
 
-if (isConfigured && !getApps().length) {
+if (isConfigured && !firebaseApp) {
   try {
-    initializeApp({
+    firebaseApp = initializeApp({
       credential: cert({ projectId, clientEmail, privateKey }),
-    })
+    }, FIREBASE_APP_NAME)
   } catch (error) {
     initializationError = error
     console.error('Firebase Admin initialization failed. Check the Firebase credentials configured for this environment.', error)
   }
 }
 
-const db = isConfigured && !initializationError ? getFirestore() : null
+const db = isConfigured && firebaseApp && !initializationError ? getFirestore(firebaseApp) : null
 
 export function isFirestoreConfigured() {
   return !!db
@@ -137,6 +142,7 @@ function mapDocToStaff(doc: DocumentSnapshot): StaffRecord {
     passwordHash: data.passwordHash || '',
     active: typeof data.active === 'boolean' ? data.active : true,
     mustChangePassword: typeof data.mustChangePassword === 'boolean' ? data.mustChangePassword : true,
+    sessionVersion: Number.isInteger(data.sessionVersion) ? data.sessionVersion : 0,
     phone: data.phone || '',
     address: data.address || '',
     details: data.details || '',
@@ -157,15 +163,17 @@ function mapDocToAdmin(doc: DocumentSnapshot): AdminRecord {
     email: data.email || '',
     passwordHash: data.passwordHash || '',
     active: typeof data.active === 'boolean' ? data.active : true,
+    sessionVersion: Number.isInteger(data.sessionVersion) ? data.sessionVersion : 0,
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
 }
 
 export function toPublicStaff(staff: StaffRecord): PublicStaffRecord {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { passwordHash, ...publicData } = staff
-  return publicData
+  const publicData: Partial<StaffRecord> = { ...staff }
+  delete publicData.passwordHash
+  delete publicData.sessionVersion
+  return publicData as PublicStaffRecord
 }
 
 export async function getStaffById(id: string): Promise<StaffRecord | null> {
@@ -211,6 +219,7 @@ export async function createAdminAccount(input: { email: string; passwordHash: s
       email: normalizedEmail,
       passwordHash: input.passwordHash,
       active: true,
+      sessionVersion: 0,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     })
@@ -227,7 +236,11 @@ export async function createAdminAccount(input: { email: string; passwordHash: s
 export async function updateAdminPassword(id: string, passwordHash: string): Promise<AdminRecord> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.ADMINS).doc(id)
-  await docRef.update({ passwordHash, updatedAt: FieldValue.serverTimestamp() })
+  await docRef.update({
+    passwordHash,
+    sessionVersion: FieldValue.increment(1),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
   const updatedDoc = await docRef.get()
   if (!updatedDoc.exists) throw new Error('Admin account not found after update.')
   return mapDocToAdmin(updatedDoc)
@@ -254,6 +267,7 @@ export async function createStaffAccount(input: { name: string; email?: string; 
       passwordHash: input.passwordHash,
       active: true,
       mustChangePassword: true,
+      sessionVersion: 0,
       phone: '',
       address: '',
       details: '',
@@ -299,6 +313,9 @@ export async function updateStaffAccount(id: string, updates: Partial<Omit<Staff
   if (dataToUpdate.email && typeof dataToUpdate.email === 'string') {
     dataToUpdate.email = dataToUpdate.email.toLowerCase()
   }
+  if (typeof updates.active === 'boolean') {
+    dataToUpdate.sessionVersion = FieldValue.increment(1)
+  }
 
   await docRef.update(dataToUpdate)
 
@@ -336,6 +353,7 @@ export async function updateStaffPassword(staffId: string, passwordHash: string)
   await docRef.update({
     passwordHash: passwordHash,
     mustChangePassword: false,
+    sessionVersion: FieldValue.increment(1),
     updatedAt: FieldValue.serverTimestamp(),
   })
 
@@ -352,6 +370,7 @@ export async function updateStaffPasswordAndFlag(staffId: string, passwordHash: 
   await docRef.update({
     passwordHash: passwordHash,
     mustChangePassword: true,
+    sessionVersion: FieldValue.increment(1),
     updatedAt: FieldValue.serverTimestamp(),
   })
   const updatedDoc = await docRef.get()
@@ -629,6 +648,7 @@ export async function completeStaffOnboarding(staffId: string, input: { password
     emergencyContactName: input.emergencyContactName.trim(),
     emergencyContactPhone: input.emergencyContactPhone.trim(),
     mustChangePassword: false,
+    sessionVersion: FieldValue.increment(1),
     updatedAt: FieldValue.serverTimestamp(),
   })
   const updatedDoc = await docRef.get()
@@ -661,7 +681,7 @@ export async function getSecuritySettings(): Promise<SecuritySettings> {
   const data = snapshot.data() || {}
   return {
     sessionHours: [1, 4, 8, 12, 24].includes(data.sessionHours) ? data.sessionHours as SecuritySettings['sessionHours'] : 24,
-    minPasswordLength: typeof data.minPasswordLength === 'number' ? Math.min(64, Math.max(8, data.minPasswordLength)) : 8,
+    minPasswordLength: typeof data.minPasswordLength === 'number' ? Math.min(64, Math.max(12, data.minPasswordLength)) : 12,
     requireUppercase: data.requireUppercase === true,
     requireNumber: data.requireNumber === true,
   }
@@ -714,7 +734,7 @@ export type SecuritySettings = {
 }
 
 const defaultExpenseFieldSettings: ExpenseFieldSettings = { cityRequired: true, descriptionRequired: true, receiptRequired: true }
-const defaultSecuritySettings: SecuritySettings = { sessionHours: 24, minPasswordLength: 8, requireUppercase: false, requireNumber: false }
+const defaultSecuritySettings: SecuritySettings = { sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false }
 
 async function deleteAuditLogSnapshot(snapshot: FirebaseFirestore.QuerySnapshot) {
   if (!db || snapshot.empty) return 0

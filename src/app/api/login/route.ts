@@ -5,7 +5,7 @@ import { getSecuritySettings, isFirestoreConfigured } from '@/lib/firestore'
 const loginAttempts = new Map<string, { count: number; resetAt: number }>()
 
 export async function POST(request: Request) {
-  const clientKey = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local'
+  const clientKey = (request.headers.get('x-vercel-forwarded-for') || request.headers.get('x-forwarded-for'))?.split(',')[0]?.trim() || 'local'
   const attempt = loginAttempts.get(clientKey)
   if (attempt && attempt.resetAt > Date.now() && attempt.count >= 8) return NextResponse.json({ message: 'Too many login attempts. Please try again later.' }, { status: 429 })
   let body: unknown
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
 
   const { email, password } = body as { email?: unknown; password?: unknown }
 
-  if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password) {
+  if (typeof email !== 'string' || typeof password !== 'string' || !email.trim() || !password || email.length > 254 || password.length > 1024) {
     return NextResponse.json({ message: 'Email and password are required.' }, { status: 400 })
   }
 
@@ -55,15 +55,16 @@ export async function POST(request: Request) {
 
     response.cookies.set(authConfig.cookieName, createSessionToken(user, maxAge), {
       httpOnly: true,
-      sameSite: 'lax',
+      sameSite: 'strict',
       secure: process.env.NODE_ENV === 'production',
       maxAge,
       path: '/',
+      priority: 'high',
     })
 
     return response
   } catch (error) {
     console.error('Login failed unexpectedly:', error)
-    return NextResponse.json({ message: 'The server could not complete login. Check the deployment logs and Firebase environment variables.' }, { status: 500 })
+    return NextResponse.json({ message: 'The server could not complete login.' }, { status: 500 })
   }
 }

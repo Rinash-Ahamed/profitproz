@@ -1,5 +1,6 @@
 import crypto from 'crypto'
-import { createAdminAccount, getAdminByEmail, getStaffByEmail, isFirestoreConfigured, type SecuritySettings } from './firestore'
+import { getAdminByEmail, getStaffByEmail, isFirestoreConfigured, type SecuritySettings } from './firestore'
+import 'server-only'
 
 export type UserRole = 'admin' | 'staff'
 
@@ -7,16 +8,17 @@ export type SessionUser = {
   email: string
   role: UserRole
   mustChangePassword?: boolean
+  sessionVersion: number
 }
 
 type LoginUser = SessionUser & {
   password: string
-  shouldSeedFirestore?: boolean
 }
 
-const SESSION_COOKIE = 'profitpro_session'
+const SESSION_COOKIE = process.env.NODE_ENV === 'production' ? '__Host-profitpro_session' : 'profitpro_session'
 const ONE_DAY_SECONDS = 60 * 60 * 24
-const PASSWORD_ITERATIONS = 120000
+const PASSWORD_ITERATIONS = 600000
+const MIN_SUPPORTED_PASSWORD_ITERATIONS = 120000
 const PASSWORD_KEY_LENGTH = 32
 
 export const authConfig = {
@@ -27,12 +29,17 @@ export const authConfig = {
 function getAuthSecret() {
   const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
   if (!secret && process.env.NODE_ENV === 'production') throw new Error('AUTH_SECRET is required in production.')
+  if (secret && process.env.NODE_ENV === 'production' && Buffer.byteLength(secret) < 32) throw new Error('AUTH_SECRET must contain at least 32 bytes.')
   return secret || 'profitpro-local-dev-secret'
 }
 
 export function getAuthConfigurationError() {
   if (process.env.NODE_ENV === 'production' && !process.env.AUTH_SECRET && !process.env.NEXTAUTH_SECRET) {
     return 'Server authentication is not configured. Add AUTH_SECRET to the deployment environment and redeploy.'
+  }
+
+  if (process.env.NODE_ENV === 'production' && !isFirestoreConfigured()) {
+    return 'Server authentication storage is not configured.'
   }
 
   return null
@@ -50,6 +57,8 @@ function safeEqual(a: string, b: string) {
 }
 
 export function getConfiguredUsers(): LoginUser[] {
+  if (process.env.NODE_ENV === 'production') return []
+
   const users: LoginUser[] = []
 
   const adminEmail = process.env.ADMIN_EMAIL || process.env.ADMIN_LOGIN_EMAIL
@@ -60,7 +69,7 @@ export function getConfiguredUsers(): LoginUser[] {
       email: adminEmail,
       password: adminPassword,
       role: 'admin',
-      shouldSeedFirestore: true,
+      sessionVersion: 0,
     })
   }
 
@@ -69,6 +78,7 @@ export function getConfiguredUsers(): LoginUser[] {
       email: process.env.STAFF_LOGIN_EMAIL,
       password: process.env.STAFF_LOGIN_PASSWORD,
       role: 'staff',
+      sessionVersion: 0,
     })
   }
 
@@ -91,12 +101,19 @@ export async function hashPassword(password: string, salt = crypto.randomBytes(1
 
 export async function verifyPassword(password: string, storedPassword: string) {
   const [iterations, salt, storedHash] = storedPassword.split(':')
+  const iterationCount = Number(iterations)
 
-  if (!iterations || !salt || !storedHash) {
-    return safeEqual(password, storedPassword)
+  if (
+    !Number.isInteger(iterationCount) ||
+    iterationCount < MIN_SUPPORTED_PASSWORD_ITERATIONS ||
+    iterationCount > 1_000_000 ||
+    !/^[a-f0-9]{32}$/i.test(salt || '') ||
+    !/^[a-f0-9]{64}$/i.test(storedHash || '')
+  ) {
+    return false
   }
 
-  const hash = await derivePasswordKey(password, salt, Number(iterations))
+  const hash = await derivePasswordKey(password, salt, iterationCount)
 
   return safeEqual(hash.toString('hex'), storedHash)
 }
@@ -127,31 +144,20 @@ export async function authenticateUser(email: string, password: string): Promise
       return {
         email: admin.email,
         role: 'admin',
+        sessionVersion: admin.sessionVersion,
       }
     }
   }
 
-  for (const user of getConfiguredUsers()) {
+  for (const user of isFirestoreConfigured() ? [] : getConfiguredUsers()) {
     const emailMatches = user.email.trim().toLowerCase() === normalizedEmail
     const passwordMatches = safeEqual(password, user.password)
 
     if (emailMatches && passwordMatches) {
-      if (user.role === 'admin' && user.shouldSeedFirestore && isFirestoreConfigured()) {
-        try {
-          await createAdminAccount({
-            email: normalizedEmail,
-            passwordHash: await hashPassword(password),
-          })
-        } catch (error) {
-          if (!(error instanceof Error) || error.message !== 'ADMIN_EXISTS') {
-            console.error('Failed to seed Firestore admin account:', error)
-          }
-        }
-      }
-
       return {
         email: normalizedEmail,
         role: user.role,
+        sessionVersion: user.sessionVersion,
       }
     }
   }
@@ -167,6 +173,7 @@ export async function authenticateUser(email: string, password: string): Promise
       email: staff.email,
       role: 'staff',
       mustChangePassword: staff.mustChangePassword,
+      sessionVersion: staff.sessionVersion,
     }
   }
 
@@ -179,6 +186,7 @@ export function createSessionToken(user: SessionUser, maxAge = authConfig.maxAge
       email: user.email,
       role: user.role,
       mustChangePassword: user.mustChangePassword || false,
+      sessionVersion: user.sessionVersion,
       exp: Math.floor(Date.now() / 1000) + maxAge,
     })
   ).toString('base64url')
@@ -218,6 +226,7 @@ export function verifySessionToken(token?: string): SessionUser | null {
       typeof decoded.email !== 'string' ||
       (decoded.role !== 'admin' && decoded.role !== 'staff') ||
       typeof decoded.mustChangePassword !== 'boolean' ||
+      !Number.isInteger(decoded.sessionVersion) ||
       typeof decoded.exp !== 'number' ||
       decoded.exp < Math.floor(Date.now() / 1000)
     ) {
@@ -228,9 +237,39 @@ export function verifySessionToken(token?: string): SessionUser | null {
       email: decoded.email,
       role: decoded.role,
       mustChangePassword: decoded.mustChangePassword,
+      sessionVersion: decoded.sessionVersion,
     }
   } catch {
     return null
+  }
+}
+
+export async function verifyActiveSessionToken(
+  token: string | undefined,
+  options: { role?: UserRole; allowMustChangePassword?: boolean } = {},
+): Promise<SessionUser | null> {
+  const session = verifySessionToken(token)
+  if (!session || (options.role && session.role !== options.role)) return null
+
+  if (!isFirestoreConfigured()) {
+    return process.env.NODE_ENV === 'production' ? null : session
+  }
+
+  if (session.role === 'admin') {
+    const admin = await getAdminByEmail(session.email)
+    if (!admin?.active || admin.sessionVersion !== session.sessionVersion) return null
+    return { email: admin.email, role: 'admin', mustChangePassword: false, sessionVersion: admin.sessionVersion }
+  }
+
+  const staff = await getStaffByEmail(session.email)
+  if (!staff?.active || staff.sessionVersion !== session.sessionVersion) return null
+  if (staff.mustChangePassword && !options.allowMustChangePassword) return null
+
+  return {
+    email: staff.email,
+    role: 'staff',
+    mustChangePassword: staff.mustChangePassword,
+    sessionVersion: staff.sessionVersion,
   }
 }
 

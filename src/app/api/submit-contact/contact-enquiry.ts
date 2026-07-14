@@ -8,7 +8,24 @@ type EnquiryData = {
   message?: string
 }
 
+function escapeHtml(value: unknown) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+}
+
 export function getContactEnquiryHtml({ name, email, phone, hotel, rooms, service, message }: EnquiryData): string {
+  name = escapeHtml(name)
+  email = email ? escapeHtml(email) : undefined
+  phone = escapeHtml(phone)
+  hotel = escapeHtml(hotel)
+  rooms = rooms ? escapeHtml(rooms) : undefined
+  service = escapeHtml(service)
+  message = message ? escapeHtml(message) : undefined
+
   return `
 <div style="margin:0;padding:40px 16px;background:#09090B;font-family:Inter,Segoe UI,Arial,sans-serif;">
 
@@ -227,7 +244,7 @@ export function getContactEnquiryHtml({ name, email, phone, hotel, rooms, servic
             <div style="text-align:center;margin-top:32px;">
 
               <a
-                href="mailto:${email}"
+                href="mailto:${encodeURIComponent(email)}"
                 style="
                   display:inline-block;
                   background:#FAFAFA;
