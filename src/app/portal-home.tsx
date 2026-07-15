@@ -3,10 +3,11 @@
 import { FormEvent, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { CheckCircle2, ClipboardList, Edit, FileDown, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Trash2, User, UserPlus, Users, XCircle } from 'lucide-react'
+import { Building2, CheckCircle2, ClipboardList, Edit, FileDown, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Trash2, User, UserPlus, Users, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
-import type { ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, TimesheetRecord } from '@/lib/firestore'
+import type { ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, TimesheetRecord } from '@/lib/firestore'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
+import { PropertiesPanel } from '@/app/properties-panel'
 
 type PortalHomeProps = {
   user: SessionUser
@@ -39,6 +40,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
   const [salaryList, setSalaryList] = useState<SalaryRecord[]>([])
   const [editingStaff, setEditingStaff] = useState<PublicStaffRecord | null>(null)
+  const [propertyList, setPropertyList] = useState<PropertyRecord[]>([])
   // Timesheet state
   const [timesheetList, setTimesheetList] = useState<TimesheetRecord[]>([])
   const [showTimesheetFilters, setShowTimesheetFilters] = useState(false)
@@ -93,12 +95,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
     if (activeTab === 'dashboard') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/staff'), fetch('/api/admin/timesheets'), fetch('/api/admin/expenses')])
-        .then(async ([staffRes, timesheetRes, expenseRes]) => {
-          const [staffData, timesheetData, expenseData] = await Promise.all([staffRes.json(), timesheetRes.json(), expenseRes.json()])
+      Promise.all([fetch('/api/admin/staff'), fetch('/api/admin/timesheets'), fetch('/api/admin/expenses'), fetch('/api/admin/properties')])
+        .then(async ([staffRes, timesheetRes, expenseRes, propertyRes]) => {
+          const [staffData, timesheetData, expenseData, propertyData] = await Promise.all([staffRes.json(), timesheetRes.json(), expenseRes.json(), propertyRes.json()])
           if (staffData.staff) setStaffList(staffData.staff)
           if (timesheetData.timesheets) setTimesheetList(timesheetData.timesheets)
           if (expenseData.expenses) setExpenseList(expenseData.expenses)
+          if (propertyData.properties) setPropertyList(propertyData.properties)
         })
         .catch(() => setError('Could not load dashboard data.'))
         .finally(() => setLoading(false))
@@ -114,6 +117,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           }
         })
         .catch(() => setError('Could not load employee list.'))
+        .finally(() => setLoading(false))
+    }
+
+    if (activeTab === 'properties') {
+      setLoading(true)
+      fetch('/api/admin/properties')
+        .then((res) => res.json())
+        .then((data) => { if (data.properties) setPropertyList(data.properties) })
+        .catch(() => setError('Could not load client properties.'))
         .finally(() => setLoading(false))
     }
 
@@ -210,6 +222,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     if (activeTab === 'leaves') {
       setLoading(true)
       fetch('/api/staff/leaves').then((res) => res.json()).then((data) => { if (data.leaves) setLeaveList(data.leaves) }).catch(() => setError('Could not load your leave requests.')).finally(() => setLoading(false))
+    }
+
+    if (activeTab === 'properties') {
+      setLoading(true)
+      fetch('/api/properties')
+        .then((res) => res.json())
+        .then((data) => { if (data.properties) setPropertyList(data.properties) })
+        .catch(() => setError('Could not load client properties.'))
+        .finally(() => setLoading(false))
     }
 
   }, [activeTab, user.mustChangePassword, user.role])
@@ -682,7 +703,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         </div>
 
         {user.role === 'admin' && (
-          <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm md:flex">
+          <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm xl:flex">
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -701,6 +722,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                 }`}
               >
                 Employees
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('properties')}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === 'properties' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
+                }`}
+              >
+                Clients
               </button>
               <button
                 type="button"
@@ -746,7 +776,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         {user.role === 'staff' && !user.mustChangePassword && (
           <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm md:flex">
             <div className="flex items-center gap-1">
-              {['dashboard', 'expenses', 'timesheets', 'leaves'].map((tab) => (
+              {['dashboard', 'properties', 'expenses', 'timesheets', 'leaves'].map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -755,7 +785,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     activeTab === tab ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                   }`}
                 >
-                  {tab}
+                  {tab === 'properties' ? 'Clients' : tab}
                 </button>
               ))}
             </div>
@@ -799,7 +829,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
           {/* Mobile nav tabs */}
           {user.role === 'admin' && (
-            <div className="mt-10 overflow-x-auto border-b border-zinc-800 md:hidden">
+            <div className="mt-10 overflow-x-auto border-b border-zinc-800 xl:hidden">
               <div className="-mb-px flex items-center gap-4">
                 <button
                   type="button"
@@ -822,6 +852,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   }`}
                 >
                   Employees
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('properties')}
+                  className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
+                    activeTab === 'properties' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'
+                  }`}
+                >
+                  Clients
                 </button>
                 <button
                   type="button"
@@ -871,7 +910,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           {user.role === 'staff' && !user.mustChangePassword && (
             <div className="mt-10 overflow-x-auto border-b border-zinc-800 md:hidden">
               <div className="-mb-px flex items-center gap-4">
-                {['dashboard', 'expenses', 'timesheets', 'leaves'].map((tab) => (
+                {['dashboard', 'properties', 'expenses', 'timesheets', 'leaves'].map((tab) => (
                   <button
                     key={tab}
                     type="button"
@@ -882,20 +921,21 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         : 'border-transparent text-sub hover:border-zinc-700'
                     }`}
                   >
-                    {tab}
+                    {tab === 'properties' ? 'Clients' : tab}
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          <div className={`mt-10 w-full ${(user.role === 'admin' || activeTab === 'dashboard' || activeTab === 'expenses' || activeTab === 'timesheets') ? 'max-w-7xl' : 'max-w-3xl'}`}>
+          <div className={`mt-10 w-full ${(user.role === 'admin' || activeTab === 'dashboard' || activeTab === 'properties' || activeTab === 'expenses' || activeTab === 'timesheets') ? 'max-w-7xl' : 'max-w-3xl'}`}>
             {user.role === 'admin'
               ? {
                    dashboard: (
                     <div className="admin-dashboard space-y-6">
-                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                         <DashboardMetric icon={<Users className="h-5 w-5" />} label="Active employees" value={staffList.length} detail="People in your workspace" />
+                        <DashboardMetric icon={<Building2 className="h-5 w-5" />} label="Active client properties" value={propertyList.filter((property) => property.status === 'active').length} detail="Hospitality properties served" />
                         <DashboardMetric icon={<ClipboardList className="h-5 w-5" />} label="Timesheets to review" value={pendingTimesheets.length} detail="Awaiting a decision" />
                         <DashboardMetric icon={<ReceiptText className="h-5 w-5" />} label="Expenses to review" value={pendingExpenses.length} detail="Awaiting a decision" />
                         <DashboardMetric icon={<CheckCircle2 className="h-5 w-5" />} label="Approved expenses" value={`Rs. ${approvedExpenseTotal.toLocaleString('en-IN')}`} detail="Total approved to date" />
@@ -919,6 +959,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <p className="text-lg font-semibold text-ink">Quick actions</p>
                           <div className="mt-5 grid gap-3">
                             <button type="button" onClick={() => { setActiveTab('staff'); setStaffSubTab('add') }} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Add employee <UserPlus className="h-4 w-4 text-[#4d9144]" /></button>
+                            <button type="button" onClick={() => setActiveTab('properties')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Manage client properties <Building2 className="h-4 w-4 text-[#4d9144]" /></button>
                             <button type="button" onClick={() => setActiveTab('expenses')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Review expenses <ReceiptText className="h-4 w-4 text-[#4d9144]" /></button>
                             <button type="button" onClick={() => setActiveTab('payroll')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Open payroll <FileDown className="h-4 w-4 text-[#4d9144]" /></button>
                           </div>
@@ -1071,6 +1112,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       )}
                     </div>
                   ),
+                  properties: <PropertiesPanel properties={propertyList} loading={loading} onChange={setPropertyList} />,
                   timesheets: (
                     <div className="surface rounded-lg">
                       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
@@ -1412,6 +1454,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       </div>
                     </div>
                   ),
+                  properties: <PropertiesPanel properties={propertyList} loading={loading} onChange={setPropertyList} readOnly />,
                   expenses: (
                     <div className="staff-workspace space-y-6 text-left">
                       <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitExpense}>

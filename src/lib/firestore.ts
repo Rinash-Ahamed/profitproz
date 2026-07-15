@@ -54,6 +54,30 @@ function normalizePrivateKey(value?: string) {
     .replace(/\r\n/g, '\n')
 }
 
+export type PropertyStatus = 'pending' | 'active' | 'inactive'
+export type PropertyType = 'hotel' | 'resort' | 'homestay' | 'serviced-apartment' | 'hostel' | 'other'
+
+export type PropertyRecord = {
+  id: string
+  name: string
+  propertyType: PropertyType
+  contactName: string
+  contactEmail: string
+  contactPhone: string
+  city: string
+  address: string
+  roomCount: number
+  commissionPercent: number
+  contractStartDate: string
+  signedContractUrl: string
+  status: PropertyStatus
+  notes: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type PropertyInput = Omit<PropertyRecord, 'id' | 'createdAt' | 'updatedAt'>
+
 const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
 
 const isConfigured = !!(projectId && clientEmail && privateKey)
@@ -98,6 +122,7 @@ function ensureDb() {
 const COLLECTIONS = {
   ADMINS: 'admins',
   STAFF: 'staff',
+  PROPERTIES: 'properties',
   EXPENSES: 'expenses',
   EXPENSE_RECEIPTS: 'expense_receipts',
   TIMESHEETS: 'timesheets',
@@ -174,6 +199,29 @@ export function toPublicStaff(staff: StaffRecord): PublicStaffRecord {
   delete publicData.passwordHash
   delete publicData.sessionVersion
   return publicData as PublicStaffRecord
+}
+
+function mapDocToProperty(doc: DocumentSnapshot): PropertyRecord {
+  const data = doc.data() || {}
+
+  return {
+    id: doc.id,
+    name: typeof data.name === 'string' ? data.name : '',
+    propertyType: ['hotel', 'resort', 'homestay', 'serviced-apartment', 'hostel', 'other'].includes(data.propertyType) ? data.propertyType as PropertyType : 'hotel',
+    contactName: typeof data.contactName === 'string' ? data.contactName : '',
+    contactEmail: typeof data.contactEmail === 'string' ? data.contactEmail : '',
+    contactPhone: typeof data.contactPhone === 'string' ? data.contactPhone : '',
+    city: typeof data.city === 'string' ? data.city : '',
+    address: typeof data.address === 'string' ? data.address : '',
+    roomCount: typeof data.roomCount === 'number' ? data.roomCount : 0,
+    commissionPercent: typeof data.commissionPercent === 'number' ? data.commissionPercent : 0,
+    contractStartDate: typeof data.contractStartDate === 'string' ? data.contractStartDate : '',
+    status: data.status === 'active' && typeof data.signedContractUrl === 'string' && data.signedContractUrl ? 'active' : data.status === 'inactive' ? 'inactive' : 'pending',
+    signedContractUrl: typeof data.signedContractUrl === 'string' ? data.signedContractUrl : '',
+    notes: typeof data.notes === 'string' ? data.notes : '',
+    createdAt: mapTimestamp(data.createdAt),
+    updatedAt: mapTimestamp(data.updatedAt),
+  }
 }
 
 export async function getStaffById(id: string): Promise<StaffRecord | null> {
@@ -506,6 +554,47 @@ export async function listStaffAccounts() {
   if (!db) return []
   const snapshot = await db.collection(COLLECTIONS.STAFF).get()
   return snapshot.docs.map(mapDocToStaff)
+}
+
+export async function listProperties(): Promise<PropertyRecord[]> {
+  const db = ensureDb()
+  const snapshot = await db.collection(COLLECTIONS.PROPERTIES).get()
+  return snapshot.docs.map(mapDocToProperty)
+}
+
+export async function getPropertyById(id: string): Promise<PropertyRecord | null> {
+  const db = ensureDb()
+  const snapshot = await db.collection(COLLECTIONS.PROPERTIES).doc(id).get()
+  return snapshot.exists ? mapDocToProperty(snapshot) : null
+}
+
+export async function createProperty(input: PropertyInput): Promise<PropertyRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.PROPERTIES).doc(createDocumentId())
+  await docRef.set({
+    ...input,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+  const snapshot = await docRef.get()
+  return mapDocToProperty(snapshot)
+}
+
+export async function updateProperty(id: string, updates: Partial<PropertyInput>): Promise<PropertyRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.PROPERTIES).doc(id)
+  const existing = await docRef.get()
+  if (!existing.exists) throw new Error('PROPERTY_NOT_FOUND')
+  await docRef.update({ ...updates, updatedAt: FieldValue.serverTimestamp() })
+  return mapDocToProperty(await docRef.get())
+}
+
+export async function deleteProperty(id: string): Promise<void> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.PROPERTIES).doc(id)
+  const existing = await docRef.get()
+  if (!existing.exists) throw new Error('PROPERTY_NOT_FOUND')
+  await docRef.delete()
 }
 
 export async function listExpenses(staffEmail?: string) {
