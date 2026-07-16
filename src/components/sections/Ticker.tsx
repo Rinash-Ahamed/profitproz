@@ -1,6 +1,5 @@
 'use client'
 import React, { useEffect, useMemo, useState } from 'react'
-import Image from 'next/image'
 
 type TickerProps = {
   logos: { src: string; alt: string }[]
@@ -59,12 +58,12 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
         }}
       >
         {mobileLogos.map((logo, i) => (
-          <Image
+          <img
             key={`${logo.src}-${i}`}
             src={logo.src}
             alt={logo.alt}
-            width={96}
-            height={28}
+            loading="eager"
+            decoding="async"
             className="h-7 w-auto max-w-[96px] object-contain [content-visibility:visible]"
           />
         ))}
@@ -84,12 +83,12 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
       >
         {duplicatedLogos.map((logo, i) => (
           <div key={`${logo.src}-${i}`} className="flex h-7 shrink-0 items-center px-5 md:h-8 md:px-8">
-            <Image
+            <img
               src={logo.src}
               alt={i >= logos.length ? '' : logo.alt}
               aria-hidden={i >= logos.length}
-              width={120}
-              height={32}
+              loading="eager"
+              decoding="async"
               className="h-full w-auto max-w-none object-contain [content-visibility:visible]"
             />
           </div>

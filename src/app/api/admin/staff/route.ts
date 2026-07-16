@@ -43,11 +43,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid employee request.' }, { status: 400 })
   }
 
-  const { firstName, lastName, employeeId, department, annualCtc } = body as {
+  const { firstName, lastName, employeeId, department, role, annualCtc } = body as {
     firstName?: unknown
     lastName?: unknown
     employeeId?: unknown
     department?: unknown
+    role?: unknown
     annualCtc?: unknown
   }
   const first = typeof firstName === 'string' ? firstName.trim() : ''
@@ -55,10 +56,11 @@ export async function POST(request: Request) {
   const staffName = `${first} ${last}`.trim()
   const staffEmployeeId = typeof employeeId === 'string' ? employeeId.trim() : ''
   const staffDepartment = typeof department === 'string' ? department.trim() : ''
+  const staffRole = typeof role === 'string' ? role.trim() : ''
   const ctc = Number(annualCtc)
 
-  if (!first || first.length > 80 || !last || last.length > 80 || !staffEmployeeId || staffEmployeeId.length > 50 || !staffDepartment || staffDepartment.length > 100) {
-    return NextResponse.json({ message: 'First name, last name, employee ID, and department are required.' }, { status: 400 })
+  if (!first || first.length > 80 || !last || last.length > 80 || !staffEmployeeId || staffEmployeeId.length > 50 || !staffDepartment || staffDepartment.length > 100 || !staffRole || staffRole.length > 100) {
+    return NextResponse.json({ message: 'First name, last name, employee ID, department, and role are required.' }, { status: 400 })
   }
 
   if (!Number.isFinite(ctc) || ctc <= 0 || ctc > 1_000_000_000) {
@@ -72,6 +74,7 @@ export async function POST(request: Request) {
       email: `${first.toLowerCase().replace(/\s+/g, '')}@profitproz.com`,
       employeeId: staffEmployeeId,
       department: staffDepartment,
+      role: staffRole,
       annualCtc: ctc,
       passwordHash: await hashPassword(temporaryPassword),
     })

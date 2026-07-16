@@ -18,6 +18,7 @@ export type StaffRecord = {
   emergencyContactName?: string
   emergencyContactPhone?: string
   department?: string
+  role?: string
   annualCtc?: number
   createdAt?: string
   updatedAt?: string
@@ -174,6 +175,7 @@ function mapDocToStaff(doc: DocumentSnapshot): StaffRecord {
     emergencyContactName: data.emergencyContactName || '',
     emergencyContactPhone: data.emergencyContactPhone || '',
     department: data.department || '',
+    role: data.role || '',
     annualCtc: typeof data.annualCtc === 'number' ? data.annualCtc : 0,
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
@@ -294,7 +296,7 @@ export async function updateAdminPassword(id: string, passwordHash: string): Pro
   return mapDocToAdmin(updatedDoc)
 }
 
-export async function createStaffAccount(input: { name: string; email?: string; passwordHash: string; employeeId: string; department: string; annualCtc: number }): Promise<StaffRecord> {
+export async function createStaffAccount(input: { name: string; email?: string; passwordHash: string; employeeId: string; department: string; role: string; annualCtc: number }): Promise<StaffRecord> {
   const db = ensureDb()
   const generatedEmail = input.email?.trim().toLowerCase() || emailFromStaffName(input.name)
   const staffCollection = db.collection(COLLECTIONS.STAFF)
@@ -322,6 +324,7 @@ export async function createStaffAccount(input: { name: string; email?: string; 
       emergencyContactName: '',
       emergencyContactPhone: '',
       department: input.department,
+      role: input.role,
       annualCtc: input.annualCtc,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),

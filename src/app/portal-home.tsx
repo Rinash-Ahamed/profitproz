@@ -35,6 +35,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffLastName, setStaffLastName] = useState('')
   const [staffEmployeeId, setStaffEmployeeId] = useState('')
   const [staffDepartment, setStaffDepartment] = useState('')
+  const [staffRole, setStaffRole] = useState('')
   const [staffCtc, setStaffCtc] = useState('')
   // Staff list state
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
@@ -250,7 +251,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       const response = await fetch('/api/admin/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName: staffFirstName, lastName: staffLastName, annualCtc: Number(staffCtc), employeeId: staffEmployeeId, department: staffDepartment }),
+        body: JSON.stringify({ firstName: staffFirstName, lastName: staffLastName, annualCtc: Number(staffCtc), employeeId: staffEmployeeId, department: staffDepartment, role: staffRole }),
       })
       const data = (await response.json()) as { message?: string; initialPassword?: string; staff: PublicStaffRecord }
 
@@ -263,6 +264,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       setStaffLastName('')
       setStaffEmployeeId('')
       setStaffDepartment('')
+      setStaffRole('')
       setStaffCtc('')
       setMessage('Employee added successfully.')
       if (data.initialPassword) {
@@ -1035,6 +1037,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                               </label>
                               <input id="staffDepartment" value={staffDepartment} onChange={(e) => setStaffDepartment(e.target.value)} className={inputClass} required />
                             </div>
+                            <div>
+                              <label htmlFor="staffRole" className="label-upper mb-2 block text-ghost">
+                                Role
+                              </label>
+                              <input id="staffRole" value={staffRole} onChange={(e) => setStaffRole(e.target.value)} className={inputClass} placeholder="e.g., Revenue Manager" required />
+                            </div>
                           </div>
 
                           <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -1094,7 +1102,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                          {staff.emergencyContactName ? <p className="mt-1 max-w-56 truncate text-xs text-sub">Emergency: {staff.emergencyContactName} ({staff.emergencyContactPhone})</p> : null}
                                          {staff.details ? <p className="mt-1 max-w-56 truncate text-xs text-sub">{staff.details}</p> : null}
                                        </td>
-                                       <td className="px-6 py-4 text-sub">{staff.department || 'N/A'}</td>
+                                       <td className="px-6 py-4 text-sub">
+                                         <p>{staff.department || 'N/A'}</p>
+                                         <p className="mt-1 text-xs text-ghost">{staff.role || 'Role not set'}</p>
+                                       </td>
                                       <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
                                           <button type="button" onClick={() => setEditingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors" aria-label={`Edit ${staff.name}`}><Edit className="h-4 w-4" /></button>
@@ -1683,6 +1694,8 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
   const [email, setEmail] = useState(staff.email)
   const [employeeId, setEmployeeId] = useState(staff.employeeId || '')
   const [department, setDepartment] = useState(staff.department || '')
+  const [role, setRole] = useState(staff.role || '')
+  const [annualCtc, setAnnualCtc] = useState(staff.annualCtc ? String(staff.annualCtc) : '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -1706,6 +1719,8 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
       ...(email !== staff.email && { email }),
       ...(employeeId !== (staff.employeeId || '') && { employeeId }),
       ...(department !== (staff.department || '') && { department }),
+      ...(role !== (staff.role || '') && { role }),
+      ...(Number(annualCtc) !== (staff.annualCtc || 0) && { annualCtc: Number(annualCtc) }),
     }
 
     if (Object.keys(updates).length === 0) {
@@ -1766,6 +1781,14 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
               <div>
                 <label htmlFor="edit-staffDepartment" className="label-upper mb-2 block text-ghost">Department</label>
                 <input id="edit-staffDepartment" value={department} onChange={(e) => setDepartment(e.target.value)} className={inputClass} required />
+              </div>
+              <div>
+                <label htmlFor="edit-staffRole" className="label-upper mb-2 block text-ghost">Role</label>
+                <input id="edit-staffRole" value={role} onChange={(e) => setRole(e.target.value)} className={inputClass} placeholder="e.g., Revenue Manager" required />
+              </div>
+              <div>
+                <label htmlFor="edit-staffAnnualCtc" className="label-upper mb-2 block text-ghost">Annual CTC</label>
+                <input id="edit-staffAnnualCtc" type="number" inputMode="decimal" min="0.01" step="0.01" value={annualCtc} onChange={(e) => setAnnualCtc(e.target.value)} className={inputClass} required />
               </div>
             </div>
             {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}

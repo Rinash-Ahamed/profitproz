@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { deleteStaffAccount, getStaffById, logAdminAction, toPublicStaff, updateStaffAccount } from '@/lib/firestore'
+import { deleteStaffAccount, getStaffById, logAdminAction, saveSalary, toPublicStaff, updateStaffAccount } from '@/lib/firestore'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -40,6 +40,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     email?: unknown
     employeeId?: unknown
     department?: unknown
+    role?: unknown
+    annualCtc?: unknown
     active?: unknown
   }
   const updates: Parameters<typeof updateStaffAccount>[1] = {}
@@ -68,6 +70,18 @@ export async function PATCH(request: Request, context: RouteContext) {
     updates.department = department
   }
 
+  if (typeof input.role === 'string') {
+    const role = input.role.trim()
+    if (!role || role.length > 100) return NextResponse.json({ message: 'Enter a valid employee role.' }, { status: 400 })
+    updates.role = role
+  }
+
+  if (input.annualCtc !== undefined) {
+    const annualCtc = Number(input.annualCtc)
+    if (!Number.isFinite(annualCtc) || annualCtc <= 0 || annualCtc > 1_000_000_000) return NextResponse.json({ message: 'Annual CTC must be a valid positive number.' }, { status: 400 })
+    updates.annualCtc = annualCtc
+  }
+
   if (typeof input.active === 'boolean') {
     updates.active = input.active
   }
@@ -79,6 +93,14 @@ export async function PATCH(request: Request, context: RouteContext) {
   try {
     const before = await getStaffById(id)
     const staff = await updateStaffAccount(id, updates)
+
+    if (updates.annualCtc !== undefined || updates.email !== undefined) {
+      await saveSalary(staff.id, {
+        staffEmail: staff.email,
+        baseSalary: (updates.annualCtc ?? before?.annualCtc ?? 0) / 12,
+        notes: 'Monthly salary calculated from annual CTC.',
+      })
+    }
 
     await logAdminAction({
       actorEmail: user.email,
