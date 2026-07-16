@@ -1,6 +1,7 @@
 'use client'
 
 import { FormEvent, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Building2, Edit, Loader2, Plus, Trash2, X } from 'lucide-react'
 import type { PropertyInput, PropertyRecord } from '@/lib/firestore'
 
@@ -131,9 +132,9 @@ function PropertyModal({ title, initial, propertyId, onClose, onSaved }: { title
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm" onClick={onClose}>
-      <div className="surface my-6 w-full max-w-3xl rounded-xl p-6 shadow-2xl sm:p-7" onClick={(event) => event.stopPropagation()}>
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm" onClick={onClose}>
+      <div className="surface w-full max-w-3xl rounded-xl p-6 shadow-2xl sm:p-7" onClick={(event) => event.stopPropagation()}>
         <div className="mb-6 flex items-start justify-between gap-4"><div><p className="text-lg font-semibold text-ink">{title}</p><p className="mt-1 text-sm text-sub">Store the client and commercial agreement details.</p></div><button type="button" onClick={onClose} className="rounded-md p-1 text-sub hover:bg-zinc-800 hover:text-ink" aria-label="Close"><X className="h-5 w-5" /></button></div>
         <form onSubmit={submit}>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -155,7 +156,8 @@ function PropertyModal({ title, initial, propertyId, onClose, onSaved }: { title
           <div className="mt-7 flex justify-end gap-3"><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button><button type="submit" disabled={saving} className="flex h-11 min-w-28 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save property'}</button></div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
