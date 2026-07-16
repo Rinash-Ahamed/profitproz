@@ -65,6 +65,7 @@ export type PropertyRecord = {
   contactName: string
   contactEmail: string
   contactPhone: string
+  gstNumber: string
   city: string
   address: string
   roomCount: number
@@ -213,6 +214,7 @@ function mapDocToProperty(doc: DocumentSnapshot): PropertyRecord {
     contactName: typeof data.contactName === 'string' ? data.contactName : '',
     contactEmail: typeof data.contactEmail === 'string' ? data.contactEmail : '',
     contactPhone: typeof data.contactPhone === 'string' ? data.contactPhone : '',
+    gstNumber: typeof data.gstNumber === 'string' ? data.gstNumber : '',
     city: typeof data.city === 'string' ? data.city : '',
     address: typeof data.address === 'string' ? data.address : '',
     roomCount: typeof data.roomCount === 'number' ? data.roomCount : 0,

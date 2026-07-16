@@ -2,6 +2,7 @@ import type { PropertyInput } from '@/lib/firestore'
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const phonePattern = /^\+?[0-9 ()-]{7,20}$/
+const gstPattern = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/
 const datePattern = /^\d{4}-\d{2}-\d{2}$/
 
 type PropertyPayload = Record<string, unknown>
@@ -12,6 +13,7 @@ export const propertyFields = [
   'contactName',
   'contactEmail',
   'contactPhone',
+  'gstNumber',
   'city',
   'address',
   'roomCount',
@@ -43,6 +45,7 @@ export function parsePropertyPayload(body: unknown, partial = false): { value?: 
   error ||= readText('contactName', 100)
   error ||= readText('contactEmail', 254)
   error ||= readText('contactPhone', 20)
+  error ||= readText('gstNumber', 15)
   error ||= readText('city', 100, true)
   error ||= readText('address', 500)
   error ||= readText('contractStartDate', 10)
@@ -52,6 +55,10 @@ export function parsePropertyPayload(body: unknown, partial = false): { value?: 
 
   if (value.contactEmail && !emailPattern.test(value.contactEmail)) return { error: 'Enter a valid contact email.' }
   if (value.contactPhone && !phonePattern.test(value.contactPhone)) return { error: 'Enter a valid contact phone number.' }
+  if (value.gstNumber) {
+    value.gstNumber = value.gstNumber.toUpperCase()
+    if (!gstPattern.test(value.gstNumber)) return { error: 'Enter a valid 15-character GSTIN.' }
+  }
   if (value.contractStartDate) {
     const parsed = new Date(`${value.contractStartDate}T00:00:00Z`)
     if (!datePattern.test(value.contractStartDate) || Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== value.contractStartDate) {
