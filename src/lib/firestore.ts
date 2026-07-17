@@ -351,7 +351,7 @@ export async function createStaffAccount(input: { name: string; email?: string; 
       email: generatedEmail,
       employeeId: input.employeeId,
       passwordHash: input.passwordHash,
-      active: true,
+      active: false,
       mustChangePassword: true,
       sessionVersion: 0,
       phone: '',

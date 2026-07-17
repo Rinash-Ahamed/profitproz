@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProfitPro Offer of Employment</title>
+  <style>
+    :root { --ink:#151817; --muted:#667068; --line:#dfe5df; --green:#66b159; --green-dark:#3f8438; --soft:#f4f7f2; }
+    * { box-sizing:border-box; }
+    @page { size:A4; margin:0; }
+    html,body { margin:0; padding:0; color:var(--ink); background:#e9ede8; font-family:Arial,Helvetica,sans-serif; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .offer-page { position:relative; width:210mm; min-height:297mm; margin:0 auto 8mm; padding:15mm 18mm 17mm; overflow:hidden; background:#fff; page-break-after:always; }
+    .offer-page::before { position:absolute; inset:0 0 auto; height:5mm; content:""; background:linear-gradient(90deg,var(--green-dark),var(--green)); }
+    .header { display:flex; align-items:flex-start; justify-content:space-between; gap:12mm; padding-top:2mm; }
+    .logo { width:45mm; height:auto; object-fit:contain; }
+    .header-copy { text-align:right; }
+    .eyebrow { margin:0 0 1.5mm; color:var(--green-dark); font-size:8px; font-weight:800; letter-spacing:1.5px; text-transform:uppercase; }
+    h1 { margin:0; font-size:23px; letter-spacing:-.5px; }
+    .offer-date { margin:2mm 0 0; color:var(--muted); font-size:9px; }
+    .page-title { margin:8mm 0 5mm; padding-bottom:3mm; border-bottom:1px solid var(--line); font-size:16px; text-transform:uppercase; }
+    .summary-grid { display:grid; grid-template-columns:1fr 1fr; gap:0; margin-top:7mm; overflow:hidden; border:1px solid var(--line); border-radius:3mm; }
+    .summary-item { padding:3mm 4mm; border-right:1px solid var(--line); border-bottom:1px solid var(--line); }
+    .summary-item:nth-child(even) { border-right:0; }
+    .summary-item:nth-last-child(-n+2) { border-bottom:0; }
+    .label { display:block; margin-bottom:1mm; color:var(--muted); font-size:7px; font-weight:800; letter-spacing:.8px; text-transform:uppercase; }
+    .value { font-size:10px; font-weight:750; }
+    .section-title { margin:6mm 0 3mm; color:var(--green-dark); font-size:11px; font-weight:800; text-transform:uppercase; }
+    .copy { color:#303733; font-family:"Times New Roman",serif; font-size:10.2px; line-height:1.52; }
+    .copy p { margin:0 0 3.2mm; }
+    .responsibilities { margin:0; padding-left:5mm; }
+    .responsibilities li { margin-bottom:2mm; }
+    .comp-card { display:grid; grid-template-columns:1fr 1fr; gap:4mm; margin:5mm 0; }
+    .metric { padding:4mm; border:1px solid var(--line); border-radius:3mm; background:var(--soft); }
+    .metric strong { display:block; margin-top:1mm; color:var(--green-dark); font-size:16px; }
+    .salary { width:100%; margin:5mm 0; border-collapse:collapse; }
+    .salary th,.salary td { padding:3mm 4mm; border:1px solid var(--line); font-size:9px; text-align:left; }
+    .salary th { color:#fff; background:var(--ink); font-size:8px; letter-spacing:.6px; text-transform:uppercase; }
+    .salary th:not(:first-child),.salary td:not(:first-child) { text-align:right; }
+    .numbered { margin:0; padding-left:6mm; }
+    .numbered li { margin-bottom:3mm; padding-left:1mm; }
+    .nda-list { margin:0; padding:0; list-style:none; counter-reset:nda; }
+    .nda-list > li { position:relative; margin-bottom:4mm; padding-left:9mm; counter-increment:nda; }
+    .nda-list > li::before { position:absolute; top:0; left:0; width:6mm; height:6mm; border-radius:50%; color:#fff; background:var(--green-dark); content:counter(nda); font-family:Arial,sans-serif; font-size:8px; font-weight:800; line-height:6mm; text-align:center; }
+    .nda-list strong,.term-list strong { display:block; margin-bottom:1mm; font-family:Arial,sans-serif; font-size:9.5px; }
+    .term-list { margin:0; padding:0; list-style:none; }
+    .term-list li { margin-bottom:4mm; padding:3mm 4mm; border-left:1mm solid var(--green); border-radius:0 2mm 2mm 0; background:var(--soft); }
+    .declaration { margin-top:6mm; padding:4mm; border-radius:3mm; color:#edf3ed; background:var(--ink); }
+    .signature-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10mm; margin-top:12mm; }
+    .signature-line { padding-top:7mm; border-bottom:1px solid #9ba49d; }
+    .signature-label { margin-top:1.5mm; color:var(--muted); font-size:8px; }
+    .footer { position:absolute; right:18mm; bottom:8mm; left:18mm; display:flex; justify-content:space-between; padding-top:2.5mm; border-top:1px solid var(--line); color:var(--muted); font-size:8px; }
+    .footer a { color:var(--green-dark); font-weight:800; text-decoration:none; }
+    @media print { html,body { background:#fff; } .offer-page { margin:0; } }
+  </style>
+</head>
+<body>
+  <main class="offer-page">
+    <header class="header"><img class="logo" src="/invoice.png" alt="ProfitPro" /><div class="header-copy"><p class="eyebrow">Employment</p><h1>Offer of Employment</h1><p class="offer-date">Offer date: {{offer_date}}</p></div></header>
+    <section class="summary-grid">
+      <div class="summary-item"><span class="label">Candidate</span><span class="value">{{employee_name}}</span></div>
+      <div class="summary-item"><span class="label">Date of joining</span><span class="value">{{joining_date}}</span></div>
+      <div class="summary-item"><span class="label">Position</span><span class="value">{{role}}</span></div>
+      <div class="summary-item"><span class="label">Location</span><span class="value">{{location}}</span></div>
+      <div class="summary-item"><span class="label">Department</span><span class="value">{{department}}</span></div>
+      <div class="summary-item"><span class="label">Employee ID</span><span class="value">{{employee_id}}</span></div>
+    </section>
+    <h2 class="section-title">Employment Summary</h2>
+    <section class="copy">
+      <p>We are delighted to welcome you to <strong>ProfitPro Pvt. Ltd.</strong> and are pleased to offer you the position of <strong>{{role}}</strong> in the <strong>{{department}}</strong> department.</p>
+      <p>{{role_summary}}</p>
+      <p>At ProfitPro, we are committed to fostering a collaborative, innovative, and performance-driven work environment where employees are encouraged to develop professionally while delivering exceptional value to our clients. We believe that our people are our greatest asset, and we look forward to supporting your career journey with us.</p>
+      <p>This offer is subject to successful verification of your educational qualifications, employment history, identity, and other supporting documents; acceptance of the Company's policies, code of conduct, and confidentiality obligations; and execution of the annexures attached to this letter.</p>
+      <p>By accepting this offer, you agree to comply with all applicable Company policies, procedures, and statutory requirements as amended from time to time. This Offer Letter and its annexures shall govern your employment with ProfitPro Pvt. Ltd.</p>
+    </section>
+    <h2 class="section-title">Key Responsibilities</h2>
+    <ul class="copy responsibilities">{{key_responsibilities}}</ul>
+    <footer class="footer"><span>ProfitPro Offer of Employment</span><span>Page 1 of 4</span></footer>
+  </main>
+
+  <main class="offer-page">
+    <header class="header"><img class="logo" src="/invoice.png" alt="ProfitPro" /><div class="header-copy"><p class="eyebrow">Annexure A</p><h1>Compensation</h1></div></header>
+    <div class="comp-card"><div class="metric"><span class="label">Annual CTC</span><strong>₹{{annual_ctc}}</strong><span class="copy">per annum</span></div><div class="metric"><span class="label">Monthly salary</span><strong>₹{{monthly_salary}}</strong><span class="copy">before applicable deductions</span></div></div>
+    <section class="copy">
+      <h2 class="section-title">Performance Incentive</h2>
+      <p>Performance incentives, where applicable to your role, will be provided in accordance with Company policy and individual performance. Additional benefits will be governed by the Company's prevailing policies, which may be revised from time to time.</p>
+      <h2 class="section-title">Salary Structure</h2>
+      <p>The salary structure below forms Annexure A and may be revised by the Company in accordance with applicable law, organisational requirements, and Company policies.</p>
+      <table class="salary"><thead><tr><th>Salary component</th><th>Monthly (₹)</th><th>Annual (₹)</th></tr></thead><tbody><tr><td><strong>Total CTC</strong></td><td>{{monthly_salary}}</td><td>{{annual_ctc}}</td></tr></tbody></table>
+      <h2 class="section-title">Notes</h2>
+      <ol class="numbered"><li>The compensation is subject to statutory deductions and applicable taxes.</li><li>Performance incentives, bonuses, reimbursements, or other benefits are governed by Company policies and are not included in the CTC unless specifically stated.</li><li>The Company reserves the right to revise the salary structure in accordance with applicable law, organisational requirements, and Company policies.</li><li>Salary will be credited on or before the designated payroll date, subject to statutory compliance and attendance records.</li></ol>
+    </section>
+    <footer class="footer"><span>ProfitPro Offer of Employment</span><span>Page 2 of 4</span></footer>
+  </main>
+
+  <main class="offer-page">
+    <header class="header"><img class="logo" src="/invoice.png" alt="ProfitPro" /><div class="header-copy"><p class="eyebrow">Employment Annexure</p><h1>Confidentiality & NDA</h1></div></header>
+    <h2 class="page-title">Confidentiality & Non-Disclosure Agreement</h2>
+    <ol class="copy nda-list">
+      <li><strong>Purpose</strong>This Agreement forms an integral part of your employment with ProfitPro and protects confidential information belonging to ProfitPro and its clients.</li>
+      <li><strong>Confidential Information</strong>Includes client details, hotel information, revenue strategies, pricing, ADR, RevPAR, forecasting reports, OTA accounts, PMS/RMS credentials, SOPs, reports, software, dashboards, CRM data, AI prompts, source code, financial and employee information, business plans, proposals, passwords, API keys, and all proprietary information.</li>
+      <li><strong>Employee Obligations</strong>Use confidential information only for official duties. Do not copy, disclose, photograph, download, or share confidential information without written authorisation. Report any suspected breach immediately.</li>
+      <li><strong>Intellectual Property</strong>All documents, templates, spreadsheets, software, reports, presentations, automation workflows, AI content, and other materials created during employment remain the exclusive property of ProfitPro.</li>
+      <li><strong>Return of Company Property</strong>Upon separation, all documents, credentials, client data, backups, and Company property must be returned immediately.</li>
+      <li><strong>Non-Solicitation</strong>The employee shall not use confidential information to solicit clients or employees for personal or competing business during employment and for the applicable post-employment period, where enforceable.</li>
+      <li><strong>Survival</strong>Confidentiality obligations continue after employment ends.</li>
+      <li><strong>Breach</strong>Violation may result in disciplinary action, termination, legal proceedings, and recovery of damages.</li>
+      <li><strong>Governing Law</strong>Governed by the laws of India and subject to the jurisdiction of the courts of Coimbatore, Tamil Nadu.</li>
+    </ol>
+    <footer class="footer"><span>ProfitPro Confidentiality Agreement</span><span>Page 3 of 4</span></footer>
+  </main>
+
+  <main class="offer-page">
+    <header class="header"><img class="logo" src="/invoice.png" alt="ProfitPro" /><div class="header-copy"><p class="eyebrow">Annexure B</p><h1>Employee Declaration</h1></div></header>
+    <h2 class="page-title">Employee Declaration & General Terms</h2>
+    <ul class="copy term-list">
+      <li><strong>Accuracy of Information</strong>I confirm that all information and documents submitted during recruitment are true and complete.</li>
+      <li><strong>Compliance</strong>I agree to comply with all Company policies, procedures, lawful instructions, and ethical standards.</li>
+      <li><strong>Confidentiality</strong>I understand that the NDA forms part of my employment and I will protect confidential information at all times.</li>
+      <li><strong>Conflict of Interest</strong>I will disclose any situation that may create a conflict between my personal interests and the interests of ProfitPro.</li>
+      <li><strong>Use of Company Assets & Information Security</strong>Company devices, software, email, documents, and systems will be used only for authorised business. I will protect credentials and client information and will not install unauthorised software or share access.</li>
+      <li><strong>Intellectual Property & Return of Property</strong>Work created during employment belongs exclusively to ProfitPro. Upon separation, I will return all Company assets, records, credentials, and confidential information.</li>
+      <li><strong>Background Verification & Policy Updates</strong>Employment is subject to satisfactory verification. I acknowledge that Company policies may be updated and agree to comply with those revisions.</li>
+    </ul>
+    <div class="copy declaration"><strong>Declaration:</strong> I have read and understood this Offer Letter and its Annexures and voluntarily accept all terms and conditions of employment. I will acknowledge acceptance by replying to the offer email.</div>
+    <div class="signature-grid"><div><div class="signature-line"></div><div class="signature-label">Employee name</div></div><div><div class="signature-line"></div><div class="signature-label">Employee signature</div></div><div><div class="signature-line"></div><div class="signature-label">Date</div></div></div>
+    <footer class="footer"><a href="https://www.profitproz.com">www.profitproz.com</a><span>Page 4 of 4</span></footer>
+  </main>
+</body>
+</html>

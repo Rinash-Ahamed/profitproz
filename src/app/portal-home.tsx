@@ -1,9 +1,9 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Building2, CheckCircle2, ClipboardList, Edit, Eye, EyeOff, FileDown, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Search, Trash2, User, UserPlus, Users, XCircle } from 'lucide-react'
+import { Building2, CheckCircle2, ClipboardList, Download, Edit, Eye, EyeOff, FileDown, FileText, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Search, Trash2, User, UserPlus, Users, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
 import type { ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, TimesheetRecord } from '@/lib/firestore'
 import type { OnboardingRecord } from '@/lib/onboarding'
@@ -45,6 +45,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffSearch, setStaffSearch] = useState('')
   const [salaryList, setSalaryList] = useState<SalaryRecord[]>([])
   const [editingStaff, setEditingStaff] = useState<PublicStaffRecord | null>(null)
+  const [offerStaff, setOfferStaff] = useState<PublicStaffRecord | null>(null)
   const [propertyList, setPropertyList] = useState<PropertyRecord[]>([])
   const [onboardingList, setOnboardingList] = useState<OnboardingRecord[]>([])
   // Timesheet state
@@ -309,6 +310,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       }
       // Refresh staff list with the new record from the API response
       setStaffList((prev) => [...prev, data.staff].sort((a, b) => (a.name || '').localeCompare(b.name || '')))
+      setStaffSubTab('all')
+      setOfferStaff(data.staff)
     } catch {
       setError('Unable to add employee right now.')
     } finally {
@@ -377,6 +380,28 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function activateAcknowledgedStaff(staff: PublicStaffRecord) {
+    if (!window.confirm(`Confirm that ${staff.name} acknowledged the offer by email and activate their employee access?`)) return
+    setLoading(true)
+    setError('')
+    try {
+      const response = await fetch(`/api/admin/staff/${staff.id}`, {
+        method: 'PATCH',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: true }),
+      })
+      const data = await response.json() as { staff?: PublicStaffRecord; message?: string }
+      if (!response.ok || !data.staff) throw new Error(data.message || 'Failed to activate employee.')
+      setStaffList((current) => current.map((item) => item.id === data.staff!.id ? data.staff! : item))
+      setMessage(`${staff.name} is now active.`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Failed to activate employee.')
     } finally {
       setLoading(false)
     }
@@ -1066,7 +1091,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             </div>
                             <div>
                               <p className="text-lg font-semibold text-ink">Add new employee</p>
-                              <p className="mt-1 text-sm text-sub">New employees receive a random one-time password and must change it after first login.</p>
+                              <p className="mt-1 text-sm text-sub">New employees remain Pending until their offer acknowledgment is received and Admin activates access.</p>
                             </div>
                           </div>
 
@@ -1150,18 +1175,19 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                   <th className="px-6 py-4 font-medium text-sub">Employee ID</th>
                                   <th className="px-6 py-4 font-medium text-sub">Contact details</th>
                                   <th className="px-6 py-4 font-medium text-sub">Department</th>
+                                  <th className="px-6 py-4 font-medium text-sub">Status</th>
                                   <th className="px-6 py-4 font-medium text-sub">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {loading ? (
                                   <tr>
-                                     <td colSpan={5} className="py-10 text-center text-sub">
+                                     <td colSpan={6} className="py-10 text-center text-sub">
                                       <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </td>
                                   </tr>
                                 ) : visibleStaffList.length === 0 ? (
-                                  <tr><td colSpan={5} className="px-6 py-10 text-center text-sub">No matching employees.</td></tr>
+                                  <tr><td colSpan={6} className="px-6 py-10 text-center text-sub">No matching employees.</td></tr>
                                 ) : (
                                   visibleStaffList.map((staff) => (
                                     <tr key={staff.id} className="border-b border-zinc-800 last:border-none">
@@ -1180,11 +1206,14 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                          <p>{staff.department || 'N/A'}</p>
                                          <p className="mt-1 text-xs text-ghost">{staff.role || 'Role not set'}</p>
                                        </td>
+                                      <td className="px-6 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${staff.active ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-amber-500/20 bg-amber-500/10 text-amber-400'}`}>{staff.active ? 'Active' : 'Pending'}</span></td>
                                       <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                          <button type="button" onClick={() => setEditingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors" aria-label={`Edit ${staff.name}`}><Edit className="h-4 w-4" /></button>
-                                          <button type="button" onClick={() => handleResetPassword(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-amber-500/20 hover:text-amber-400 transition-colors" aria-label={`Reset password for ${staff.name}`}><RefreshCw className="h-4 w-4" /></button>
-                                          <button type="button" onClick={() => handleDeleteStaff(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Delete ${staff.name}`}><Trash2 className="h-4 w-4" /></button>
+                                          <button type="button" onClick={() => setOfferStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`Generate offer letter for ${staff.name}`} title="Generate offer letter"><FileText className="h-4 w-4" /></button>
+                                          {!staff.active ? <button type="button" onClick={() => activateAcknowledgedStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-green-500/20 hover:text-green-400 transition-colors" aria-label={`Acknowledge offer and activate ${staff.name}`} title="Acknowledge & activate"><CheckCircle2 className="h-4 w-4" /></button> : null}
+                                          <button type="button" onClick={() => setEditingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors" aria-label={`Edit ${staff.name}`} title="Edit employee"><Edit className="h-4 w-4" /></button>
+                                          <button type="button" onClick={() => handleResetPassword(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-amber-500/20 hover:text-amber-400 transition-colors" aria-label={`Reset password for ${staff.name}`} title="Reset password"><RefreshCw className="h-4 w-4" /></button>
+                                          <button type="button" onClick={() => handleDeleteStaff(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Delete ${staff.name}`} title="Delete employee"><Trash2 className="h-4 w-4" /></button>
                                         </div>
                                       </td>
                                     </tr>
@@ -1783,7 +1812,140 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           }}
         />
       )}
+      {offerStaff ? <OfferLetterModal staff={offerStaff} onClose={() => setOfferStaff(null)} /> : null}
     </main>
+  )
+}
+
+function getOfferRoleContent(roleValue: string, departmentValue: string) {
+  const role = roleValue.toLowerCase()
+  const department = departmentValue.toLowerCase()
+  if (/business development|sales|bdm/.test(`${role} ${department}`)) return {
+    summary: 'In this role, you will report to the Head of Business Development and/or the Managing Director. Your primary responsibility is to promote and expand our hotel revenue management services by identifying business opportunities, conducting lead-generation activities, building strong client relationships, and driving sustainable revenue growth.',
+    responsibilities: ['Identify and acquire new hotel clients.', "Present, promote, and market ProfitPro's hotel revenue management solutions.", 'Develop and maintain long-term relationships with hotel owners and management teams.', 'Work toward monthly and quarterly sales targets while monitoring market and competitor activity.', 'Coordinate with revenue management and operations teams to ensure smooth client onboarding.'],
+  }
+  if (/revenue|pricing|yield/.test(`${role} ${department}`)) return {
+    summary: 'In this role, you will support hotel revenue performance through disciplined pricing, forecasting, inventory controls, market intelligence, and close collaboration with clients and internal teams.',
+    responsibilities: ['Review daily pickup, occupancy, demand, and market conditions.', 'Recommend and implement pricing and inventory strategies across relevant channels.', 'Monitor competitor pricing, events, forecasts, ADR, RevPAR, and revenue trends.', 'Prepare clear performance reports and communicate actions to hotel stakeholders.', 'Coordinate with onboarding and operations teams to maintain accurate rates, availability, and restrictions.'],
+  }
+  if (/onboarding|ota|distribution/.test(`${role} ${department}`)) return {
+    summary: 'In this role, you will manage accurate and timely onboarding of hotel properties across selected online travel platforms, ensuring that listings, content, policies, rates, and inventory are ready for sale.',
+    responsibilities: ['Create and configure OTA accounts and property listings.', 'Collect, verify, and securely manage onboarding documents and credentials.', 'Upload accurate property content, room details, policies, images, rates, and inventory.', 'Track platform verification and resolve pending setup requirements.', 'Coordinate with clients and internal teams until every selected platform is live.'],
+  }
+  if (/operation|customer success|client service|support/.test(`${role} ${department}`)) return {
+    summary: 'In this role, you will help deliver reliable day-to-day client operations, maintain service quality, coordinate internal actions, and ensure that client requests are resolved with clarity and ownership.',
+    responsibilities: ['Coordinate daily client requests and internal follow-ups.', 'Maintain accurate operational records, trackers, and service documentation.', 'Monitor open actions and escalate risks or delays promptly.', 'Support consistent communication with hotel stakeholders.', 'Work across teams to improve service quality and turnaround time.'],
+  }
+  return {
+    summary: `In this role, you will contribute to the ${departmentValue || 'assigned'} function, carry out the responsibilities associated with the position of ${roleValue || 'your assigned role'}, and collaborate with your manager and colleagues to deliver high-quality outcomes for ProfitPro and its clients.`,
+    responsibilities: ['Perform the responsibilities assigned to the role with care, accuracy, and professional judgment.', 'Maintain timely communication and reliable records for assigned work.', 'Collaborate with colleagues and client-facing teams to meet agreed objectives.', 'Protect Company and client information and follow all approved processes.', 'Support continuous improvement and undertake other reasonable duties aligned with the role.'],
+  }
+}
+
+function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClose: () => void }) {
+  const today = new Date()
+  const initialDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const [offerDate, setOfferDate] = useState(initialDate)
+  const [joiningDate, setJoiningDate] = useState(initialDate)
+  const [location, setLocation] = useState('Coimbatore, Tamil Nadu')
+  const [template, setTemplate] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch('/template/ProfitPro_Offer_Letter_Template.html', { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error('Offer letter template could not be loaded.')
+        return response.text()
+      })
+      .then(setTemplate)
+      .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Offer letter template could not be loaded.') })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [])
+
+  const renderedOffer = useMemo(() => {
+    if (!template) return ''
+    const displayDate = (value: string) => value.split('-').reverse().join('-')
+    const escapeValue = (value: string | number) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
+    const annualCtc = staff.annualCtc || 0
+    const roleContent = getOfferRoleContent(staff.role || '', staff.department || '')
+    const values: Record<string, string | number> = {
+      offer_date: displayDate(offerDate),
+      joining_date: displayDate(joiningDate),
+      employee_name: staff.name,
+      employee_email: staff.email,
+      employee_id: staff.employeeId || '',
+      role: staff.role || '',
+      department: staff.department || '',
+      location,
+      role_summary: roleContent.summary,
+      annual_ctc: annualCtc.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
+      monthly_salary: (annualCtc / 12).toLocaleString('en-IN', { maximumFractionDigits: 2 }),
+    }
+    const populated = Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeValue(value)), template)
+    const responsibilities = roleContent.responsibilities.map((item) => `<li>${escapeValue(item)}</li>`).join('')
+    return populated.replaceAll('{{key_responsibilities}}', responsibilities)
+  }, [joiningDate, location, offerDate, staff, template])
+
+  async function downloadOffer() {
+    const previewDocument = iframeRef.current?.contentDocument
+    const pages = previewDocument ? Array.from(previewDocument.querySelectorAll('.offer-page')) as HTMLElement[] : []
+    if (!previewDocument || pages.length === 0) return
+    setDownloading(true)
+    setError('')
+    try {
+      const images = pages.flatMap((page) => Array.from(page.querySelectorAll('img')))
+      await Promise.all(images.map((image) => image.complete ? Promise.resolve() : new Promise<void>((resolve) => {
+        image.addEventListener('load', () => resolve(), { once: true })
+        image.addEventListener('error', () => resolve(), { once: true })
+      })))
+      await previewDocument.fonts?.ready
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true })
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      for (let index = 0; index < pages.length; index += 1) {
+        const canvas = await html2canvas(pages[index], { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false })
+        if (index > 0) pdf.addPage('a4', 'portrait')
+        const ratio = canvas.width / canvas.height
+        let width = pageWidth
+        let height = width / ratio
+        if (height > pageHeight) { height = pageHeight; width = height * ratio }
+        pdf.addImage(canvas.toDataURL('image/jpeg', 0.98), 'JPEG', (pageWidth - width) / 2, (pageHeight - height) / 2, width, height, undefined, 'FAST')
+      }
+      pdf.save(`ProfitPro_Offer_Letter_${staff.employeeId || staff.name.replace(/\s+/g, '_')}.pdf`)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Failed to download offer letter.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  const inputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
+  return (
+    <div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm sm:px-6">
+      <div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl">
+        <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6">
+          <div><p className="text-lg font-semibold text-ink">Generate offer letter</p><p className="mt-1 text-sm text-sub">{staff.name} · {staff.role} · {staff.department}</p></div>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="block w-40"><span className="label-upper mb-2 block text-ghost">Offer date</span><DatePickerInput value={offerDate} onChange={setOfferDate} className={inputClass} required /></label>
+            <label className="block w-40"><span className="label-upper mb-2 block text-ghost">Joining date</span><DatePickerInput value={joiningDate} onChange={setJoiningDate} className={inputClass} min={offerDate} required /></label>
+            <label className="block w-52"><span className="label-upper mb-2 block text-ghost">Work location</span><input value={location} onChange={(event) => setLocation(event.target.value)} className={inputClass} maxLength={120} required /></label>
+            <button type="button" onClick={downloadOffer} disabled={!renderedOffer || downloading} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button>
+            <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Close</button>
+          </div>
+        </div>
+        {error ? <p className="m-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+        <div className="max-h-[calc(100vh-9rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">
+          {loading ? <div className="flex min-h-96 items-center justify-center gap-3 text-sm text-sub"><Loader2 className="h-5 w-5 animate-spin" /> Loading offer letter…</div> : null}
+          {!loading && renderedOffer ? <iframe ref={iframeRef} title={`Offer letter preview for ${staff.name}`} srcDoc={renderedOffer} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}
+        </div>
+      </div>
+    </div>
   )
 }
 
