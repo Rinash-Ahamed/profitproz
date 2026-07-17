@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion'
 import { useInView } from '@/hooks/useInView'
 import { useCounter } from '@/hooks/useCounter'
-import { ease, formatNumber } from '@/lib/utils'
+import { formatNumber } from '@/lib/utils'
 
 const data = [
   { pre: '', value: 10, suf: '+', label: 'Hotels Managed' },

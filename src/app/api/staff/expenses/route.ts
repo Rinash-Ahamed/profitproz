@@ -1,8 +1,9 @@
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken, SessionUser } from '@/lib/auth'
-import { createExpense, getExpenseFieldSettings, getStaffByEmail, listExpenses } from '@/lib/firestore'
-import { getExpenseNotificationHtml, sendMail } from '@/lib/mail'
+import { createExpense, getExpenseFieldSettings, getStaffByEmail, listExpenses, listExpensesPage } from '@/lib/firestore'
+import { getExpenseNotificationHtml, queueMail } from '@/lib/mail'
+import { readPagination } from '@/lib/pagination'
 
 // Helper to centralize authentication and role checking for staff routes
 async function getAuthenticatedStaffUser(): Promise<SessionUser | NextResponse> {
@@ -16,15 +17,18 @@ async function getAuthenticatedStaffUser(): Promise<SessionUser | NextResponse> 
   return user
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const userOrResponse = await getAuthenticatedStaffUser()
   if (userOrResponse instanceof NextResponse) {
     return userOrResponse
   }
 
   try {
-    const [expenses, settings] = await Promise.all([listExpenses(userOrResponse.email), getExpenseFieldSettings()])
-    return NextResponse.json({ expenses, settings })
+    const pagination = readPagination(request)
+    const [expenseResult, settings] = await Promise.all([pagination ? listExpensesPage(pagination, userOrResponse.email) : listExpenses(userOrResponse.email), getExpenseFieldSettings()])
+    return Array.isArray(expenseResult)
+      ? NextResponse.json({ expenses: expenseResult, settings })
+      : NextResponse.json({ expenses: expenseResult.items, settings, nextCursor: expenseResult.nextCursor })
   } catch (error) {
     console.error('Error fetching expenses:', error)
     return NextResponse.json({ message: 'An internal server error occurred.' }, { status: 500 })
@@ -69,18 +73,18 @@ export async function POST(request: NextRequest) {
     const title = `${expenseType.charAt(0).toUpperCase() + expenseType.slice(1)} expense`
     const expense = await createExpense({ staffEmail: user.email, staffName: staff?.name || user.email, title, city, expenseType, description, amount, receiptName: receiptUrl ? 'External receipt link' : '', receiptUrl })
 
-    // Fire-and-forget email notification with error logging.
-    // In a larger system, this would be offloaded to a queue.
-    sendMail({
+    try {
+      await queueMail({
       fromName: 'ProfitPro Portal',
       to: `${process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@profitproz.com'}, support@profitproz.com`,
       replyTo: user.email,
       subject: `Expense submitted by ${user.email}`,
       text: `${staff?.name || user.email} submitted a ${expenseType} expense for ${amount}. City: ${city || 'N/A'}. Description: ${description || 'N/A'}`,
       html: getExpenseNotificationHtml({ staffEmail: user.email, title, amount, notes: description }),
-    }).catch((mailError) => {
+      })
+    } catch (mailError) {
       console.error(`Failed to send expense notification email for ${user.email}:`, mailError)
-    })
+    }
 
     return NextResponse.json({ expense }, { status: 201 }) // Use 201 for created resource
   } catch (error) {

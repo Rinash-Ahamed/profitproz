@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2, LockKeyhole, Mail } from 'lucide-react'
 
 type LoginResponse = {
@@ -11,6 +12,7 @@ type LoginResponse = {
 }
 
 export function LoginForm({ notice = '' }: { notice?: string }) {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -43,7 +45,7 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
         return
       }
 
-      window.location.href = data.redirectTo
+      router.replace(data.redirectTo)
     } catch {
       setError('Something went wrong.')
     } finally {

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { deleteStaffAccount, getStaffById, logAdminAction, saveSalary, toPublicStaff, updateStaffAccount } from '@/lib/firestore'
+import { deleteStaffAccount, getStaffById, logAdminAction, toPublicStaff, updateStaffAccount } from '@/lib/firestore'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -101,14 +101,6 @@ export async function PATCH(request: Request, context: RouteContext) {
     const before = await getStaffById(id)
     const staff = await updateStaffAccount(id, updates)
 
-    if (updates.annualCtc !== undefined || updates.email !== undefined) {
-      await saveSalary(staff.id, {
-        staffEmail: staff.email,
-        baseSalary: (updates.annualCtc ?? before?.annualCtc ?? 0) / 12,
-        notes: 'Monthly salary calculated from annual CTC.',
-      })
-    }
-
     await logAdminAction({
       actorEmail: user.email,
       action: 'STAFF_UPDATE',
@@ -123,6 +115,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json({ staff: toPublicStaff(staff) })
   } catch (error) {
+    if (error instanceof Error && error.message === 'STAFF_NOT_FOUND') return NextResponse.json({ message: 'Employee was not found.' }, { status: 404 })
+    if (error instanceof Error && error.message === 'STAFF_EXISTS') return NextResponse.json({ message: 'An employee with this company email already exists.' }, { status: 409 })
+    if (error instanceof Error && error.message === 'EMPLOYEE_ID_EXISTS') return NextResponse.json({ message: 'An employee with this employee ID already exists.' }, { status: 409 })
     console.error(`Failed to update staff ${id}:`, error)
     return NextResponse.json({ message: 'Failed to update employee.' }, { status: 500 })
   }

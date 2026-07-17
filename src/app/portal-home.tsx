@@ -5,12 +5,14 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Building2, CheckCircle2, ClipboardList, Download, Edit, Eye, EyeOff, FileDown, FileText, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Search, Trash2, User, UserPlus, Users, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
-import type { ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, TimesheetRecord } from '@/lib/firestore'
+import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, TimesheetRecord } from '@/lib/firestore'
 import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
 import { ClientServicesPanel } from '@/app/client-services-panel'
-import { PropertiesPanel } from '@/app/properties-panel'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
+import { addDateOnlyDays, countDateOnlyDaysInclusive, dateOnlyDay, formatDateOnlyForLocale } from '@/lib/date-only'
+import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
+import { LEAVE_ALLOWANCES, leaveTypeLabel, type LeaveType } from '@/lib/leave'
 
 type PortalHomeProps = {
   user: SessionUser
@@ -63,7 +65,16 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [leaveList, setLeaveList] = useState<LeaveRequestRecord[]>([])
   const [leaveStartDate, setLeaveStartDate] = useState('')
   const [leaveEndDate, setLeaveEndDate] = useState('')
+  const [leaveType, setLeaveType] = useState<LeaveType>('sick')
   const [leaveReason, setLeaveReason] = useState('')
+  const requestedLeaveDays = countDateOnlyDaysInclusive(leaveStartDate, leaveEndDate)
+  const selectedLeaveYear = leaveStartDate.slice(0, 4) || String(new Date().getFullYear())
+  const usedLeaveDays = leaveList.reduce((total, leave) => {
+    if (leave.status === 'rejected' || leave.leaveType !== leaveType || !leave.startDate.startsWith(`${selectedLeaveYear}-`)) return total
+    return total + (leave.durationDays || countDateOnlyDaysInclusive(leave.startDate, leave.endDate))
+  }, 0)
+  const remainingLeaveDays = Math.max(0, LEAVE_ALLOWANCES[leaveType] - usedLeaveDays)
+  const exceedsLeaveBalance = requestedLeaveDays > remainingLeaveDays
   const [expenseCity, setExpenseCity] = useState('')
   const [expenseType, setExpenseType] = useState<'travel' | 'food' | 'fuel' | 'other'>('travel')
   const [expenseAmount, setExpenseAmount] = useState('')
@@ -71,6 +82,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [expenseReceiptUrl, setExpenseReceiptUrl] = useState('')
   const [expenseSettings, setExpenseSettings] = useState<ExpenseFieldSettings>({ cityRequired: true, descriptionRequired: true, receiptRequired: true })
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false })
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('')
@@ -129,14 +141,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
     if (activeTab === 'dashboard') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/staff'), fetch('/api/admin/timesheets'), fetch('/api/admin/expenses'), fetch('/api/admin/properties')])
-        .then(async ([staffRes, timesheetRes, expenseRes, propertyRes]) => {
-          const [staffData, timesheetData, expenseData, propertyData] = await Promise.all([staffRes.json(), timesheetRes.json(), expenseRes.json(), propertyRes.json()])
-          if (staffData.staff) setStaffList(staffData.staff)
-          if (timesheetData.timesheets) setTimesheetList(timesheetData.timesheets)
-          if (expenseData.expenses) setExpenseList(expenseData.expenses)
-          if (propertyData.properties) setPropertyList(propertyData.properties)
-        })
+      apiFetch<{ summary: DashboardSummary }>('/api/dashboard')
+        .then((data) => setDashboardSummary(data.summary))
         .catch(() => setError('Could not load dashboard data.'))
         .finally(() => setLoading(false))
     }
@@ -229,6 +235,11 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   useEffect(() => {
     if (user.role !== 'staff' || user.mustChangePassword) return
+
+    if (activeTab === 'dashboard') {
+      setLoading(true)
+      apiFetch<{ summary: DashboardSummary }>('/api/dashboard').then((data) => setDashboardSummary(data.summary)).catch(() => setError('Could not load dashboard data.')).finally(() => setLoading(false))
+    }
 
     if (activeTab === 'expenses') {
       setLoading(true)
@@ -532,10 +543,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   async function submitLeaveRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setError(''); setMessage('')
     try {
-      const response = await fetch('/api/staff/leaves', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startDate: leaveStartDate, endDate: leaveEndDate, reason: leaveReason }) })
+      const response = await fetch('/api/staff/leaves', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startDate: leaveStartDate, endDate: leaveEndDate, leaveType, reason: leaveReason }) })
       const data = await response.json() as { leave?: LeaveRequestRecord; message?: string }
       if (!response.ok || !data.leave) throw new Error(data.message || 'Unable to submit leave request.')
-      setLeaveList((current) => [data.leave!, ...current]); setLeaveStartDate(''); setLeaveEndDate(''); setLeaveReason(''); setMessage('Leave request submitted.')
+      setLeaveList((current) => [data.leave!, ...current]); setLeaveStartDate(''); setLeaveEndDate(''); setLeaveType('sick'); setLeaveReason(''); setMessage('Leave request submitted.')
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to submit leave request.') } finally { setLoading(false) }
   }
 
@@ -733,12 +744,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   const weekDays = useMemo(() => {
     if (!timesheetWorkDate) return []
-    const start = new Date(`${timesheetWorkDate}T00:00:00`)
-    if (Number.isNaN(start.getTime())) return []
     return Array.from({ length: 7 }, (_, index) => {
-      const date = new Date(start)
-      date.setDate(start.getDate() + index)
-      return { value: date.toISOString().slice(0, 10), label: date.toLocaleDateString('en-IN', { weekday: 'short' }), day: date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) }
+      const value = addDateOnlyDays(timesheetWorkDate, index)
+      return { value, label: formatDateOnlyForLocale(value, { weekday: 'short' }), day: formatDateOnlyForLocale(value, { day: 'numeric', month: 'short' }) }
     })
   }, [timesheetWorkDate])
 
@@ -769,13 +777,16 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const approvedExpenseTotal = expenseList
     .filter((expense) => expense.status === 'approved')
     .reduce((total, expense) => total + expense.amount, 0)
+  const dashboardPendingTimesheets = dashboardSummary?.pendingTimesheets ?? pendingTimesheets.length
+  const dashboardPendingExpenses = dashboardSummary?.pendingExpenses ?? pendingExpenses.length
+  const dashboardApprovedExpenseTotal = dashboardSummary?.approvedExpenseTotal ?? approvedExpenseTotal
   const recentActivity = [...timesheetList.map((timesheet) => ({ type: 'Timesheet', title: timesheet.workDate, status: timesheet.status, createdAt: timesheet.createdAt })), ...expenseList.map((expense) => ({ type: 'Expense', title: expense.title, status: expense.status, createdAt: expense.createdAt }))]
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 5)
 
   return (
     <main className={`portal-app ${user.role === 'admin' ? 'admin-workspace' : ''} relative flex min-h-screen flex-col overflow-hidden bg-[#0a0b0c] px-6 py-8 text-ink sm:px-10`}>
-      <video className="portal-video" autoPlay loop muted playsInline aria-hidden="true">
+      <video className="portal-video" autoPlay loop muted playsInline preload="metadata" aria-hidden="true">
         <source src="/portal/background.mp4" type="video/mp4" />
       </video>
 
@@ -1025,11 +1036,11 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                    dashboard: (
                     <div className="admin-dashboard space-y-6">
                       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                        <DashboardMetric icon={<Users className="h-5 w-5" />} label="Active employees" value={staffList.length} detail="People in your workspace" />
+                        <DashboardMetric icon={<Users className="h-5 w-5" />} label="Active employees" value={dashboardSummary?.staffCount ?? staffList.length} detail="People in your workspace" />
                         <DashboardMetric icon={<Building2 className="h-5 w-5" />} label="Active client properties" value={propertyList.filter((property) => property.status === 'active').length} detail="Hospitality properties served" />
-                        <DashboardMetric icon={<ClipboardList className="h-5 w-5" />} label="Timesheets to review" value={pendingTimesheets.length} detail="Awaiting a decision" />
-                        <DashboardMetric icon={<ReceiptText className="h-5 w-5" />} label="Expenses to review" value={pendingExpenses.length} detail="Awaiting a decision" />
-                        <DashboardMetric icon={<CheckCircle2 className="h-5 w-5" />} label="Approved expenses" value={`Rs. ${approvedExpenseTotal.toLocaleString('en-IN')}`} detail="Total approved to date" />
+                        <DashboardMetric icon={<ClipboardList className="h-5 w-5" />} label="Timesheets to review" value={dashboardPendingTimesheets} detail="Awaiting a decision" />
+                        <DashboardMetric icon={<ReceiptText className="h-5 w-5" />} label="Expenses to review" value={dashboardPendingExpenses} detail="Awaiting a decision" />
+                        <DashboardMetric icon={<CheckCircle2 className="h-5 w-5" />} label="Approved expenses" value={`Rs. ${dashboardApprovedExpenseTotal.toLocaleString('en-IN')}`} detail="Total approved to date" />
                       </div>
 
                       <div className="grid gap-6 lg:grid-cols-[1.35fr_0.85fr]">
@@ -1042,8 +1053,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             <button type="button" onClick={() => setActiveTab('timesheets')} className="text-sm font-semibold text-[#4d9144] hover:text-[#36722f]">Review timesheets</button>
                           </div>
                           <div className="mt-6 divide-y divide-zinc-200">
-                            <DashboardQueueRow label="Timesheets" count={pendingTimesheets.length} action="Open queue" onClick={() => setActiveTab('timesheets')} />
-                            <DashboardQueueRow label="Expense claims" count={pendingExpenses.length} action="Open queue" onClick={() => setActiveTab('expenses')} />
+                            <DashboardQueueRow label="Timesheets" count={dashboardPendingTimesheets} action="Open queue" onClick={() => setActiveTab('timesheets')} />
+                            <DashboardQueueRow label="Expense claims" count={dashboardPendingExpenses} action="Open queue" onClick={() => setActiveTab('expenses')} />
                           </div>
                         </div>
                         <div className="surface rounded-lg p-6 sm:p-7">
@@ -1359,7 +1370,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   leaves: (
                     <div className="surface rounded-lg">
                       <div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">Leave Requests</p><p className="mt-1 text-sm text-sub">Review employee leave requests.</p></div>
-                      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="px-6 py-4 text-sub">{leave.startDate} to {leave.endDate}</td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <div className="flex gap-2"><button onClick={() => updateLeaveStatus(leave.id, 'approved')} className="text-sm text-green-400">Approve</button><button onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="text-sm text-red-400">Reject</button></div> : null}</td></tr>)}</tbody></table></div>
+                      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="px-6 py-4 text-sub"><p>{leave.startDate} to {leave.endDate}</p><p className="mt-1 text-xs text-ghost">{leaveTypeLabel(leave.leaveType)} · {leave.durationDays} {leave.durationDays === 1 ? 'day' : 'days'}</p></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <div className="flex gap-2"><button onClick={() => updateLeaveStatus(leave.id, 'approved')} className="text-sm text-green-400">Approve</button><button onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="text-sm text-red-400">Reject</button></div> : null}</td></tr>)}</tbody></table></div>
                     </div>
                   ),
                   payroll: (
@@ -1561,9 +1572,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   dashboard: (
                     <div className="staff-dashboard space-y-6">
                       <div className="grid gap-4 sm:grid-cols-3">
-                        <DashboardMetric icon={<ClipboardList className="h-5 w-5" />} label="Pending timesheets" value={pendingTimesheets.length} detail="Waiting for admin review" />
-                        <DashboardMetric icon={<ReceiptText className="h-5 w-5" />} label="Pending expenses" value={pendingExpenses.length} detail="Waiting for admin review" />
-                        <DashboardMetric icon={<CheckCircle2 className="h-5 w-5" />} label="Approved expenses" value={`Rs. ${approvedExpenseTotal.toLocaleString('en-IN')}`} detail="Reimbursable total approved" />
+                        <DashboardMetric icon={<ClipboardList className="h-5 w-5" />} label="Pending timesheets" value={dashboardPendingTimesheets} detail="Waiting for admin review" />
+                        <DashboardMetric icon={<ReceiptText className="h-5 w-5" />} label="Pending expenses" value={dashboardPendingExpenses} detail="Waiting for admin review" />
+                        <DashboardMetric icon={<CheckCircle2 className="h-5 w-5" />} label="Approved expenses" value={`Rs. ${dashboardApprovedExpenseTotal.toLocaleString('en-IN')}`} detail="Reimbursable total approved" />
                       </div>
                       <div className="grid gap-6 lg:grid-cols-[1.35fr_0.85fr]">
                         <div className="surface rounded-lg p-6 sm:p-7">
@@ -1629,7 +1640,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         <div className="mt-4">
                           <label htmlFor="expenseReceipt" className="label-upper mb-2 block text-ghost">Receipt link{expenseSettings.receiptRequired ? ' *' : ''}</label>
                           <input id="expenseReceipt" type="url" inputMode="url" value={expenseReceiptUrl} required={expenseSettings.receiptRequired} onChange={(event) => setExpenseReceiptUrl(event.target.value)} className={inputClass} placeholder="Google Drive or receipt reference URL" />
-                          <p className="mt-2 text-xs text-sub">Use a shareable Drive link or other secure receipt URL. Files are not stored in Firebase.</p>
+                          <p className="mt-2 text-xs text-sub">Use a shareable Drive link or other secure receipt URL.</p>
                         </div>
 
                         {message && <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p>}
@@ -1696,13 +1707,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             <DatePickerInput id="timesheetWorkDate" value={timesheetWorkDate} onChange={(value) => {
                               setTimesheetWorkDate(value)
                               setTimesheetWorkedDates([])
-                              const start = new Date(`${value}T00:00:00`)
-                              if (value && !Number.isNaN(start.getTime()) && start.getDay() === 0) {
-                                start.setDate(start.getDate() + 6)
-                                const year = start.getFullYear()
-                                const month = String(start.getMonth() + 1).padStart(2, '0')
-                                const day = String(start.getDate()).padStart(2, '0')
-                                setTimesheetWeekEnd(`${year}-${month}-${day}`)
+                              if (value && dateOnlyDay(value) === 0) {
+                                setTimesheetWeekEnd(addDateOnlyDays(value, 6))
                               } else {
                                 setTimesheetWeekEnd('')
                               }
@@ -1719,7 +1725,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         </div>
                         {timesheetWorkDate ? <fieldset className="mt-5">
                           <legend className="label-upper mb-3 block text-ghost">Days worked</legend>
-                          {new Date(`${timesheetWorkDate}T00:00:00`).getDay() !== 0 ? <p className="text-sm text-red-600">Please choose a Sunday as the week start.</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                          {dateOnlyDay(timesheetWorkDate) !== 0 ? <p className="text-sm text-red-600">Please choose a Sunday as the week start.</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
                             {weekDays.map((day) => {
                               const selected = timesheetWorkedDates.includes(day.value)
                               return <label key={day.value} className={`cursor-pointer rounded-lg border px-3 py-3 text-center transition-colors ${selected ? 'border-[#66B159] bg-[#66B159]/15 text-[#36722f]' : 'border-zinc-200 bg-white text-ink hover:border-[#66B159]/60'}`}>
@@ -1795,8 +1801,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   ),
                   leaves: (
                     <div className="staff-workspace space-y-6 text-left">
-                      <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}><p className="text-lg font-semibold text-ink">Request Leave</p><div className="mt-5 grid gap-4 sm:grid-cols-2"><div><label className="label-upper mb-2 block text-ghost">Start date</label><DatePickerInput value={leaveStartDate} onChange={setLeaveStartDate} className={inputClass} required /></div><div><label className="label-upper mb-2 block text-ghost">End date</label><DatePickerInput value={leaveEndDate} onChange={setLeaveEndDate} className={inputClass} min={leaveStartDate || undefined} required /></div></div><div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div><button type="submit" className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white">Submit leave request</button></form>
-                      <div className="staff-work-card rounded-lg"><div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">My Leave Requests</p></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800"><td className="px-6 py-4 text-ink">{leave.startDate} to {leave.endDate}</td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td></tr>)}</tbody></table></div></div>
+                      <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}><p className="text-lg font-semibold text-ink">Request Leave</p><div className="mt-5 grid gap-4 sm:grid-cols-3"><div><label className="label-upper mb-2 block text-ghost">Leave type</label><select value={leaveType} onChange={(event) => setLeaveType(event.target.value as LeaveType)} className={inputClass}><option value="sick">Sick leave</option><option value="flexi">Flexi leave</option></select></div><div><label className="label-upper mb-2 block text-ghost">Start date</label><DatePickerInput value={leaveStartDate} onChange={setLeaveStartDate} className={inputClass} required /></div><div><label className="label-upper mb-2 block text-ghost">End date</label><DatePickerInput value={leaveEndDate} onChange={setLeaveEndDate} className={inputClass} min={leaveStartDate || undefined} required /></div></div><div className={`mt-3 rounded-lg border px-4 py-3 text-sm ${exceedsLeaveBalance ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-zinc-700 bg-zinc-900/60 text-sub'}`}><p>{leaveTypeLabel(leaveType)} allowance for {selectedLeaveYear}: {remainingLeaveDays} of {LEAVE_ALLOWANCES[leaveType]} days remaining.</p>{requestedLeaveDays > 0 ? <p className="mt-1 font-medium">Selected duration: {requestedLeaveDays} {requestedLeaveDays === 1 ? 'day' : 'days'}{exceedsLeaveBalance ? ' — exceeds available balance' : ''}</p> : null}</div><div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div><button type="submit" disabled={requestedLeaveDays < 1 || exceedsLeaveBalance} className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Submit leave request</button></form>
+                      <div className="staff-work-card rounded-lg"><div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">My Leave Requests</p></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800"><td className="px-6 py-4 text-ink"><p>{leave.startDate} to {leave.endDate}</p><p className="mt-1 text-xs text-ghost">{leaveTypeLabel(leave.leaveType)} · {leave.durationDays} {leave.durationDays === 1 ? 'day' : 'days'}</p></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td></tr>)}</tbody></table></div></div>
                     </div>
                   ),
                 }[activeTab]}
@@ -1920,11 +1926,14 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
       for (let index = 0; index < pages.length; index += 1) {
         // Render at roughly 380 DPI on an A4 page so small offer-letter text
         // remains crisp when viewed at 100% or printed.
-        const canvas = await html2canvas(pages[index], { scale: 4, useCORS: true, backgroundColor: '#ffffff', logging: false })
+        const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 8
+        const canvas = await html2canvas(pages[index], { scale: memory <= 4 || window.innerWidth < 768 ? 3 : 4, useCORS: true, backgroundColor: '#ffffff', logging: false })
         if (index > 0) pdf.addPage('a4', 'portrait')
         // Every offer section is exactly A4. Exact origin placement prevents a
         // fractional vertical shift, and PNG preserves crisp text baselines.
         pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST')
+        canvas.width = 1
+        canvas.height = 1
       }
       pdf.save(`ProfitPro_Offer_Letter_${staff.employeeId || staff.name.replace(/\s+/g, '_')}.pdf`)
     } catch (caught) {

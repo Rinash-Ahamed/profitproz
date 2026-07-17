@@ -1,8 +1,11 @@
 import { getApps, initializeApp, cert } from 'firebase-admin/app'
-import { getFirestore, Timestamp, FieldValue, DocumentSnapshot, Query } from 'firebase-admin/firestore'
+import { getFirestore, Timestamp, FieldValue, FieldPath, AggregateField, DocumentSnapshot, Query } from 'firebase-admin/firestore'
 import crypto from 'crypto'
 import 'server-only'
 import type { OnboardingDetailsInput, OnboardingRecord, OnboardingPlatformProgress, OtaPlatform } from './onboarding'
+import type { PaginationRequest } from './pagination'
+import { countDateOnlyDaysInclusive } from './date-only'
+import { LEAVE_ALLOWANCES, type LeaveType } from './leave'
 
 export type StaffRecord = {
   id: string
@@ -128,7 +131,8 @@ const COLLECTIONS = {
   ADMINS: 'admins',
   STAFF: 'staff',
   PROPERTIES: 'properties',
-  OTA_ONBOARDINGS: 'ota_onboardings',
+    OTA_ONBOARDINGS: 'ota_onboardings',
+    REVENUE_INVOICES: 'revenue_invoices',
   EXPENSES: 'expenses',
   EXPENSE_RECEIPTS: 'expense_receipts',
   TIMESHEETS: 'timesheets',
@@ -258,6 +262,14 @@ function mapDocToOnboarding(doc: DocumentSnapshot): OnboardingRecord {
     phone: typeof data.phone === 'string' ? data.phone : '',
     ratePerPlatform: typeof data.ratePerPlatform === 'number' ? data.ratePerPlatform : 0,
     invoiceNotes: typeof data.invoiceNotes === 'string' ? data.invoiceNotes : '',
+    invoiceSequence: Number.isInteger(data.invoiceSequence) && data.invoiceSequence > 0 ? data.invoiceSequence : undefined,
+    paymentStatus: data.paymentStatus === 'complete'
+      ? 'complete'
+      : data.paymentStatus === 'pending' || (Number.isInteger(data.invoiceSequence) && data.invoiceSequence > 0)
+        ? 'pending'
+        : 'not_invoiced',
+    invoiceGeneratedAt: mapTimestamp(data.invoiceGeneratedAt),
+    paymentCompletedAt: mapTimestamp(data.paymentCompletedAt),
     platforms,
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
@@ -289,38 +301,6 @@ export async function getAdminByEmail(email: string): Promise<AdminRecord | null
   return snapshot.empty ? null : mapDocToAdmin(snapshot.docs[0])
 }
 
-export async function createAdminAccount(input: { email: string; passwordHash: string }): Promise<AdminRecord> {
-  const db = ensureDb()
-  const normalizedEmail = input.email.trim().toLowerCase()
-  const adminCollection = db.collection(COLLECTIONS.ADMINS)
-
-  const newDocRef = await db.runTransaction(async (transaction) => {
-    const query = adminCollection.where('email', '==', normalizedEmail).limit(1)
-    const snapshot = await transaction.get(query)
-
-    if (!snapshot.empty) {
-      throw new Error('ADMIN_EXISTS')
-    }
-
-    const docRef = adminCollection.doc()
-    transaction.set(docRef, {
-      email: normalizedEmail,
-      passwordHash: input.passwordHash,
-      active: true,
-      sessionVersion: 0,
-      createdAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    })
-    return docRef
-  })
-
-  const finalDoc = await newDocRef.get()
-  if (!finalDoc.exists) {
-    throw new Error('Failed to create and retrieve admin account.')
-  }
-  return mapDocToAdmin(finalDoc)
-}
-
 export async function updateAdminPassword(id: string, passwordHash: string): Promise<AdminRecord> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.ADMINS).doc(id)
@@ -347,6 +327,9 @@ export async function createStaffAccount(input: { name: string; email?: string; 
       throw new Error('STAFF_EXISTS')
     }
 
+    const employeeIdSnapshot = await transaction.get(staffCollection.where('employeeId', '==', input.employeeId).limit(1))
+    if (!employeeIdSnapshot.empty) throw new Error('EMPLOYEE_ID_EXISTS')
+
     const docRef = staffCollection.doc() // Use auto-generated ID
     const newStaffData = {
       name: toTitleCase(input.name.trim()),
@@ -369,6 +352,12 @@ export async function createStaffAccount(input: { name: string; email?: string; 
       updatedAt: FieldValue.serverTimestamp(),
     }
     transaction.set(docRef, newStaffData)
+    transaction.set(db.collection(COLLECTIONS.SALARIES).doc(docRef.id), {
+      staffEmail: generatedEmail,
+      baseSalary: input.annualCtc / 12,
+      notes: 'Monthly salary calculated from annual CTC.',
+      updatedAt: FieldValue.serverTimestamp(),
+    })
     return docRef
   })
 
@@ -392,7 +381,7 @@ export async function updateStaffAccount(id: string, updates: Partial<Omit<Staff
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.STAFF).doc(id)
 
-  const dataToUpdate: Record<string, any> = {
+  const dataToUpdate: Record<string, unknown> = {
     ...updates,
     updatedAt: FieldValue.serverTimestamp(),
   }
@@ -403,11 +392,39 @@ export async function updateStaffAccount(id: string, updates: Partial<Omit<Staff
   if (dataToUpdate.email && typeof dataToUpdate.email === 'string') {
     dataToUpdate.email = dataToUpdate.email.toLowerCase()
   }
+  if (dataToUpdate.personalEmail && typeof dataToUpdate.personalEmail === 'string') {
+    dataToUpdate.personalEmail = dataToUpdate.personalEmail.toLowerCase()
+  }
   if (typeof updates.active === 'boolean') {
     dataToUpdate.sessionVersion = FieldValue.increment(1)
   }
 
-  await docRef.update(dataToUpdate)
+  await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(docRef)
+    if (!existing.exists) throw new Error('STAFF_NOT_FOUND')
+    const existingData = existing.data() || {}
+
+    if (typeof dataToUpdate.email === 'string' && dataToUpdate.email !== existingData.email) {
+      const duplicate = await transaction.get(db.collection(COLLECTIONS.STAFF).where('email', '==', dataToUpdate.email).limit(1))
+      if (duplicate.docs.some((document) => document.id !== id)) throw new Error('STAFF_EXISTS')
+    }
+    if (typeof dataToUpdate.employeeId === 'string' && dataToUpdate.employeeId !== existingData.employeeId) {
+      const duplicate = await transaction.get(db.collection(COLLECTIONS.STAFF).where('employeeId', '==', dataToUpdate.employeeId).limit(1))
+      if (duplicate.docs.some((document) => document.id !== id)) throw new Error('EMPLOYEE_ID_EXISTS')
+    }
+
+    transaction.update(docRef, dataToUpdate)
+    if (typeof dataToUpdate.annualCtc === 'number' || typeof dataToUpdate.email === 'string') {
+      const staffEmail = typeof dataToUpdate.email === 'string' ? dataToUpdate.email : String(existingData.email || '')
+      const annualCtc = typeof dataToUpdate.annualCtc === 'number' ? dataToUpdate.annualCtc : Number(existingData.annualCtc || 0)
+      transaction.set(db.collection(COLLECTIONS.SALARIES).doc(id), {
+        staffEmail,
+        baseSalary: annualCtc / 12,
+        notes: 'Monthly salary calculated from annual CTC.',
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true })
+    }
+  })
 
   const updatedDoc = await docRef.get()
   if (!updatedDoc.exists) {
@@ -598,16 +615,94 @@ export async function listStaffAccounts() {
   return snapshot.docs.map(mapDocToStaff)
 }
 
+export type PageResult<T> = { items: T[]; nextCursor: string | null }
+
+async function paginateQuery<T>(query: Query, map: (document: DocumentSnapshot) => T, page: PaginationRequest): Promise<PageResult<T>> {
+  let paged = query.orderBy(FieldPath.documentId())
+  if (page.cursor) paged = paged.startAfter(page.cursor)
+  const snapshot = await paged.limit(page.limit + 1).get()
+  const hasMore = snapshot.docs.length > page.limit
+  const documents = hasMore ? snapshot.docs.slice(0, page.limit) : snapshot.docs
+  return { items: documents.map(map), nextCursor: hasMore ? documents.at(-1)?.id || null : null }
+}
+
+export function listStaffAccountsPage(page: PaginationRequest) {
+  return paginateQuery(ensureDb().collection(COLLECTIONS.STAFF), mapDocToStaff, page)
+}
+
+export type DashboardSummary = {
+  staffCount: number
+  pendingTimesheets: number
+  pendingExpenses: number
+  approvedExpenseTotal: number
+}
+
+function isMissingIndexError(error: unknown) {
+  if (!error || typeof error !== 'object' || !('code' in error)) return false
+  const code = (error as { code?: unknown }).code
+  return code === 9 || code === 'failed-precondition' || code === 'FAILED_PRECONDITION'
+}
+
+async function getApprovedExpenseTotal(query: Query) {
+  try {
+    const aggregate = await query.aggregate({ total: AggregateField.sum('amount') }).get()
+    return Number(aggregate.data().total || 0)
+  } catch (error) {
+    if (!isMissingIndexError(error)) throw error
+
+    // A newly deployed aggregate index can take time to build. Keep the
+    // dashboard available during that window, selecting only the required field.
+    const snapshot = await query.select('amount').get()
+    return snapshot.docs.reduce((total, document) => {
+      const amount = document.data().amount
+      return total + (typeof amount === 'number' && Number.isFinite(amount) ? amount : 0)
+    }, 0)
+  }
+}
+
+export async function getDashboardSummary(staffEmail?: string): Promise<DashboardSummary> {
+  const db = ensureDb()
+  const email = staffEmail?.trim().toLowerCase()
+  let timesheetQuery: Query = db.collection(COLLECTIONS.TIMESHEETS).where('status', '==', 'pending')
+  let expensePendingQuery: Query = db.collection(COLLECTIONS.EXPENSES).where('status', '==', 'pending')
+  let expenseApprovedQuery: Query = db.collection(COLLECTIONS.EXPENSES).where('status', '==', 'approved')
+  if (email) {
+    timesheetQuery = timesheetQuery.where('staffEmail', '==', email)
+    expensePendingQuery = expensePendingQuery.where('staffEmail', '==', email)
+    expenseApprovedQuery = expenseApprovedQuery.where('staffEmail', '==', email)
+  }
+  const [staffCount, timesheetCount, expenseCount, approvedTotal] = await Promise.all([
+    email ? Promise.resolve({ data: () => ({ count: 0 }) }) : db.collection(COLLECTIONS.STAFF).count().get(),
+    timesheetQuery.count().get(),
+    expensePendingQuery.count().get(),
+    getApprovedExpenseTotal(expenseApprovedQuery),
+  ])
+  return {
+    staffCount: staffCount.data().count,
+    pendingTimesheets: timesheetCount.data().count,
+    pendingExpenses: expenseCount.data().count,
+    approvedExpenseTotal: approvedTotal,
+  }
+}
+
 export async function listProperties(): Promise<PropertyRecord[]> {
   const db = ensureDb()
   const snapshot = await db.collection(COLLECTIONS.PROPERTIES).get()
   return snapshot.docs.map(mapDocToProperty)
 }
 
+export function listPropertiesPage(page: PaginationRequest) {
+  return paginateQuery(ensureDb().collection(COLLECTIONS.PROPERTIES), mapDocToProperty, page)
+}
+
 export async function listOnboardings(): Promise<OnboardingRecord[]> {
   const db = ensureDb()
   const snapshot = await db.collection(COLLECTIONS.OTA_ONBOARDINGS).get()
   return snapshot.docs.map(mapDocToOnboarding)
+}
+
+export function listOnboardingsPage(page: PaginationRequest) {
+  return paginateQuery(ensureDb().collection(COLLECTIONS.OTA_ONBOARDINGS), mapDocToOnboarding, page)
 }
 
 export async function createOnboarding(input: OnboardingDetailsInput): Promise<OnboardingRecord> {
@@ -660,17 +755,26 @@ export async function deleteOnboarding(id: string): Promise<void> {
   await docRef.delete()
 }
 
-export async function getOrCreateOnboardingInvoiceSequence(id: string): Promise<number> {
+export async function getOrCreateOnboardingInvoiceSequence(id: string): Promise<{ sequence: number; onboarding: OnboardingRecord }> {
   const db = ensureDb()
   const onboardingRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
   const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('ota-invoice-sequence')
 
-  return db.runTransaction(async (transaction) => {
+  const sequence = await db.runTransaction(async (transaction) => {
     const onboardingSnapshot = await transaction.get(onboardingRef)
     if (!onboardingSnapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
 
     const existingSequence = onboardingSnapshot.data()?.invoiceSequence
-    if (Number.isInteger(existingSequence) && existingSequence > 0) return existingSequence as number
+    if (Number.isInteger(existingSequence) && existingSequence > 0) {
+      if (onboardingSnapshot.data()?.paymentStatus !== 'complete') {
+        transaction.update(onboardingRef, {
+          paymentStatus: 'pending',
+          invoiceGeneratedAt: onboardingSnapshot.data()?.invoiceGeneratedAt || FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      }
+      return existingSequence as number
+    }
 
     const counterSnapshot = await transaction.get(counterRef)
     const lastSequence = counterSnapshot.exists && Number.isInteger(counterSnapshot.data()?.lastSequence)
@@ -679,8 +783,55 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string): Promise<
     const nextSequence = lastSequence + 1
 
     transaction.set(counterRef, { lastSequence: nextSequence, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
-    transaction.update(onboardingRef, { invoiceSequence: nextSequence, updatedAt: FieldValue.serverTimestamp() })
+    transaction.update(onboardingRef, {
+      invoiceSequence: nextSequence,
+      paymentStatus: 'pending',
+      invoiceGeneratedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
     return nextSequence
+  })
+
+  return { sequence, onboarding: mapDocToOnboarding(await onboardingRef.get()) }
+}
+
+export async function completeOnboardingInvoicePayment(id: string): Promise<OnboardingRecord> {
+  const db = ensureDb()
+  const onboardingRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(onboardingRef)
+    if (!snapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
+    if (!Number.isInteger(snapshot.data()?.invoiceSequence) || snapshot.data()!.invoiceSequence < 1) {
+      throw new Error('ONBOARDING_INVOICE_NOT_GENERATED')
+    }
+    if (snapshot.data()?.paymentStatus === 'complete') return
+    transaction.update(onboardingRef, {
+      paymentStatus: 'complete',
+      paymentCompletedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+  })
+
+  return mapDocToOnboarding(await onboardingRef.get())
+}
+
+export async function createRevenueInvoiceSequence(propertyId: string): Promise<number> {
+  const db = ensureDb()
+  const propertyRef = db.collection(COLLECTIONS.PROPERTIES).doc(propertyId)
+  const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('revenue-invoice-sequence')
+  const invoiceRef = db.collection(COLLECTIONS.REVENUE_INVOICES).doc(createDocumentId())
+
+  return db.runTransaction(async (transaction) => {
+    const property = await transaction.get(propertyRef)
+    if (!property.exists) throw new Error('PROPERTY_NOT_FOUND')
+    if (property.data()?.status !== 'active') throw new Error('PROPERTY_NOT_ACTIVE')
+    const counter = await transaction.get(counterRef)
+    const lastSequence = Number.isInteger(counter.data()?.lastSequence) ? Number(counter.data()?.lastSequence) : 0
+    const sequence = lastSequence + 1
+    transaction.set(counterRef, { lastSequence: sequence, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    transaction.set(invoiceRef, { propertyId, sequence, status: 'generated', createdAt: FieldValue.serverTimestamp() })
+    return sequence
   })
 }
 
@@ -780,6 +931,12 @@ export async function listExpenses(staffEmail?: string) {
   return snapshot.docs.map(mapDocToExpense)
 }
 
+export function listExpensesPage(page: PaginationRequest, staffEmail?: string) {
+  let query: Query = ensureDb().collection(COLLECTIONS.EXPENSES)
+  if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
+  return paginateQuery(query, mapDocToExpense, page)
+}
+
 export async function createExpense(input: { staffEmail: string; staffName: string; title: string; city: string; expenseType: ExpenseRecord['expenseType']; description: string; amount: number; receiptName: string; receiptUrl?: string }): Promise<ExpenseRecord> {
   const db = ensureDb()
 
@@ -842,6 +999,12 @@ export async function listTimesheets(staffEmail?: string) {
   return snapshot.docs.map(mapDocToTimesheet)
 }
 
+export function listTimesheetsPage(page: PaginationRequest, staffEmail?: string) {
+  let query: Query = ensureDb().collection(COLLECTIONS.TIMESHEETS)
+  if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
+  return paginateQuery(query, mapDocToTimesheet, page)
+}
+
 export async function createTimesheet(input: { staffEmail: string; weekStart: string; weekEnd: string; workedDates: string[]; workLocation: 'remote' | 'office'; notes?: string }): Promise<TimesheetRecord> {
   const db = ensureDb()
 
@@ -891,6 +1054,8 @@ export type LeaveRequestRecord = {
   staffEmail: string
   startDate: string
   endDate: string
+  leaveType: LeaveType | 'legacy'
+  durationDays: number
   reason: string
   status: 'pending' | 'approved' | 'rejected'
   decisionNote?: string
@@ -957,6 +1122,10 @@ export async function listSalaries() {
   if (!db) return []
   const snapshot = await db.collection(COLLECTIONS.SALARIES).get()
   return snapshot.docs.map(mapDocToSalary)
+}
+
+export function listSalariesPage(page: PaginationRequest) {
+  return paginateQuery(ensureDb().collection(COLLECTIONS.SALARIES), mapDocToSalary, page)
 }
 
 export async function saveSalary(staffId: string, input: { staffEmail: string; baseSalary: number; notes: string }): Promise<SalaryRecord> {
@@ -1075,17 +1244,65 @@ export async function listLeaveRequests(staffEmail?: string): Promise<LeaveReque
   let query: Query = db.collection(COLLECTIONS.LEAVE_REQUESTS)
   if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
   const snapshot = await query.get()
-  return snapshot.docs.map((doc) => {
-    const data = doc.data()
-    return { id: doc.id, staffEmail: data.staffEmail || '', startDate: data.startDate || '', endDate: data.endDate || '', reason: data.reason || '', status: data.status === 'approved' || data.status === 'rejected' ? data.status : 'pending', decisionNote: data.decisionNote || '', createdAt: mapTimestamp(data.createdAt) }
-  })
+  return snapshot.docs.map(mapDocToLeaveRequest)
 }
 
-export async function createLeaveRequest(input: Omit<LeaveRequestRecord, 'id' | 'status' | 'decisionNote' | 'createdAt'>) {
+function mapDocToLeaveRequest(doc: DocumentSnapshot): LeaveRequestRecord {
+  const data = doc.data() || {}
+  const startDate = typeof data.startDate === 'string' ? data.startDate : ''
+  const endDate = typeof data.endDate === 'string' ? data.endDate : ''
+  return {
+    id: doc.id,
+    staffEmail: data.staffEmail || '',
+    startDate,
+    endDate,
+    leaveType: data.leaveType === 'sick' || data.leaveType === 'flexi' ? data.leaveType : 'legacy',
+    durationDays: Number.isInteger(data.durationDays) && data.durationDays > 0 ? data.durationDays : countDateOnlyDaysInclusive(startDate, endDate),
+    reason: data.reason || '',
+    status: data.status === 'approved' || data.status === 'rejected' ? data.status : 'pending',
+    decisionNote: data.decisionNote || '',
+    createdAt: mapTimestamp(data.createdAt),
+  }
+}
+
+export function listLeaveRequestsPage(page: PaginationRequest, staffEmail?: string) {
+  let query: Query = ensureDb().collection(COLLECTIONS.LEAVE_REQUESTS)
+  if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
+  return paginateQuery(query, mapDocToLeaveRequest, page)
+}
+
+export async function createLeaveRequest(input: { staffEmail: string; startDate: string; endDate: string; leaveType: LeaveType; reason: string }) {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc()
-  await docRef.set({ ...input, staffEmail: input.staffEmail.trim().toLowerCase(), reason: input.reason.trim(), status: 'pending', createdAt: FieldValue.serverTimestamp() })
-  return (await listLeaveRequests(input.staffEmail)).find((leave) => leave.id === docRef.id)!
+  const staffEmail = input.staffEmail.trim().toLowerCase()
+  const durationDays = countDateOnlyDaysInclusive(input.startDate, input.endDate)
+  const leaveYear = input.startDate.slice(0, 4)
+
+  await db.runTransaction(async (transaction) => {
+    const existing = await transaction.get(db.collection(COLLECTIONS.LEAVE_REQUESTS).where('staffEmail', '==', staffEmail))
+    const usedDays = existing.docs.reduce((total, document) => {
+      const data = document.data()
+      if (data.status === 'rejected' || data.leaveType !== input.leaveType || typeof data.startDate !== 'string' || !data.startDate.startsWith(`${leaveYear}-`)) return total
+      const days = Number.isInteger(data.durationDays) && data.durationDays > 0
+        ? data.durationDays
+        : countDateOnlyDaysInclusive(data.startDate, data.endDate || data.startDate)
+      return total + days
+    }, 0)
+    const remainingDays = LEAVE_ALLOWANCES[input.leaveType] - usedDays
+    if (durationDays < 1 || durationDays > remainingDays) throw new Error(`LEAVE_ALLOWANCE_EXCEEDED:${Math.max(0, remainingDays)}`)
+
+    transaction.set(docRef, {
+      ...input,
+      staffEmail,
+      reason: input.reason.trim(),
+      durationDays,
+      leaveYear,
+      status: 'pending',
+      createdAt: FieldValue.serverTimestamp(),
+    })
+  })
+
+  return mapDocToLeaveRequest(await docRef.get())
 }
 
 export async function updateLeaveRequestStatus(id: string, status: 'approved' | 'rejected', decisionNote = '') {
@@ -1094,5 +1311,5 @@ export async function updateLeaveRequestStatus(id: string, status: 'approved' | 
   await docRef.update({ status, decisionNote: decisionNote.trim(), updatedAt: FieldValue.serverTimestamp() })
   const doc = await docRef.get()
   const data = doc.data() || {}
-  return { id: doc.id, staffEmail: data.staffEmail || '', startDate: data.startDate || '', endDate: data.endDate || '', reason: data.reason || '', status: data.status, decisionNote: data.decisionNote || '', createdAt: mapTimestamp(data.createdAt) } as LeaveRequestRecord
+  return mapDocToLeaveRequest(doc)
 }

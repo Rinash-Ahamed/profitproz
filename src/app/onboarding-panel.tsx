@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { CheckCircle2, ChevronDown, Download, Edit, FileText, Loader2, Plus, Save, Search, Trash2 } from 'lucide-react'
 import { OTA_PLATFORMS, type OnboardingPlatformProgress, type OnboardingRecord, type OtaPlatform } from '@/lib/onboarding'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
+import { authenticatedFetch as fetch } from '@/lib/client-api'
 
 type OnboardingPanelProps = {
   onboardings: OnboardingRecord[]
@@ -18,6 +19,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
   const [editing, setEditing] = useState<OnboardingRecord | null>(null)
   const [invoiceRecord, setInvoiceRecord] = useState<OnboardingRecord | null>(null)
   const [deletingId, setDeletingId] = useState('')
+  const [completingPaymentId, setCompletingPaymentId] = useState('')
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState('')
@@ -47,6 +49,22 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
       setError(caught instanceof Error ? caught.message : 'Failed to delete onboarding tracker.')
     } finally {
       setDeletingId('')
+    }
+  }
+
+  async function completePayment(record: OnboardingRecord) {
+    if (!window.confirm(`Confirm that payment has been received for ${record.propertyName}?`)) return
+    setCompletingPaymentId(record.id)
+    setError('')
+    try {
+      const response = await fetch(`/api/admin/onboardings/${encodeURIComponent(record.id)}/invoice-number`, { method: 'PATCH' })
+      const data = await response.json() as { onboarding?: OnboardingRecord; message?: string }
+      if (!response.ok || !data.onboarding) throw new Error(data.message || 'Failed to complete invoice payment.')
+      onChange(onboardings.map((item) => item.id === data.onboarding!.id ? data.onboarding! : item))
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Failed to complete invoice payment.')
+    } finally {
+      setCompletingPaymentId('')
     }
   }
 
@@ -83,6 +101,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
           {visibleOnboardings.map((record) => {
             const liveCount = record.platforms.filter((platform) => platform.status === 'live').length
             const expanded = expandedId === record.id
+            const paymentStatus = record.paymentStatus || (record.invoiceSequence ? 'pending' : 'not_invoiced')
             return (
               <section key={record.id}>
                 <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
@@ -93,17 +112,18 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
                       <span className="mt-0.5 block text-xs text-sub">{liveCount}/{record.platforms.length} live · {record.platforms.length - liveCount} pending</span>
                     </span>
                   </button>
-                  <div className="flex shrink-0 items-center gap-3">
-                    <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${liveCount === record.platforms.length ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-amber-500/20 bg-amber-500/10 text-amber-400'}`}>
-                      {liveCount === record.platforms.length ? 'Completed' : 'In progress'}
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <span className={`rounded-full border px-3 py-1 text-xs font-medium ${liveCount === record.platforms.length ? 'border-green-500/25 bg-green-500/10 text-green-300' : 'border-amber-500/25 bg-amber-500/10 text-amber-300'}`}>
+                      {liveCount === record.platforms.length ? 'Onboarding complete' : 'Onboarding in progress'}
                     </span>
-                    {!readOnly && liveCount === record.platforms.length ? <button type="button" onClick={() => setInvoiceRecord(record)} className="inline-flex h-9 items-center gap-2 rounded-md border border-[#66B159]/30 bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"><FileText className="h-4 w-4" /> Generate invoice</button> : null}
-                    {!readOnly ? <button type="button" onClick={() => setEditing(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={`Edit onboarding details for ${record.propertyName}`}>
-                      <Edit className="h-4 w-4" />
-                    </button> : null}
-                    {!readOnly ? <button type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete onboarding for ${record.propertyName}`}>
-                      {deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                    </button> : null}
+                    {!readOnly && paymentStatus === 'pending' ? <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">Payment pending</span> : null}
+                    {paymentStatus === 'complete' ? <span className="rounded-full border border-green-500/25 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-300">Payment complete</span> : null}
+                    {!readOnly ? <div className="ml-1 flex items-center gap-1">
+                      {liveCount === record.platforms.length && paymentStatus !== 'complete' ? <button type="button" onClick={() => setInvoiceRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159]" aria-label={`${paymentStatus === 'pending' ? 'Open' : 'Generate'} invoice for ${record.propertyName}`} title={paymentStatus === 'pending' ? 'Open invoice PDF' : 'Generate invoice'}><FileText className="h-4 w-4" /></button> : null}
+                      {paymentStatus === 'pending' ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => completePayment(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50" aria-label={`Mark payment complete for ${record.propertyName}`} title="Mark payment complete">{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}</button> : null}
+                      <button type="button" onClick={() => setEditing(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={`Edit onboarding details for ${record.propertyName}`} title="Edit onboarding"><Edit className="h-4 w-4" /></button>
+                      <button type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete onboarding for ${record.propertyName}`} title="Delete onboarding">{deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button>
+                    </div> : null}
                   </div>
                 </div>
 
@@ -126,7 +146,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
 
       {showCreate ? <OnboardingDetailsModal onClose={() => setShowCreate(false)} onSaved={(record) => { onChange([...onboardings, record].sort((a, b) => a.propertyName.localeCompare(b.propertyName))); setExpandedId(record.id); setShowCreate(false) }} /> : null}
       {editing ? <OnboardingDetailsModal initial={editing} onClose={() => setEditing(null)} onSaved={(record) => { onChange(onboardings.map((item) => item.id === record.id ? record : item).sort((a, b) => a.propertyName.localeCompare(b.propertyName))); setEditing(null) }} /> : null}
-      {invoiceRecord ? <InvoiceModal record={invoiceRecord} onClose={() => setInvoiceRecord(null)} /> : null}
+      {invoiceRecord ? <InvoiceModal record={invoiceRecord} onGenerated={(updated) => { onChange(onboardings.map((item) => item.id === updated.id ? updated : item)); setInvoiceRecord(updated) }} onClose={() => setInvoiceRecord(null)} /> : null}
     </div>
   )
 }
@@ -171,8 +191,9 @@ const emptyInvoicePaymentSettings: InvoicePaymentSettings = {
   companyAddress: '',
 }
 
-function InvoiceModal({ record, onClose }: { record: OnboardingRecord; onClose: () => void }) {
+function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingRecord; onGenerated: (record: OnboardingRecord) => void; onClose: () => void }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const onGeneratedRef = useRef(onGenerated)
   const [invoiceDate, setInvoiceDate] = useState(localIsoDate())
   const [template, setTemplate] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<InvoicePaymentSettings>(emptyInvoicePaymentSettings)
@@ -186,6 +207,10 @@ function InvoiceModal({ record, onClose }: { record: OnboardingRecord; onClose: 
   const subtotal = record.ratePerPlatform * record.platforms.length
 
   useEffect(() => {
+    onGeneratedRef.current = onGenerated
+  }, [onGenerated])
+
+  useEffect(() => {
     const controller = new AbortController()
     Promise.all([
       fetch('/template/ProfitPro_OTA_Onboarding_Invoice_Template.html', { signal: controller.signal }),
@@ -197,11 +222,13 @@ function InvoiceModal({ record, onClose }: { record: OnboardingRecord; onClose: 
         if (!settingsResponse.ok) throw new Error('Invoice payment details could not be loaded.')
         if (!sequenceResponse.ok) throw new Error('Invoice number could not be assigned.')
         const settingsData = await settingsResponse.json() as { settings?: InvoicePaymentSettings }
-        const sequenceData = await sequenceResponse.json() as { sequence?: number }
+        const sequenceData = await sequenceResponse.json() as { sequence?: number; onboarding?: OnboardingRecord }
         if (!Number.isInteger(sequenceData.sequence) || (sequenceData.sequence || 0) < 1) throw new Error('Invoice number could not be assigned.')
+        if (!sequenceData.onboarding) throw new Error('Invoice payment status could not be updated.')
         setTemplate(await templateResponse.text())
         setPaymentSettings(settingsData.settings || emptyInvoicePaymentSettings)
         setInvoiceSequence(sequenceData.sequence!)
+        onGeneratedRef.current(sequenceData.onboarding)
       })
       .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Invoice template could not be loaded.') })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
@@ -254,8 +281,9 @@ function InvoiceModal({ record, onClose }: { record: OnboardingRecord; onClose: 
         import('html2canvas'),
         import('jspdf'),
       ])
+      const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 8
       const canvas = await html2canvas(page, {
-        scale: 4,
+        scale: memory <= 4 || window.innerWidth < 768 ? 3 : 4,
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
@@ -266,6 +294,8 @@ function InvoiceModal({ record, onClose }: { record: OnboardingRecord; onClose: 
       // The template is exactly A4. Placing it at the exact page origin avoids
       // fractional centering offsets, while PNG keeps small text edges lossless.
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST')
+      canvas.width = 1
+      canvas.height = 1
       pdf.save(`${invoiceNumber}.pdf`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to download invoice PDF.')

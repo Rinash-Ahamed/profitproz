@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Building2, Download, Edit, FileText, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
 import type { PropertyInput, PropertyRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
+import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
 
 type PropertiesPanelProps = {
   properties: PropertyRecord[]
@@ -34,6 +35,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<PropertyRecord | null>(null)
   const [contractProperty, setContractProperty] = useState<PropertyRecord | null>(null)
+  const [invoiceProperty, setInvoiceProperty] = useState<PropertyRecord | null>(null)
   const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
@@ -115,7 +117,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
                   <td className="px-6 py-4 text-sub"><p>{property.contractStartDate ? new Date(`${property.contractStartDate}T00:00:00`).toLocaleDateString('en-IN') : 'Not set'}</p>{!readOnly && property.signedContractUrl ? <a href={property.signedContractUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View signed contract</a> : null}</td>
                   <td className="px-6 py-4"><PropertyStatusBadge status={property.status} /></td>
                   {!readOnly ? <td className="px-6 py-4">{property.signedContractUrl ? <span className="text-xs text-ghost">Signed</span> : <button type="button" onClick={() => setContractProperty(property)} className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-[#66B159]/30 bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"><FileText className="h-4 w-4" /> Contract PDF</button>}</td> : null}
-                  {!readOnly ? <td className="px-6 py-4"><div className="flex gap-2"><button type="button" onClick={() => setEditing(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label={`Edit ${property.name}`}><Edit className="h-4 w-4" /></button><button type="button" disabled={deletingId === property.id} onClick={() => deleteRecord(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete ${property.name}`}>{deletingId === property.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button></div></td> : null}
+                  {!readOnly ? <td className="px-6 py-4"><div className="flex gap-2">{property.status === 'active' ? <button type="button" onClick={() => setInvoiceProperty(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159]" aria-label={`Generate revenue invoice for ${property.name}`} title="Generate revenue invoice"><FileText className="h-4 w-4" /></button> : null}<button type="button" onClick={() => setEditing(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label={`Edit ${property.name}`}><Edit className="h-4 w-4" /></button><button type="button" disabled={deletingId === property.id} onClick={() => deleteRecord(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete ${property.name}`}>{deletingId === property.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button></div></td> : null}
                 </tr>
               ))}
             </tbody>
@@ -126,8 +128,92 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
       {showCreate ? <PropertyModal title="Add Client Property" initial={emptyProperty} onClose={() => setShowCreate(false)} onSaved={(property) => { onChange([...properties, property].sort((a, b) => a.name.localeCompare(b.name))); setShowCreate(false); setContractProperty(property) }} /> : null}
       {editing ? <PropertyModal title="Edit Client Property" initial={editing} propertyId={editing.id} onClose={() => setEditing(null)} onSaved={(property) => { onChange(properties.map((item) => item.id === property.id ? property : item).sort((a, b) => a.name.localeCompare(b.name))); setEditing(null) }} /> : null}
       {contractProperty ? <ContractPreviewModal property={contractProperty} onClose={() => setContractProperty(null)} /> : null}
+      {invoiceProperty ? <RevenueInvoiceModal property={invoiceProperty} onClose={() => setInvoiceProperty(null)} /> : null}
     </div>
   )
+}
+
+type InvoiceSettings = { accountName: string; bankName: string; accountNumber: string; ifscCode: string; upiVpa: string; upiNumber: string; companyAddress: string }
+const emptyInvoiceSettings: InvoiceSettings = { accountName: '', bankName: '', accountNumber: '', ifscCode: '', upiVpa: '', upiNumber: '', companyAddress: '' }
+const localDate = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
+const displayDate = (value: string) => value.split('-').reverse().join('-')
+const escapeTemplateValue = (value: string | number) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
+
+function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; onClose: () => void }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [invoiceDate, setInvoiceDate] = useState(localDate())
+  const [dueDate, setDueDate] = useState(localDate())
+  const [billingPeriod, setBillingPeriod] = useState('')
+  const [managedRevenue, setManagedRevenue] = useState('')
+  const [notes, setNotes] = useState('Revenue management services provided for the stated billing period.')
+  const [template, setTemplate] = useState('')
+  const [settings, setSettings] = useState<InvoiceSettings>(emptyInvoiceSettings)
+  const [sequence, setSequence] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState('')
+  const [year, month] = invoiceDate.split('-')
+  const invoiceNumber = sequence
+    ? `PP-RMS-${month}-${year.slice(-2)}-${String(sequence).padStart(3, '0')}`
+    : `PP-RMS-${month}-${year.slice(-2)}-PREVIEW`
+  const subtotal = Number(managedRevenue || 0) * property.commissionPercent / 100
+
+  useEffect(() => {
+    const controller = new AbortController()
+    Promise.all([
+      fetch('/template/ProfitPro_Revenue_Management_Invoice_Template.html', { signal: controller.signal }).then(async (response) => { if (!response.ok) throw new Error('Revenue invoice template could not be loaded.'); return response.text() }),
+      apiFetch<{ settings: InvoiceSettings }>('/api/admin/invoice-settings', { signal: controller.signal }),
+    ]).then(([html, payment]) => { setTemplate(html); setSettings(payment.settings || emptyInvoiceSettings) })
+      .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Revenue invoice could not be prepared.') })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [property.id])
+
+  const rendered = useMemo(() => {
+    if (!template) return ''
+    const values: Record<string, string | number> = {
+      invoice_number: invoiceNumber, invoice_date: displayDate(invoiceDate), due_date: displayDate(dueDate),
+      billing_period: billingPeriod, client_name: property.contactName || property.name, property_name: property.name,
+      property_address: [property.address, property.city].filter(Boolean).join(', '), email_address: property.contactEmail,
+      phone: property.contactPhone, managed_revenue: Number(managedRevenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }),
+      commission_percent: property.commissionPercent.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
+      subtotal: subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 }), total_amount: subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 }), notes,
+      account_name: settings.accountName, bank_name: settings.bankName, account_number: settings.accountNumber,
+      ifsc_code: settings.ifscCode, upi_vpa: settings.upiVpa, upi_number: settings.upiNumber, company_address: settings.companyAddress,
+    }
+    return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeTemplateValue(value)), template)
+  }, [billingPeriod, dueDate, invoiceDate, invoiceNumber, managedRevenue, notes, property, settings, subtotal, template])
+
+  async function downloadPdf() {
+    if (!billingPeriod.trim() || managedRevenue === '' || !(Number(managedRevenue) >= 0)) { setError('Enter the billing period and managed revenue.'); return }
+    if (!dueDate || dueDate < invoiceDate) { setError('Due date cannot be earlier than the invoice date.'); return }
+    setDownloading(true); setError('')
+    try {
+      let issuedSequence = sequence
+      if (!issuedSequence) {
+        const numbering = await apiFetch<{ sequence: number }>(`/api/admin/properties/${encodeURIComponent(property.id)}/invoice-number`, { method: 'POST' })
+        issuedSequence = numbering.sequence
+        const frame = iframeRef.current
+        const invoiceRendered = new Promise<void>((resolve) => frame?.addEventListener('load', () => resolve(), { once: true }))
+        setSequence(issuedSequence)
+        await Promise.race([invoiceRendered, new Promise<void>((resolve) => setTimeout(resolve, 2_000))])
+      }
+      const page = iframeRef.current?.contentDocument?.querySelector('.invoice-page') as HTMLElement | null
+      if (!page) throw new Error('Revenue invoice preview is not ready.')
+      await iframeRef.current?.contentDocument?.fonts?.ready
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
+      const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 8
+      const canvas = await html2canvas(page, { scale: memory <= 4 ? 3 : 4, useCORS: true, backgroundColor: '#ffffff', logging: false })
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true })
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight(), undefined, 'FAST')
+      canvas.width = 1; canvas.height = 1
+      const issuedInvoiceNumber = `PP-RMS-${month}-${year.slice(-2)}-${String(issuedSequence).padStart(3, '0')}`
+      pdf.save(`${issuedInvoiceNumber}.pdf`)
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Failed to download revenue invoice.') } finally { setDownloading(false) }
+  }
+
+  const inputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
+  return createPortal(<div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Generate revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {sequence ? invoiceNumber : 'Number assigned on download'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Billing period</span><input value={billingPeriod} onChange={(event) => setBillingPeriod(event.target.value)} maxLength={80} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="border-b border-zinc-800 p-5"><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} /></label>{error ? <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}</div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
 }
 
 function PropertyModal({ title, initial, propertyId, onClose, onSaved }: { title: string; initial: PropertyInput; propertyId?: string; onClose: () => void; onSaved: (property: PropertyRecord) => void }) {
@@ -236,10 +322,16 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
     setDownloading(true)
     setError('')
 
-    const wrapper = (preview.querySelector('.docx-wrapper') as HTMLElement | null) || preview
+    const sourceWrapper = (preview.querySelector('.docx-wrapper') as HTMLElement | null) || preview
+    const exportHost = document.createElement('div')
+    const wrapper = sourceWrapper.cloneNode(true) as HTMLElement
+    exportHost.style.position = 'fixed'
+    exportHost.style.left = '-100000px'
+    exportHost.style.top = '0'
+    exportHost.style.background = '#ffffff'
+    exportHost.appendChild(wrapper)
+    document.body.appendChild(exportHost)
     const sections = Array.from(wrapper.querySelectorAll('section.docx')) as HTMLElement[]
-    const wrapperStyle = wrapper.getAttribute('style')
-    const sectionStyles = sections.map((section) => section.getAttribute('style'))
 
     try {
       wrapper.style.padding = '0'
@@ -256,19 +348,13 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
         margin: 0,
         filename: `${safeName}-ProfitPro-Contract.pdf`,
         image: { type: 'jpeg', quality: 1 },
-        html2canvas: { scale: 4, useCORS: true, backgroundColor: '#ffffff', logging: false },
+        html2canvas: { scale: getPdfRenderScale(), useCORS: true, backgroundColor: '#ffffff', logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       }).from(wrapper).save()
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to download the contract PDF.')
     } finally {
-      if (wrapperStyle === null) wrapper.removeAttribute('style')
-      else wrapper.setAttribute('style', wrapperStyle)
-      sections.forEach((section, index) => {
-        const style = sectionStyles[index]
-        if (style === null) section.removeAttribute('style')
-        else section.setAttribute('style', style)
-      })
+      exportHost.remove()
       setDownloading(false)
     }
   }
@@ -299,6 +385,11 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
     </div>,
     document.body,
   )
+}
+
+function getPdfRenderScale() {
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 8
+  return memory <= 4 || window.innerWidth < 768 ? 3 : 4
 }
 
 function Field({ label, wide = false, children }: { label: string; wide?: boolean; children: React.ReactNode }) {

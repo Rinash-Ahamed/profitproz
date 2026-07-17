@@ -1,4 +1,5 @@
 'use client'
+/* eslint-disable @next/next/no-img-element -- OTA logos intentionally use intrinsic img sizing in the continuous ticker. */
 import React, { useEffect, useMemo, useState } from 'react'
 
 type TickerProps = {

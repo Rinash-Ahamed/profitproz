@@ -2,10 +2,10 @@
 import Image from 'next/image'
 
 const mobileImages = [
-  { src: '/mobile/mob1.png', alt: 'revenue insights' },
-  { src: '/mobile/mob2.png', alt: 'competitor rates' },
-  { src: '/mobile/mob3.png', alt: 'occupancy overview' },
-  { src: '/mobile/mob4.png', alt: 'dynamic pricing controls' },
+  { src: '/mobile/mob1.webp', alt: 'revenue insights' },
+  { src: '/mobile/mob2.webp', alt: 'competitor rates' },
+  { src: '/mobile/mob3.webp', alt: 'occupancy overview' },
+  { src: '/mobile/mob4.webp', alt: 'dynamic pricing controls' },
 ]
 
 export function MobilePreview() {

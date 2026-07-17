@@ -2,7 +2,8 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import crypto from 'node:crypto'
 import { authConfig, hashPassword, verifyActiveSessionToken } from '@/lib/auth'
-import { createStaffAccount, listStaffAccounts, logAdminAction, saveSalary, toPublicStaff } from '@/lib/firestore'
+import { createStaffAccount, listStaffAccounts, listStaffAccountsPage, logAdminAction, toPublicStaff } from '@/lib/firestore'
+import { readPagination } from '@/lib/pagination'
 
 function createTemporaryPassword() {
   return crypto.randomBytes(24).toString('base64url')
@@ -15,13 +16,19 @@ async function requireAdmin() {
   return user?.role === 'admin' ? user : null
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await requireAdmin()
 
   if (!user) {
     return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
   }
 
+  const pagination = readPagination(request)
+  if (pagination) {
+    const page = await listStaffAccountsPage(pagination)
+    page.items.sort((a, b) => a.name.localeCompare(b.name))
+    return NextResponse.json({ staff: page.items.map(toPublicStaff), nextCursor: page.nextCursor })
+  }
   const staff = await listStaffAccounts()
   staff.sort((a, b) => a.name.localeCompare(b.name))
 
@@ -86,12 +93,6 @@ export async function POST(request: Request) {
       passwordHash: await hashPassword(temporaryPassword),
     })
 
-    await saveSalary(staff.id, {
-      staffEmail: staff.email,
-      baseSalary: ctc / 12,
-      notes: 'Monthly salary calculated from annual CTC.',
-    })
-
     await logAdminAction({
       actorEmail: user.email,
       action: 'STAFF_CREATE',
@@ -103,6 +104,9 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === 'STAFF_EXISTS') {
       return NextResponse.json({ message: 'An employee with this generated email already exists.' }, { status: 409 })
+    }
+    if (error instanceof Error && error.message === 'EMPLOYEE_ID_EXISTS') {
+      return NextResponse.json({ message: 'An employee with this employee ID already exists.' }, { status: 409 })
     }
 
     console.error('Failed to create staff account:', error)

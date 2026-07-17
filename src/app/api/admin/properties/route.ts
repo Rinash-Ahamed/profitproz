@@ -1,8 +1,9 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { createProperty, listProperties, logAdminAction, type PropertyInput } from '@/lib/firestore'
+import { createProperty, listProperties, listPropertiesPage, logAdminAction, type PropertyInput } from '@/lib/firestore'
 import { parsePropertyPayload } from '@/lib/property-validation'
+import { readPagination } from '@/lib/pagination'
 
 async function requireAdmin() {
   const cookieStore = await cookies()
@@ -10,11 +11,17 @@ async function requireAdmin() {
   return user?.role === 'admin' ? user : null
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const user = await requireAdmin()
   if (!user) return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
 
   try {
+    const pagination = readPagination(request)
+    if (pagination) {
+      const page = await listPropertiesPage(pagination)
+      page.items.sort((a, b) => a.name.localeCompare(b.name))
+      return NextResponse.json({ properties: page.items, nextCursor: page.nextCursor })
+    }
     const properties = await listProperties()
     properties.sort((a, b) => a.name.localeCompare(b.name))
     return NextResponse.json({ properties })
