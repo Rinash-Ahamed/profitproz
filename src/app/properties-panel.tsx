@@ -255,8 +255,8 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
       await html2pdf().set({
         margin: 0,
         filename: `${safeName}-ProfitPro-Contract.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+        image: { type: 'jpeg', quality: 1 },
+        html2canvas: { scale: 4, useCORS: true, backgroundColor: '#ffffff', logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       }).from(wrapper).save()
     } catch (caught) {

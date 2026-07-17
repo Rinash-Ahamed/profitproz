@@ -3,6 +3,11 @@ import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { getStaffByEmail, toPublicStaff, updateStaffProfile } from '@/lib/firestore'
 
+function toEmployeeFacingProfile(staff: Parameters<typeof toPublicStaff>[0]) {
+  const { employeeId: _employeeId, ...profile } = toPublicStaff(staff)
+  return profile
+}
+
 export async function GET() {
   const cookieStore = await cookies()
   const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
@@ -17,7 +22,7 @@ export async function GET() {
     return NextResponse.json({ message: 'Profile not found.' }, { status: 404 })
   }
 
-  return NextResponse.json({ profile: toPublicStaff(staff) })
+  return NextResponse.json({ profile: toEmployeeFacingProfile(staff) })
 }
 
 export async function PATCH(request: Request) {
@@ -60,5 +65,5 @@ export async function PATCH(request: Request) {
     ...profileInput,
   })
 
-  return NextResponse.json({ profile: toPublicStaff(profile) })
+  return NextResponse.json({ profile: toEmployeeFacingProfile(profile) })
 }

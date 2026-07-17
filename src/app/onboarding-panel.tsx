@@ -255,7 +255,7 @@ function InvoiceModal({ record, onClose }: { record: OnboardingRecord; onClose: 
         import('jspdf'),
       ])
       const canvas = await html2canvas(page, {
-        scale: 3,
+        scale: 4,
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,

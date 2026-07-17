@@ -1878,7 +1878,6 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
       joining_date: displayDate(joiningDate),
       employee_name: staff.name,
       employee_email: staff.email,
-      employee_id: staff.employeeId || '',
       role: staff.role || '',
       department: staff.department || '',
       location,
@@ -1909,13 +1908,15 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
       for (let index = 0; index < pages.length; index += 1) {
-        const canvas = await html2canvas(pages[index], { scale: 2.5, useCORS: true, backgroundColor: '#ffffff', logging: false })
+        // Render at roughly 380 DPI on an A4 page so small offer-letter text
+        // remains crisp when viewed at 100% or printed.
+        const canvas = await html2canvas(pages[index], { scale: 4, useCORS: true, backgroundColor: '#ffffff', logging: false })
         if (index > 0) pdf.addPage('a4', 'portrait')
         const ratio = canvas.width / canvas.height
         let width = pageWidth
         let height = width / ratio
         if (height > pageHeight) { height = pageHeight; width = height * ratio }
-        pdf.addImage(canvas.toDataURL('image/jpeg', 0.98), 'JPEG', (pageWidth - width) / 2, (pageHeight - height) / 2, width, height, undefined, 'FAST')
+        pdf.addImage(canvas.toDataURL('image/jpeg', 1), 'JPEG', (pageWidth - width) / 2, (pageHeight - height) / 2, width, height, undefined, 'NONE')
       }
       pdf.save(`ProfitPro_Offer_Letter_${staff.employeeId || staff.name.replace(/\s+/g, '_')}.pdf`)
     } catch (caught) {

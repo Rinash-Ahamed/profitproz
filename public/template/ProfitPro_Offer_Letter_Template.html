@@ -29,6 +29,10 @@
     .copy p { margin:0 0 3.2mm; }
     .responsibilities { margin:0; padding-left:5mm; }
     .responsibilities li { margin-bottom:2mm; }
+    .expectations { display:grid; grid-template-columns:1fr 1fr; gap:2.5mm; margin-top:4mm; }
+    .expectation { padding:3mm 3.5mm; border:1px solid var(--line); border-radius:2.5mm; background:var(--soft); }
+    .expectation strong { display:block; margin-bottom:1mm; color:var(--green-dark); font-family:Arial,sans-serif; font-size:8px; letter-spacing:.7px; text-transform:uppercase; }
+    .expectation span { display:block; color:#3e4740; font-family:"Times New Roman",serif; font-size:8.7px; line-height:1.4; }
     .comp-card { display:grid; grid-template-columns:1fr 1fr; gap:4mm; margin:5mm 0; }
     .metric { padding:4mm; border:1px solid var(--line); border-radius:3mm; background:var(--soft); }
     .metric strong { display:block; margin-top:1mm; color:var(--green-dark); font-size:16px; }
@@ -36,6 +40,10 @@
     .salary th,.salary td { padding:3mm 4mm; border:1px solid var(--line); font-size:9px; text-align:left; }
     .salary th { color:#fff; background:var(--ink); font-size:8px; letter-spacing:.6px; text-transform:uppercase; }
     .salary th:not(:first-child),.salary td:not(:first-child) { text-align:right; }
+    .comp-guidance { display:grid; grid-template-columns:1fr 1fr; gap:3mm; margin-top:5mm; }
+    .comp-note { padding:3.5mm 4mm; border:1px solid var(--line); border-radius:2.5mm; background:var(--soft); }
+    .comp-note strong { display:block; margin-bottom:1mm; color:var(--green-dark); font-size:8px; letter-spacing:.7px; text-transform:uppercase; }
+    .comp-note span { display:block; color:#3e4740; font-family:"Times New Roman",serif; font-size:9px; line-height:1.45; }
     .numbered { margin:0; padding-left:6mm; }
     .numbered li { margin-bottom:3mm; padding-left:1mm; }
     .nda-list { margin:0; padding:0; list-style:none; counter-reset:nda; }
@@ -62,7 +70,7 @@
       <div class="summary-item"><span class="label">Position</span><span class="value">{{role}}</span></div>
       <div class="summary-item"><span class="label">Location</span><span class="value">{{location}}</span></div>
       <div class="summary-item"><span class="label">Department</span><span class="value">{{department}}</span></div>
-      <div class="summary-item"><span class="label">Employee ID</span><span class="value">{{employee_id}}</span></div>
+      <div class="summary-item"><span class="label">Email</span><span class="value">{{employee_email}}</span></div>
     </section>
     <h2 class="section-title">Employment Summary</h2>
     <section class="copy">
@@ -74,7 +82,14 @@
     </section>
     <h2 class="section-title">Key Responsibilities</h2>
     <ul class="copy responsibilities">{{key_responsibilities}}</ul>
-    <footer class="footer"><span>ProfitPro Offer of Employment</span><span>Page 1 of 4</span></footer>
+    <h2 class="section-title">Professional Expectations</h2>
+    <section class="expectations">
+      <div class="expectation"><strong>Ownership</strong><span>Take responsibility for assigned work, timelines, accuracy, and timely escalation of risks.</span></div>
+      <div class="expectation"><strong>Collaboration</strong><span>Communicate respectfully and work closely with colleagues, managers, and client stakeholders.</span></div>
+      <div class="expectation"><strong>Performance</strong><span>Work toward agreed goals and service standards while maintaining reliable records and follow-ups.</span></div>
+      <div class="expectation"><strong>Continuous Improvement</strong><span>Build role knowledge, welcome feedback, and contribute practical ideas that improve client outcomes.</span></div>
+    </section>
+    <footer class="footer"><span>ProfitPro Offer of Employment</span><a href="https://www.profitproz.com">www.profitproz.com</a><span>Page 1 of 4</span></footer>
   </main>
 
   <main class="offer-page">
@@ -88,8 +103,15 @@
       <table class="salary"><thead><tr><th>Salary component</th><th>Monthly (₹)</th><th>Annual (₹)</th></tr></thead><tbody><tr><td><strong>Total CTC</strong></td><td>{{monthly_salary}}</td><td>{{annual_ctc}}</td></tr></tbody></table>
       <h2 class="section-title">Notes</h2>
       <ol class="numbered"><li>The compensation is subject to statutory deductions and applicable taxes.</li><li>Performance incentives, bonuses, reimbursements, or other benefits are governed by Company policies and are not included in the CTC unless specifically stated.</li><li>The Company reserves the right to revise the salary structure in accordance with applicable law, organisational requirements, and Company policies.</li><li>Salary will be credited on or before the designated payroll date, subject to statutory compliance and attendance records.</li></ol>
+      <h2 class="section-title">Understanding Your Compensation</h2>
+      <div class="comp-guidance">
+        <div class="comp-note"><strong>Annual CTC</strong><span>CTC represents the Company's total annual compensation commitment stated in this offer. A detailed component-wise structure may be communicated separately where applicable.</span></div>
+        <div class="comp-note"><strong>Monthly Reference</strong><span>The monthly amount shown is Annual CTC divided by twelve for reference. Actual monthly earnings and take-home pay may vary due to attendance, statutory deductions, taxes, or approved adjustments.</span></div>
+        <div class="comp-note"><strong>Incentives & Reimbursements</strong><span>Role-based incentives are linked to applicable targets and Company policy. Approved business reimbursements are processed separately and do not form part of fixed salary unless expressly stated.</span></div>
+        <div class="comp-note"><strong>Reviews & Revisions</strong><span>Compensation reviews may consider performance, responsibilities, business conditions, and Company policy. A review does not by itself guarantee an increment or revision.</span></div>
+      </div>
     </section>
-    <footer class="footer"><span>ProfitPro Offer of Employment</span><span>Page 2 of 4</span></footer>
+    <footer class="footer"><span>ProfitPro Offer of Employment</span><a href="https://www.profitproz.com">www.profitproz.com</a><span>Page 2 of 4</span></footer>
   </main>
 
   <main class="offer-page">
@@ -106,7 +128,7 @@
       <li><strong>Breach</strong>Violation may result in disciplinary action, termination, legal proceedings, and recovery of damages.</li>
       <li><strong>Governing Law</strong>Governed by the laws of India and subject to the jurisdiction of the courts of Coimbatore, Tamil Nadu.</li>
     </ol>
-    <footer class="footer"><span>ProfitPro Confidentiality Agreement</span><span>Page 3 of 4</span></footer>
+    <footer class="footer"><span>ProfitPro Confidentiality Agreement</span><a href="https://www.profitproz.com">www.profitproz.com</a><span>Page 3 of 4</span></footer>
   </main>
 
   <main class="offer-page">
@@ -123,7 +145,7 @@
     </ul>
     <div class="copy declaration"><strong>Declaration:</strong> I have read and understood this Offer Letter and its Annexures and voluntarily accept all terms and conditions of employment. I will acknowledge acceptance by replying to the offer email.</div>
     <div class="signature-grid"><div><div class="signature-line"></div><div class="signature-label">Employee name</div></div><div><div class="signature-line"></div><div class="signature-label">Employee signature</div></div><div><div class="signature-line"></div><div class="signature-label">Date</div></div></div>
-    <footer class="footer"><a href="https://www.profitproz.com">www.profitproz.com</a><span>Page 4 of 4</span></footer>
+    <footer class="footer"><span>ProfitPro Employee Declaration</span><a href="https://www.profitproz.com">www.profitproz.com</a><span>Page 4 of 4</span></footer>
   </main>
 </body>
 </html>
