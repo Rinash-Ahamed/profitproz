@@ -3,6 +3,11 @@ import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { getStaffByEmail, toPublicStaff, updateStaffProfile } from '@/lib/firestore'
 
+function toEmployeeFacingProfile(staff: Parameters<typeof toPublicStaff>[0]) {
+  const { employeeId: _employeeId, ...profile } = toPublicStaff(staff)
+  return profile
+}
+
 export async function GET() {
   const cookieStore = await cookies()
   const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
@@ -17,7 +22,7 @@ export async function GET() {
     return NextResponse.json({ message: 'Profile not found.' }, { status: 404 })
   }
 
-  return NextResponse.json({ profile: toPublicStaff(staff) })
+  return NextResponse.json({ profile: toEmployeeFacingProfile(staff) })
 }
 
 export async function PATCH(request: Request) {
@@ -51,13 +56,14 @@ export async function PATCH(request: Request) {
     emergencyContactPhone: typeof input.emergencyContactPhone === 'string' ? input.emergencyContactPhone.trim() : '',
   }
 
-  if (!/^[0-9]{7,15}$/.test(profileInput.phone) || !/^[0-9]{7,15}$/.test(profileInput.emergencyContactPhone) || !profileInput.address || profileInput.address.length > 500 || !profileInput.details || profileInput.details.length > 2000 || !profileInput.emergencyContactName || profileInput.emergencyContactName.length > 100) {
-    return NextResponse.json({ message: 'Enter valid contact, emergency contact, address, and details fields.' }, { status: 400 })
+  if (/\d/.test(profileInput.emergencyContactName)) return NextResponse.json({ message: 'Emergency contact name cannot contain digits.' }, { status: 400 })
+  if (!/^[0-9]{7,15}$/.test(profileInput.phone) || !/^[0-9]{7,15}$/.test(profileInput.emergencyContactPhone) || !profileInput.address || profileInput.address.length > 500 || profileInput.details.length > 2000 || !profileInput.emergencyContactName || profileInput.emergencyContactName.length > 100) {
+    return NextResponse.json({ message: 'Enter valid contact, emergency contact, and address fields. Phone numbers must contain digits only.' }, { status: 400 })
   }
 
   const profile = await updateStaffProfile(staff.id, {
     ...profileInput,
   })
 
-  return NextResponse.json({ profile: toPublicStaff(profile) })
+  return NextResponse.json({ profile: toEmployeeFacingProfile(profile) })
 }

@@ -11,12 +11,17 @@ const transporter = nodemailer.createTransport({
   port: smtpPort,
   secure: smtpPort === 465,
   requireTLS: smtpPort !== 465,
+  connectionTimeout: 5_000,
+  greetingTimeout: 5_000,
+  socketTimeout: 10_000,
   tls: { rejectUnauthorized: true },
   auth: {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
 })
+
+let deliveryQueue: Promise<unknown> = Promise.resolve()
 
 export async function sendMail(input: { fromName: string; to: string; replyTo?: string; subject: string; text: string; html: string }) {
   return transporter.sendMail({
@@ -49,6 +54,24 @@ export function getExpenseNotificationHtml(input: { staffEmail: string; title: s
       </div>
     </div>
   `
+}
+
+export function queueMail(input: Parameters<typeof sendMail>[0]) {
+  const deliver = async () => {
+    let lastError: unknown
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        return await sendMail(input)
+      } catch (error) {
+        lastError = error
+        if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 350))
+      }
+    }
+    throw lastError
+  }
+  const queued = deliveryQueue.then(deliver, deliver)
+  deliveryQueue = queued.catch(() => undefined)
+  return queued
 }
 
 export function escapeHtml(value: unknown) {

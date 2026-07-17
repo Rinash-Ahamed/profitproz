@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProfitPro Revenue Management Invoice</title>
+  <style>
+    :root {
+      --ink: #151817;
+      --muted: #667068;
+      --line: #dfe5df;
+      --paper: #ffffff;
+      --soft: #f4f7f2;
+      --green: #66b159;
+      --green-dark: #3f8438;
+    }
+
+    * { box-sizing: border-box; }
+
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      color: var(--ink);
+      background: #e9ede8;
+      font-family: Inter, Arial, Helvetica, sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .invoice-page {
+      position: relative;
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 16mm 16mm 13mm;
+      overflow: hidden;
+      background: var(--paper);
+    }
+
+    .invoice-page::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 5mm;
+      background: linear-gradient(90deg, var(--green-dark), var(--green));
+      content: "";
+    }
+
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16mm;
+      padding-top: 3mm;
+    }
+
+    .logo {
+      width: 48mm;
+      height: 20mm;
+      object-fit: contain;
+      object-position: left center;
+    }
+
+    .invoice-heading { text-align: right; }
+
+    .eyebrow {
+      margin: 0 0 2mm;
+      color: var(--green-dark);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 29px;
+      line-height: 1;
+      letter-spacing: -0.8px;
+    }
+
+    .invoice-number {
+      margin-top: 3mm;
+      color: var(--muted);
+      font-size: 10px;
+    }
+
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 3mm;
+      margin-top: 9mm;
+    }
+
+    .meta-card,
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 3mm;
+      background: var(--paper);
+    }
+
+    .meta-card { padding: 4mm; }
+
+    .label {
+      display: block;
+      margin-bottom: 1.4mm;
+      color: var(--muted);
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
+
+    .value {
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 1.45;
+    }
+
+    .client-grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 4mm;
+      margin-top: 4mm;
+    }
+
+    .panel { padding: 5mm; }
+
+    .panel-title {
+      margin: 0 0 3mm;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .client-name {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .detail {
+      margin: 1.5mm 0 0;
+      color: var(--muted);
+      font-size: 9.5px;
+      line-height: 1.5;
+    }
+
+    .completion-panel {
+      border-color: rgba(102, 177, 89, 0.42);
+      background: linear-gradient(135deg, #f6fbf4, #edf7ea);
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 2.5mm;
+      padding: 1.5mm 3mm;
+      border: 1px solid rgba(63, 132, 56, 0.24);
+      border-radius: 999px;
+      color: var(--green-dark);
+      background: rgba(102, 177, 89, 0.12);
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    .platforms {
+      margin: 0;
+      font-size: 10px;
+      font-weight: 700;
+      line-height: 1.55;
+    }
+
+    .items {
+      width: 100%;
+      margin-top: 6mm;
+      border-collapse: separate;
+      border-spacing: 0;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 3mm;
+    }
+
+    .items th {
+      padding: 3.5mm 4mm;
+      color: #ffffff;
+      background: var(--ink);
+      font-size: 8px;
+      letter-spacing: 0.8px;
+      text-align: left;
+      text-transform: uppercase;
+    }
+
+    .items td {
+      padding: 5mm 4mm;
+      border-bottom: 1px solid var(--line);
+      font-size: 10px;
+      vertical-align: top;
+    }
+
+    .items tr:last-child td { border-bottom: 0; }
+    .items .number { text-align: right; white-space: nowrap; }
+
+    .service-name {
+      display: block;
+      margin-bottom: 1mm;
+      font-size: 11px;
+      font-weight: 800;
+    }
+
+    .service-description {
+      color: var(--muted);
+      font-size: 9px;
+      line-height: 1.45;
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: 1fr 70mm;
+      gap: 8mm;
+      margin-top: 5mm;
+    }
+
+    .notes {
+      padding: 4mm;
+      border-radius: 3mm;
+      color: var(--muted);
+      background: var(--soft);
+      font-size: 9px;
+      line-height: 1.5;
+    }
+
+    .notes strong {
+      display: block;
+      margin-bottom: 1.5mm;
+      color: var(--ink);
+      font-size: 9px;
+      text-transform: uppercase;
+    }
+
+    .totals {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .totals td {
+      padding: 2.2mm 0;
+      border-bottom: 1px solid var(--line);
+      font-size: 10px;
+    }
+
+    .totals td:last-child {
+      font-weight: 700;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .totals .grand-total td {
+      padding-top: 3.5mm;
+      border-bottom: 0;
+      color: var(--green-dark);
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .payment {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5mm;
+      margin-top: 7mm;
+      padding: 5mm;
+      border-radius: 3mm;
+      color: #f7faf6;
+      background: var(--ink);
+    }
+
+    .payment .label { color: #9da69f; }
+    .payment .value { font-size: 9.5px; font-weight: 600; }
+    .payment p { margin: 0 0 1.5mm; }
+    .payment p:last-child { margin-bottom: 0; }
+
+    .payment-instructions {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 36mm;
+      align-items: center;
+      gap: 4mm;
+      padding: 3.5mm;
+      border: 1px solid rgba(102, 177, 89, 0.34);
+      border-radius: 2.5mm;
+      background: linear-gradient(135deg, rgba(102, 177, 89, 0.14), rgba(102, 177, 89, 0.04));
+    }
+
+    .payment-instruction-content { min-width: 0; }
+
+    .payment-instruction-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4mm;
+    }
+
+    .online-only {
+      padding: 1mm 2.2mm;
+      border-radius: 99px;
+      color: #dff5da;
+      background: rgba(102, 177, 89, 0.2);
+      font-size: 7px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .payment-methods {
+      display: flex;
+      gap: 1.5mm;
+      margin-top: 2.5mm;
+    }
+
+    .payment-method {
+      padding: 1.2mm 2.5mm;
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      border-radius: 1.5mm;
+      color: #f7faf6;
+      background: rgba(255, 255, 255, 0.06);
+      font-size: 8px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+    }
+
+    .payment-copy {
+      margin-top: 2.5mm !important;
+      color: #d7ddd8;
+      font-size: 8.5px;
+      font-weight: 500;
+      line-height: 1.55;
+    }
+
+    .upi-options {
+      display: grid;
+      grid-template-columns: 0.75fr 1.25fr;
+      gap: 2mm;
+      margin-top: 2.5mm;
+    }
+
+    .upi-card {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 1mm;
+      padding: 2.4mm 3mm;
+      border-radius: 1.8mm;
+      color: var(--ink);
+      background: #f1f8ef;
+    }
+
+    .upi-card.featured {
+      color: #ffffff;
+      background: linear-gradient(135deg, var(--green-dark), var(--green));
+    }
+
+    .upi-card span {
+      color: #5f6a61;
+      font-size: 7.5px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .upi-card strong {
+      color: var(--green-dark);
+      font-size: 10px;
+      letter-spacing: 0.02em;
+      line-height: 1.25;
+      overflow-wrap: anywhere;
+    }
+
+    .upi-card.featured span,
+    .upi-card.featured strong { color: #ffffff; }
+
+    .qr-pay-card {
+      padding: 2mm;
+      border-radius: 2mm;
+      color: var(--ink);
+      background: #ffffff;
+      text-align: center;
+    }
+
+    .qr-pay-card .qr-title {
+      display: block;
+      margin-bottom: 1.5mm;
+      color: var(--green-dark);
+      font-size: 8px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .qr-pay-card img {
+      display: block;
+      width: 32mm;
+      height: auto;
+      margin: 0 auto;
+      object-fit: contain;
+    }
+
+    .qr-pay-card .qr-caption {
+      display: block;
+      margin-top: 1.5mm;
+      color: var(--muted);
+      font-size: 7px;
+      font-weight: 700;
+    }
+
+    .footer {
+      position: absolute;
+      right: 16mm;
+      bottom: 9mm;
+      left: 16mm;
+      display: flex;
+      justify-content: space-between;
+      gap: 8mm;
+      padding-top: 3mm;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 8px;
+      line-height: 1.4;
+    }
+
+    .footer a {
+      color: var(--green-dark);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    .footer-contact {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 1mm;
+      text-align: right;
+    }
+
+    @media screen {
+      .invoice-page { margin: 18px auto; box-shadow: 0 18px 60px rgba(20, 24, 21, 0.16); }
+    }
+
+    @media print {
+      html, body { background: #ffffff; }
+      .invoice-page { margin: 0; box-shadow: none; page-break-after: always; }
+    }
+  </style>
+</head>
+<body>
+  <main class="invoice-page">
+    <header class="header">
+      <img class="logo" src="/invoice.png" alt="ProfitPro" />
+      <div class="invoice-heading">
+        <p class="eyebrow">Revenue Management</p>
+        <h1>Invoice</h1>
+        <p class="invoice-number">Invoice No: <strong>{{invoice_number}}</strong></p>
+      </div>
+    </header>
+
+    <section class="meta-grid">
+      <div class="meta-card"><span class="label">Invoice date</span><span class="value">{{invoice_date}}</span></div>
+      <div class="meta-card"><span class="label">Due date</span><span class="value">{{due_date}}</span></div>
+    </section>
+
+    <section class="client-grid">
+      <div class="panel">
+        <p class="panel-title">Bill to</p>
+        <p class="client-name">{{client_name}}</p>
+        <p class="detail"><strong>{{property_name}}</strong></p>
+        <p class="detail">{{property_address}}</p>
+        <p class="detail">{{email_address}} · {{phone}}</p>
+      </div>
+      <div class="panel completion-panel">
+        <span class="live-badge">Revenue management · Active</span>
+        <p class="panel-title">Billing period</p>
+        <p class="platforms">{{billing_period}}</p>
+      </div>
+    </section>
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th style="width:48%">Service description</th>
+          <th class="number" style="width:22%">Managed revenue</th>
+          <th class="number" style="width:15%">Commission</th>
+          <th class="number" style="width:15%">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>
+            <span class="service-name">Revenue Management Service</span>
+            <span class="service-description">Pricing strategy, inventory controls, market and competitor analysis, OTA performance monitoring, and revenue optimisation for the billing period.</span>
+          </td>
+          <td class="number">&#8377;{{managed_revenue}}</td>
+          <td class="number">{{commission_percent}}%</td>
+          <td class="number">&#8377;{{subtotal}}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <section class="summary">
+      <div class="notes">
+        <strong>Invoice notes</strong>
+        {{notes}}
+      </div>
+      <table class="totals">
+        <tr><td>Subtotal</td><td>₹{{subtotal}}</td></tr>
+        <tr class="grand-total"><td>Total due</td><td>₹{{total_amount}}</td></tr>
+      </table>
+    </section>
+
+    <section class="payment">
+      <div>
+        <span class="label">Payment details</span>
+        <p class="value">Account name: {{account_name}}</p>
+        <p class="value">Bank: {{bank_name}}</p>
+        <p class="value">Account number: {{account_number}}</p>
+        <p class="value">IFSC: {{ifsc_code}}</p>
+      </div>
+      <div>
+        <span class="label">Company details</span>
+        <p class="value">{{company_address}}</p>
+      </div>
+      <div class="payment-instructions">
+        <div class="payment-instruction-content">
+          <div class="payment-instruction-head">
+            <span class="label">How to pay</span>
+            <span class="online-only">Online payments only</span>
+          </div>
+          <div class="payment-methods">
+            <span class="payment-method">NEFT</span>
+            <span class="payment-method">UPI</span>
+            <span class="payment-method">RTGS</span>
+          </div>
+          <p class="payment-copy">Pay securely via NEFT, RTGS, or UPI. For UPI payments, scan the QR code or use the highlighted G-Pay number or VPA below. Bank transfers can be made using the account number and IFSC shown above. Cash payments are not accepted.</p>
+          <div class="upi-options">
+            <div class="upi-card featured">
+              <span>G-Pay number</span>
+              <strong>{{upi_number}}</strong>
+            </div>
+            <div class="upi-card">
+              <span>ProfitPro virtual payment address</span>
+              <strong>{{upi_vpa}}</strong>
+            </div>
+          </div>
+        </div>
+        <div class="qr-pay-card">
+          <span class="qr-title">Scan to pay</span>
+          <img src="/template/qrcode.jpeg" alt="ProfitPro UPI payment QR code" />
+          <span class="qr-caption">Use any supported UPI app</span>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span>Thanks for doing business with us.</span>
+      <span>This is an auto-generated invoice for {{property_name}}.</span>
+      <span class="footer-contact">
+        <span>For finance and invoice-related questions, please call <a href="tel:+919363509110">+91 936 350 9110</a>.</span>
+        <a href="https://www.profitproz.com" target="_blank" rel="noopener noreferrer">www.profitproz.com</a>
+      </span>
+    </footer>
+  </main>
+</body>
+</html>

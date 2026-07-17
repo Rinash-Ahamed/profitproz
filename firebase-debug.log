@@ -1,0 +1,464 @@
+[debug] [2026-07-17T19:27:31.326Z] ----------------------------------------------------------------------
+[debug] [2026-07-17T19:27:31.333Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js use
+[debug] [2026-07-17T19:27:31.334Z] CLI Version:   15.24.0
+[debug] [2026-07-17T19:27:31.334Z] Platform:      win32
+[debug] [2026-07-17T19:27:31.335Z] Node Version:  v24.15.0
+[debug] [2026-07-17T19:27:31.335Z] Detected Agent: codex_cli
+[debug] [2026-07-17T19:27:31.336Z] Time:          Sat Jul 18 2026 00:57:31 GMT+0530 (India Standard Time)
+[debug] [2026-07-17T19:27:31.336Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-17T19:27:31.762Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-17T19:27:31.762Z] > authorizing via signed-in user (rinashahamed@gmail.com)
+[error] 
+[error] Error: No active project
+[debug] [2026-07-17T19:27:32.318Z] Error: EPERM: operation not permitted, open 'C:\Users\rinas\.config\configstore\firebase-tools.json.4010045159'
+    at Object.openSync (node:fs:561:18)
+    at writeFile.writeFileSync [as sync] (C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\write-file-atomic\index.js:205:13)
+    at set all (C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:61:20)
+    at Configstore.delete (C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\node_modules\configstore\index.js:101:12)
+    at process.<anonymous> (C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\cli.js:95:45)
+    at process.emit (node:events:521:24)
+    at process.exit (node:internal/process/per_thread:236:15)
+    at Timeout._onTimeout (C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\lib\errorOut.js:20:17)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[error] 
+[error] Error: An unexpected error has occurred.
+[debug] [2026-07-17T19:27:53.650Z] ----------------------------------------------------------------------
+[debug] [2026-07-17T19:27:53.659Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules,firestore:indexes --project profitpro-admin
+[debug] [2026-07-17T19:27:53.660Z] CLI Version:   15.24.0
+[debug] [2026-07-17T19:27:53.661Z] Platform:      win32
+[debug] [2026-07-17T19:27:53.662Z] Node Version:  v24.15.0
+[debug] [2026-07-17T19:27:53.662Z] Detected Agent: codex_cli
+[debug] [2026-07-17T19:27:53.663Z] Time:          Sat Jul 18 2026 00:57:53 GMT+0530 (India Standard Time)
+[debug] [2026-07-17T19:27:53.664Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-17T19:27:58.565Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-17T19:27:58.566Z] > authorizing via signed-in user (rinashahamed@gmail.com)
+[debug] [2026-07-17T19:27:58.566Z] [iam] checking project profitpro-admin for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2026-07-17T19:27:58.599Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:27:58.599Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:27:58.602Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions [none]
+[debug] [2026-07-17T19:27:58.603Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions  x-goog-user-project=profitpro-admin
+[debug] [2026-07-17T19:27:58.603Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2026-07-17T19:27:59.986Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions 200
+[debug] [2026-07-17T19:27:59.986Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'profitpro-admin'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[info] i  firestore: ensuring required API firestore.googleapis.com is enabled... 
+[debug] [2026-07-17T19:28:00.004Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:00.004Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:00.005Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default) [none]
+[debug] [2026-07-17T19:28:00.404Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default) 200
+[debug] [2026-07-17T19:28:00.404Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default) {"name":"projects/profitpro-admin/databases/(default)","uid":"d6bf3cf8-e9b8-46fc-8239-60acfbf5b9d0","createTime":"2026-07-11T11:08:30.855916Z","updateTime":"2026-07-11T11:08:30.855916Z","locationId":"asia-south1","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-07-17T18:27:59.990851Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"j","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IO/T0++42pUDMPiwic+7z5UD"}
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2026-07-17T19:28:00.412Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:00.413Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:00.414Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/profitpro-admin:test [none]
+[debug] [2026-07-17T19:28:00.414Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/profitpro-admin:test [omitted]
+[debug] [2026-07-17T19:28:01.949Z] <<< [apiv2][status] POST https://firebaserules.googleapis.com/v1/projects/profitpro-admin:test 200
+[debug] [2026-07-17T19:28:01.950Z] <<< [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/profitpro-admin:test {}
+[info] +  cloud.firestore: rules file firestore.rules compiled successfully 
+[debug] [2026-07-17T19:28:01.959Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:01.960Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:01.962Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/profitpro-admin/releases pageSize=10&pageToken=
+[debug] [2026-07-17T19:28:03.294Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/profitpro-admin/releases 200
+[debug] [2026-07-17T19:28:03.295Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/profitpro-admin/releases {"releases":[{"name":"projects/profitpro-admin/releases/cloud.firestore","rulesetName":"projects/profitpro-admin/rulesets/cdd79b4b-8287-4b18-b15d-73d5d28dd37a","createTime":"2026-07-11T11:08:35.327613Z","updateTime":"2026-07-17T19:20:17.966923Z"}]}
+[debug] [2026-07-17T19:28:03.297Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:03.298Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:03.299Z] >>> [apiv2][query] GET https://firebaserules.googleapis.com/v1/projects/profitpro-admin/rulesets/cdd79b4b-8287-4b18-b15d-73d5d28dd37a [none]
+[debug] [2026-07-17T19:28:04.608Z] <<< [apiv2][status] GET https://firebaserules.googleapis.com/v1/projects/profitpro-admin/rulesets/cdd79b4b-8287-4b18-b15d-73d5d28dd37a 200
+[debug] [2026-07-17T19:28:04.608Z] <<< [apiv2][body] GET https://firebaserules.googleapis.com/v1/projects/profitpro-admin/rulesets/cdd79b4b-8287-4b18-b15d-73d5d28dd37a [omitted]
+[info] i  firestore: latest version of firestore.rules already up to date, skipping upload... 
+[info] i  firestore: deploying indexes... 
+[debug] [2026-07-17T19:28:04.614Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:04.614Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:04.615Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes [none]
+[debug] [2026-07-17T19:28:04.908Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes 200
+[debug] [2026-07-17T19:28:04.909Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes {"indexes":[{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/timesheets/indexes/CICAgOjXh4EK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJiUpoMK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"}]}
+[debug] [2026-07-17T19:28:04.909Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:04.910Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:04.910Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* [none]
+[debug] [2026-07-17T19:28:05.059Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* 200
+[debug] [2026-07-17T19:28:05.059Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* {"fields":[{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/__default__/fields/*","indexConfig":{"indexes":[{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"ASCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"DESCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","arrayConfig":"CONTAINS"}],"state":"READY"}]}}]}
+[debug] [2026-07-17T19:28:05.060Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:05.060Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:05.060Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default) [none]
+[debug] [2026-07-17T19:28:05.127Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default) 200
+[debug] [2026-07-17T19:28:05.127Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default) {"name":"projects/profitpro-admin/databases/(default)","uid":"d6bf3cf8-e9b8-46fc-8239-60acfbf5b9d0","createTime":"2026-07-11T11:08:30.855916Z","updateTime":"2026-07-11T11:08:30.855916Z","locationId":"asia-south1","type":"FIRESTORE_NATIVE","concurrencyMode":"PESSIMISTIC","versionRetentionPeriod":"3600s","earliestVersionTime":"2026-07-17T18:28:04.721979Z","appEngineIntegrationMode":"DISABLED","keyPrefix":"j","pointInTimeRecoveryEnablement":"POINT_IN_TIME_RECOVERY_DISABLED","deleteProtectionState":"DELETE_PROTECTION_DISABLED","databaseEdition":"STANDARD","freeTier":true,"realtimeUpdatesMode":"REALTIME_UPDATES_MODE_ENABLED","etag":"IMu19PG42pUDMPiwic+7z5UD"}
+[debug] [2026-07-17T19:28:05.129Z] Skipping existing index: {"collectionGroup":"timesheets","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}]}
+[debug] [2026-07-17T19:28:05.130Z] Skipping existing index: {"collectionGroup":"expenses","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}]}
+[debug] [2026-07-17T19:28:05.130Z] Creating new index: {"collectionGroup":"expenses","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}]}
+[debug] [2026-07-17T19:28:05.131Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:05.131Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:05.132Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes [none]
+[debug] [2026-07-17T19:28:05.132Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes {"fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"queryScope":"COLLECTION"}
+[debug] [2026-07-17T19:28:05.274Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes 200
+[debug] [2026-07-17T19:28:05.274Z] <<< [apiv2][body] POST https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes {"name":"projects/profitpro-admin/databases/(default)/operations/S0E0MW1pSmdBQ0lDDCoDIGE1ODkxYmU5ODg2Ni0yMDI4LTFlYTQtYTA4MC01ZjkwNjI0NiQac2VuaWxlcGlwCQpBEg","metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.IndexOperationMetadata","startTime":"2026-07-17T19:28:04.852095Z","index":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJim14AK","state":"INITIALIZING"}}
+[debug] [2026-07-17T19:28:05.275Z] Creating new index: {"collectionGroup":"expenses","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}]}
+[debug] [2026-07-17T19:28:05.276Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:05.276Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:05.276Z] >>> [apiv2][query] POST https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes [none]
+[debug] [2026-07-17T19:28:05.277Z] >>> [apiv2][body] POST https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes {"fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"queryScope":"COLLECTION"}
+[debug] [2026-07-17T19:28:05.408Z] <<< [apiv2][status] POST https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes 200
+[debug] [2026-07-17T19:28:05.408Z] <<< [apiv2][body] POST https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes {"name":"projects/profitpro-admin/databases/(default)/operations/S0lvOUZqSmdBQ0lDDCoDIGM0Y2QwYzRmYWUyYi1lODk4LWNhZTQtZjc0Yi1mNmM5NDgzYiQac2VuaWxlcGlwCQpBEg","metadata":{"@type":"type.googleapis.com/google.firestore.admin.v1.IndexOperationMetadata","startTime":"2026-07-17T19:28:04.992147Z","index":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJjF9oIK","state":"INITIALIZING"}}
+[info] +  firestore: deployed indexes in firestore.indexes.json successfully for (default) database 
+[debug] [2026-07-17T19:28:05.410Z] [rules] releasing cloud.firestore with ruleset projects/profitpro-admin/rulesets/cdd79b4b-8287-4b18-b15d-73d5d28dd37a
+[debug] [2026-07-17T19:28:05.411Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:05.411Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:05.411Z] >>> [apiv2][query] PATCH https://firebaserules.googleapis.com/v1/projects/profitpro-admin/releases/cloud.firestore [none]
+[debug] [2026-07-17T19:28:05.412Z] >>> [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/profitpro-admin/releases/cloud.firestore {"release":{"name":"projects/profitpro-admin/releases/cloud.firestore","rulesetName":"projects/profitpro-admin/rulesets/cdd79b4b-8287-4b18-b15d-73d5d28dd37a"}}
+[debug] [2026-07-17T19:28:05.770Z] <<< [apiv2][status] PATCH https://firebaserules.googleapis.com/v1/projects/profitpro-admin/releases/cloud.firestore 200
+[debug] [2026-07-17T19:28:05.771Z] <<< [apiv2][body] PATCH https://firebaserules.googleapis.com/v1/projects/profitpro-admin/releases/cloud.firestore {"name":"projects/profitpro-admin/releases/cloud.firestore","rulesetName":"projects/profitpro-admin/rulesets/cdd79b4b-8287-4b18-b15d-73d5d28dd37a","createTime":"2026-07-11T11:08:35.327613Z","updateTime":"2026-07-17T19:28:05.247933Z"}
+[debug] [2026-07-17T19:28:05.772Z] [rules] updated release projects/profitpro-admin/releases/cloud.firestore
+[info] +  firestore: released rules firestore.rules to cloud.firestore 
+[info] 
+[info] +  Deploy complete! 
+[info] 
+[info] Project Console: https://console.firebase.google.com/project/profitpro-admin/overview
+[debug] [2026-07-17T19:28:20.869Z] ----------------------------------------------------------------------
+[debug] [2026-07-17T19:28:20.875Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:indexes --project profitpro-admin
+[debug] [2026-07-17T19:28:20.876Z] CLI Version:   15.24.0
+[debug] [2026-07-17T19:28:20.877Z] Platform:      win32
+[debug] [2026-07-17T19:28:20.877Z] Node Version:  v24.15.0
+[debug] [2026-07-17T19:28:20.878Z] Detected Agent: codex_cli
+[debug] [2026-07-17T19:28:20.879Z] Time:          Sat Jul 18 2026 00:58:20 GMT+0530 (India Standard Time)
+[debug] [2026-07-17T19:28:20.879Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-17T19:28:25.276Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-17T19:28:25.276Z] > authorizing via signed-in user (rinashahamed@gmail.com)
+[debug] [2026-07-17T19:28:25.277Z] [iam] checking project profitpro-admin for permissions ["datastore.indexes.list","firebase.projects.get"]
+[debug] [2026-07-17T19:28:25.309Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:25.310Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:25.313Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions [none]
+[debug] [2026-07-17T19:28:25.314Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions  x-goog-user-project=profitpro-admin
+[debug] [2026-07-17T19:28:25.316Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions {"permissions":["datastore.indexes.list","firebase.projects.get"]}
+[debug] [2026-07-17T19:28:26.714Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions 200
+[debug] [2026-07-17T19:28:26.715Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions {"permissions":["datastore.indexes.list","firebase.projects.get"]}
+[debug] [2026-07-17T19:28:26.720Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:26.721Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:26.722Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes [none]
+[debug] [2026-07-17T19:28:27.058Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes 200
+[debug] [2026-07-17T19:28:27.059Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes {"indexes":[{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJim14AK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"CREATING","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/timesheets/indexes/CICAgOjXh4EK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJjF9oIK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"CREATING","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJiUpoMK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"}]}
+[debug] [2026-07-17T19:28:27.059Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:27.060Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:27.060Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* [none]
+[debug] [2026-07-17T19:28:27.201Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* 200
+[debug] [2026-07-17T19:28:27.201Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* {"fields":[{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/__default__/fields/*","indexConfig":{"indexes":[{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"ASCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"DESCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","arrayConfig":"CONTAINS"}],"state":"READY"}]}}]}
+[info] {
+  "indexes": [
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amount",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "staffEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "staffEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amount",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "timesheets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "staffEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    }
+  ],
+  "fieldOverrides": []
+}
+[debug] [2026-07-17T19:28:47.091Z] ----------------------------------------------------------------------
+[debug] [2026-07-17T19:28:47.099Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:indexes --project profitpro-admin
+[debug] [2026-07-17T19:28:47.100Z] CLI Version:   15.24.0
+[debug] [2026-07-17T19:28:47.101Z] Platform:      win32
+[debug] [2026-07-17T19:28:47.101Z] Node Version:  v24.15.0
+[debug] [2026-07-17T19:28:47.102Z] Detected Agent: codex_cli
+[debug] [2026-07-17T19:28:47.103Z] Time:          Sat Jul 18 2026 00:58:47 GMT+0530 (India Standard Time)
+[debug] [2026-07-17T19:28:47.104Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-17T19:28:51.564Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-17T19:28:51.565Z] > authorizing via signed-in user (rinashahamed@gmail.com)
+[debug] [2026-07-17T19:28:51.565Z] [iam] checking project profitpro-admin for permissions ["datastore.indexes.list","firebase.projects.get"]
+[debug] [2026-07-17T19:28:51.599Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:51.599Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:51.603Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions [none]
+[debug] [2026-07-17T19:28:51.603Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions  x-goog-user-project=profitpro-admin
+[debug] [2026-07-17T19:28:51.604Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions {"permissions":["datastore.indexes.list","firebase.projects.get"]}
+[debug] [2026-07-17T19:28:52.987Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions 200
+[debug] [2026-07-17T19:28:52.988Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions {"permissions":["datastore.indexes.list","firebase.projects.get"]}
+[debug] [2026-07-17T19:28:52.991Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:52.993Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:52.995Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes [none]
+[debug] [2026-07-17T19:28:53.284Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes 200
+[debug] [2026-07-17T19:28:53.284Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes {"indexes":[{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJim14AK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"CREATING","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/timesheets/indexes/CICAgOjXh4EK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJjF9oIK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"CREATING","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJiUpoMK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"}]}
+[debug] [2026-07-17T19:28:53.285Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:53.286Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:28:53.287Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* [none]
+[debug] [2026-07-17T19:28:53.374Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* 200
+[debug] [2026-07-17T19:28:53.374Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* {"fields":[{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/__default__/fields/*","indexConfig":{"indexes":[{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"ASCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"DESCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","arrayConfig":"CONTAINS"}],"state":"READY"}]}}]}
+[info] {
+  "indexes": [
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amount",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "staffEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "staffEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amount",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "timesheets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "staffEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    }
+  ],
+  "fieldOverrides": []
+}
+[debug] [2026-07-17T19:29:55.637Z] ----------------------------------------------------------------------
+[debug] [2026-07-17T19:29:55.644Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\rinas\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js firestore:indexes --project profitpro-admin
+[debug] [2026-07-17T19:29:55.645Z] CLI Version:   15.24.0
+[debug] [2026-07-17T19:29:55.646Z] Platform:      win32
+[debug] [2026-07-17T19:29:55.647Z] Node Version:  v24.15.0
+[debug] [2026-07-17T19:29:55.648Z] Detected Agent: codex_cli
+[debug] [2026-07-17T19:29:55.649Z] Time:          Sat Jul 18 2026 00:59:55 GMT+0530 (India Standard Time)
+[debug] [2026-07-17T19:29:55.650Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2026-07-17T19:29:59.511Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-07-17T19:29:59.512Z] > authorizing via signed-in user (rinashahamed@gmail.com)
+[debug] [2026-07-17T19:29:59.512Z] [iam] checking project profitpro-admin for permissions ["datastore.indexes.list","firebase.projects.get"]
+[debug] [2026-07-17T19:29:59.545Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:29:59.545Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:29:59.549Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions [none]
+[debug] [2026-07-17T19:29:59.550Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions  x-goog-user-project=profitpro-admin
+[debug] [2026-07-17T19:29:59.550Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions {"permissions":["datastore.indexes.list","firebase.projects.get"]}
+[debug] [2026-07-17T19:30:00.931Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions 200
+[debug] [2026-07-17T19:30:00.931Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/profitpro-admin:testIamPermissions {"permissions":["datastore.indexes.list","firebase.projects.get"]}
+[debug] [2026-07-17T19:30:00.934Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:30:00.934Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:30:00.936Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes [none]
+[debug] [2026-07-17T19:30:01.260Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes 200
+[debug] [2026-07-17T19:30:01.261Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/indexes {"indexes":[{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJim14AK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"CREATING","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/timesheets/indexes/CICAgOjXh4EK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJjF9oIK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"amount","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"CREATING","density":"SPARSE_ALL"},{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/expenses/indexes/CICAgJiUpoMK","queryScope":"COLLECTION","fields":[{"fieldPath":"status","order":"ASCENDING"},{"fieldPath":"staffEmail","order":"ASCENDING"},{"fieldPath":"__name__","order":"ASCENDING"}],"state":"READY","density":"SPARSE_ALL"}]}
+[debug] [2026-07-17T19:30:01.263Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:30:01.265Z] Checked if tokens are valid: true, expires at: 1784319592288
+[debug] [2026-07-17T19:30:01.266Z] >>> [apiv2][query] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* [none]
+[debug] [2026-07-17T19:30:01.425Z] <<< [apiv2][status] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* 200
+[debug] [2026-07-17T19:30:01.425Z] <<< [apiv2][body] GET https://firestore.googleapis.com/v1/projects/profitpro-admin/databases/(default)/collectionGroups/-/fields?filter=indexConfig.usesAncestorConfig=false OR ttlConfig:* {"fields":[{"name":"projects/profitpro-admin/databases/(default)/collectionGroups/__default__/fields/*","indexConfig":{"indexes":[{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"ASCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","order":"DESCENDING"}],"state":"READY"},{"queryScope":"COLLECTION","fields":[{"fieldPath":"*","arrayConfig":"CONTAINS"}],"state":"READY"}]}}]}
+[info] {
+  "indexes": [
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amount",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "staffEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "staffEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "amount",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    },
+    {
+      "collectionGroup": "timesheets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "staffEmail",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
+          "order": "ASCENDING"
+        }
+      ],
+      "density": "SPARSE_ALL"
+    }
+  ],
+  "fieldOverrides": []
+}

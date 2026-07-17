@@ -1,9 +1,10 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { listExpenses, listSalaries, listStaffAccounts, logAdminAction, saveSalary, toPublicStaff } from '@/lib/firestore'
+import { listExpenses, listSalaries, listSalariesPage, listStaffAccounts, logAdminAction, saveSalary, toPublicStaff } from '@/lib/firestore'
+import { readPagination } from '@/lib/pagination'
 
-export async function GET() {
+export async function GET(request: Request) {
   const cookieStore = await cookies()
   const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
 
@@ -11,7 +12,12 @@ export async function GET() {
     return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
   }
 
-  const [staff, salaries, expenses] = await Promise.all([listStaffAccounts(), listSalaries(), listExpenses()])
+  const pagination = readPagination(request)
+  const [staff, salaryResult, expenses] = await Promise.all([
+    listStaffAccounts(),
+    pagination ? listSalariesPage(pagination) : listSalaries().then((items) => ({ items, nextCursor: null })),
+    listExpenses(),
+  ])
   const approvedExpensesByStaff = expenses.reduce<Record<string, number>>((totals, expense) => {
     if (expense.status === 'approved') {
       totals[expense.staffEmail] = (totals[expense.staffEmail] || 0) + expense.amount
@@ -19,7 +25,12 @@ export async function GET() {
     return totals
   }, {})
 
-  return NextResponse.json({ staff: staff.map(toPublicStaff), salaries, approvedExpensesByStaff })
+  return NextResponse.json({
+    staff: staff.map(toPublicStaff),
+    salaries: salaryResult.items,
+    approvedExpensesByStaff,
+    ...(pagination ? { nextCursor: salaryResult.nextCursor } : {}),
+  })
 }
 
 export async function POST(request: Request) {

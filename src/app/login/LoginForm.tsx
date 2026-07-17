@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2, LockKeyhole, Mail } from 'lucide-react'
 
 type LoginResponse = {
@@ -10,7 +11,8 @@ type LoginResponse = {
   redirectTo?: string
 }
 
-export function LoginForm() {
+export function LoginForm({ notice = '' }: { notice?: string }) {
+  const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -43,7 +45,7 @@ export function LoginForm() {
         return
       }
 
-      window.location.href = data.redirectTo
+      router.replace(data.redirectTo)
     } catch {
       setError('Something went wrong.')
     } finally {
@@ -160,6 +162,12 @@ export function LoginForm() {
                     {error}
                   </div>
                 )}
+
+                {notice && !error ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-5 text-amber-100">
+                    {notice}
+                  </div>
+                ) : null}
 
                 <button
                   type="submit"

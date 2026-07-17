@@ -38,8 +38,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   const input = body as {
     name?: unknown
     email?: unknown
+    personalEmail?: unknown
     employeeId?: unknown
     department?: unknown
+    role?: unknown
+    annualCtc?: unknown
     active?: unknown
   }
   const updates: Parameters<typeof updateStaffAccount>[1] = {}
@@ -56,6 +59,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     updates.email = email
   }
 
+  if (typeof input.personalEmail === 'string') {
+    const personalEmail = input.personalEmail.trim().toLowerCase()
+    if (!personalEmail || personalEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail)) return NextResponse.json({ message: 'A valid personal email is required.' }, { status: 400 })
+    updates.personalEmail = personalEmail
+  }
+
   if (typeof input.employeeId === 'string') {
     const employeeId = input.employeeId.trim()
     if (!employeeId || employeeId.length > 50) return NextResponse.json({ message: 'Enter a valid employee ID.' }, { status: 400 })
@@ -66,6 +75,18 @@ export async function PATCH(request: Request, context: RouteContext) {
     const department = input.department.trim()
     if (!department || department.length > 100) return NextResponse.json({ message: 'Enter a valid department.' }, { status: 400 })
     updates.department = department
+  }
+
+  if (typeof input.role === 'string') {
+    const role = input.role.trim()
+    if (!role || role.length > 100) return NextResponse.json({ message: 'Enter a valid employee role.' }, { status: 400 })
+    updates.role = role
+  }
+
+  if (input.annualCtc !== undefined) {
+    const annualCtc = Number(input.annualCtc)
+    if (!Number.isFinite(annualCtc) || annualCtc <= 0 || annualCtc > 1_000_000_000) return NextResponse.json({ message: 'Annual CTC must be a valid positive number.' }, { status: 400 })
+    updates.annualCtc = annualCtc
   }
 
   if (typeof input.active === 'boolean') {
@@ -94,6 +115,9 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     return NextResponse.json({ staff: toPublicStaff(staff) })
   } catch (error) {
+    if (error instanceof Error && error.message === 'STAFF_NOT_FOUND') return NextResponse.json({ message: 'Employee was not found.' }, { status: 404 })
+    if (error instanceof Error && error.message === 'STAFF_EXISTS') return NextResponse.json({ message: 'An employee with this company email already exists.' }, { status: 409 })
+    if (error instanceof Error && error.message === 'EMPLOYEE_ID_EXISTS') return NextResponse.json({ message: 'An employee with this employee ID already exists.' }, { status: 409 })
     console.error(`Failed to update staff ${id}:`, error)
     return NextResponse.json({ message: 'Failed to update employee.' }, { status: 500 })
   }

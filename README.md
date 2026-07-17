@@ -1,81 +1,74 @@
-# ProfitPro - Hotel Revenue & Distribution
+# ProfitPro
 
-**Stack:** Next.js 14 · TypeScript · Tailwind CSS · Framer Motion · Lenis
+ProfitPro is a Next.js portal and public website for hotel revenue management, OTA onboarding, employee operations, contracts, invoices, expenses, timesheets, leave, and payroll reporting.
 
----
+## Technology
 
-## What's new vs V1
+- Next.js 16 with the App Router and TypeScript
+- React 19 and Tailwind CSS
+- Firebase Admin SDK / Firestore
+- Nodemailer SMTP delivery
+- DOCX contract templates with Docxtemplater
+- Browser PDF generation with html2canvas, jsPDF, and html2pdf.js
 
-| Issue | Fix |
-|---|---|
-| Blurry background | Removed all radial-gradient layering. Background is `#09090B` - pure, no blur |
-| Lag / jank | Dropped GSAP entirely. Framer Motion only = one animation library, 60fps |
-| Heavy intro | Gone. Instant hero load |
-| Dual accent colours fighting | Single electric blue `#3B82F6` accent throughout |
-| Doors concept | Replaced with slide-in editorial service cards + live revenue ticker |
+## Local setup
 
----
+1. Install dependencies with `npm install`.
+2. Copy `.env.example` to `.env.local`.
+3. Configure Firebase, authentication, SMTP, and invoice payment values.
+4. Run `npm run dev` and open `http://localhost:3000`.
 
-## Architecture
-
-```
-src/app/
-  page.tsx              ← Homepage
-  revenue/page.tsx      ← Revenue Management
-  onboarding/page.tsx   ← Hotel Onboarding
-
-src/components/
-  layout/
-    Nav.tsx             ← Scroll-aware, opaque (no backdrop-filter)
-    Footer.tsx
-    SmoothScroll.tsx    ← Lenis, minimal config
-  sections/
-    Ticker.tsx          ← Live revenue metrics ticker (pure CSS anim)
-    ServiceCards.tsx    ← Two-service split, slides from sides
-    Stats.tsx           ← Animated counters
-    OTAGrid.tsx         ← 7-platform grid
-    HomeCTA.tsx
-
-src/hooks/
-  useInView.ts          ← IntersectionObserver, trigger once
-  useCounter.ts         ← easeOutQuart counter
-```
-
----
-
-## Design Tokens
-
-| Token | Value | Role |
-|---|---|---|
-| `zinc-1000` | `#09090B` | Background - pure black |
-| `zinc-900` | `#111113` | Surface |
-| `zinc-800` | `#1C1C1F` | Raised surface |
-| `zinc-700` | `#27272A` | Borders |
-| `blue-500` | `#3B82F6` | Primary accent |
-| `blue-400` | `#60A5FA` | Accent light / serif highlight |
-| `ink` | `#FAFAFA` | Primary text |
-| `sub` | `#A1A1AA` | Secondary text |
-| `ghost` | `#52525B` | Tertiary / disabled |
-
-**Typography:**
-- Display: Inter (grotesque, tight negative tracking, weight 700)
-- Accent/Serif: Instrument Serif italic (editorial contrast)
-- Body: Inter regular
-
----
-
-## Deploy
+Available checks:
 
 ```bash
-npm install
-npm run dev       # localhost:3000
-
-# Vercel
-# 1. Push to GitHub
-# 2. vercel.com/new → import repo
-# 3. Framework: Next.js (auto-detected)
-# 4. Deploy - live in ~60s
-# Region: bom1 (Mumbai) pre-configured
+npm run type-check
+npm run lint
+npm run build
 ```
 
-No environment variables required.
+## Authentication
+
+Production authentication requires Firestore and `AUTH_SECRET`. Admin and staff accounts are stored in the `admins` and `staff` collections. The development-only fallback credentials use `ADMIN_EMAIL` / `ADMIN_PASSWORD` and optionally `STAFF_LOGIN_EMAIL` / `STAFF_LOGIN_PASSWORD` when Firestore is not configured.
+
+`AUTH_SECRET` must contain at least 32 bytes in production. Session duration and password rules are managed in the Admin security settings.
+
+The repository does not automatically create the first production admin. Provision the initial `admins` document through an approved deployment/bootstrap process with a PBKDF2 password hash compatible with `src/lib/auth.ts`; never store a plaintext production password in Firestore.
+
+## Templates
+
+Templates live under `public/template`:
+
+- Exactly one DOCX file is treated as the revenue-management contract template.
+- `ProfitPro_Offer_Letter_Template.html` is used for employee offer letters.
+- `ProfitPro_OTA_Onboarding_Invoice_Template.html` is used for OTA invoices.
+- `ProfitPro_Revenue_Management_Invoice_Template.html` is used for revenue-management invoices.
+
+Keep existing `{{placeholder}}` names when changing template styling. Payment values and the UPI QR image are supplied from deployment configuration and public assets.
+
+## API behaviour
+
+- Protected APIs require the signed, HTTP-only session cookie.
+- Mutating API requests are same-origin protected and limited to 32 KB by the proxy.
+- Collection endpoints support optional cursor pagination with `?limit=50&cursor=<document-id>`. Limits are capped at 100.
+- The dashboard uses Firestore aggregate queries rather than downloading full collections.
+- API responses use JSON with a `message` field on errors. Portal requests redirect to login when the session is rejected.
+
+## Firestore and deployment
+
+Firestore browser access is denied by `firestore.rules`; the application uses the server-side Admin SDK. Deploy both rules and required aggregate-query indexes after a Firebase project is selected:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+Vercel is configured for the Mumbai region (`bom1`). Add every value from `.env.example` to the Vercel project environment before deploying. Do not commit `.env.local`, service-account keys, passwords, banking data, or SMTP credentials.
+
+SMTP messages use connection, greeting, and socket timeouts, are serialized per server instance, retried once, and awaited before the API request completes. For high-volume delivery, replace this local delivery queue with a durable external job queue.
+
+## Operational notes
+
+- Generated PDFs use adaptive 3x rendering on lower-memory/mobile devices and 4x on capable desktops.
+- Employee and salary creation/update are committed atomically.
+- Revenue invoices are available only for Active revenue-management clients.
+- OTA invoices are available after every selected platform is Live.
+- Monitor Firestore read counts and move high-volume list screens to cursor pagination in the UI as record volumes grow.

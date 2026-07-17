@@ -1,9 +1,11 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { createTimesheet, listTimesheets } from '@/lib/firestore'
+import { createTimesheet, listTimesheets, listTimesheetsPage } from '@/lib/firestore'
+import { addDateOnlyDays, dateOnlyDay, parseDateOnly } from '@/lib/date-only'
+import { readPagination } from '@/lib/pagination'
 
-export async function GET() {
+export async function GET(request: Request) {
   const cookieStore = await cookies()
   const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
 
@@ -11,6 +13,8 @@ export async function GET() {
     return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
   }
 
+  const pagination = readPagination(request)
+  if (pagination) { const page = await listTimesheetsPage(pagination, user.email); return NextResponse.json({ timesheets: page.items, nextCursor: page.nextCursor }) }
   return NextResponse.json({ timesheets: await listTimesheets(user.email) })
 }
 
@@ -30,15 +34,13 @@ export async function POST(request: Request) {
   const workLocation = body.workLocation === 'office' ? 'office' : body.workLocation === 'remote' ? 'remote' : ''
   const notes = typeof body.notes === 'string' ? body.notes : ''
 
-  const start = new Date(`${weekStart}T00:00:00`)
-  const end = new Date(`${weekEnd}T00:00:00`)
-  const isSundayToSaturday = !Number.isNaN(start.getTime()) && !Number.isNaN(end.getTime()) && start.getDay() === 0 && Math.round((end.getTime() - start.getTime()) / 86400000) === 6
+  const isSundayToSaturday = dateOnlyDay(weekStart) === 0 && weekEnd === addDateOnlyDays(weekStart, 6)
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart) || !/^\d{4}-\d{2}-\d{2}$/.test(weekEnd) || !workLocation || workedDates.length === 0 || workedDates.length > 7 || notes.length > 2000 || !isSundayToSaturday) {
     return NextResponse.json({ message: 'Select a Sunday-to-Saturday week, at least one worked day, and a work location.' }, { status: 400 })
   }
 
-  if (workedDates.some((date) => { const worked = new Date(`${date}T00:00:00`); return Number.isNaN(worked.getTime()) || worked < start || worked > end })) {
+  if (workedDates.some((date) => !parseDateOnly(date) || date < weekStart || date > weekEnd)) {
     return NextResponse.json({ message: 'Worked dates must be within the selected week.' }, { status: 400 })
   }
 

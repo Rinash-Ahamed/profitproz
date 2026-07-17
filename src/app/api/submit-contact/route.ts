@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getContactEnquiryHtml } from './contact-enquiry'
-import { sendMail } from '@/lib/mail'
+import { queueMail } from '@/lib/mail'
 
 export const runtime = 'nodejs'
 
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    await sendMail({
+    await queueMail({
       fromName: name,
       to: 'support@profitproz.com',
       replyTo: email,

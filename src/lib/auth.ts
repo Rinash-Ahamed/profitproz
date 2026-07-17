@@ -9,6 +9,7 @@ export type SessionUser = {
   role: UserRole
   mustChangePassword?: boolean
   sessionVersion: number
+  expiresAt?: number
 }
 
 type LoginUser = SessionUser & {
@@ -138,7 +139,12 @@ export async function authenticateUser(email: string, password: string): Promise
   const normalizedEmail = email.trim().toLowerCase()
 
   if (isFirestoreConfigured()) {
-    const admin = await getAdminByEmail(normalizedEmail)
+    // Both collections are independent. Reading them together removes an entire
+    // network round trip for staff logins while preserving admin precedence.
+    const [admin, staff] = await Promise.all([
+      getAdminByEmail(normalizedEmail),
+      getStaffByEmail(normalizedEmail),
+    ])
 
     if (admin?.active && await verifyPassword(password, admin.passwordHash)) {
       return {
@@ -147,6 +153,17 @@ export async function authenticateUser(email: string, password: string): Promise
         sessionVersion: admin.sessionVersion,
       }
     }
+
+    if (staff?.active && await verifyPassword(password, staff.passwordHash)) {
+      return {
+        email: staff.email,
+        role: 'staff',
+        mustChangePassword: staff.mustChangePassword,
+        sessionVersion: staff.sessionVersion,
+      }
+    }
+
+    return null
   }
 
   for (const user of isFirestoreConfigured() ? [] : getConfiguredUsers()) {
@@ -159,21 +176,6 @@ export async function authenticateUser(email: string, password: string): Promise
         role: user.role,
         sessionVersion: user.sessionVersion,
       }
-    }
-  }
-
-  if (!isFirestoreConfigured()) {
-    return null
-  }
-
-  const staff = await getStaffByEmail(normalizedEmail)
-
-  if (staff?.active && await verifyPassword(password, staff.passwordHash)) {
-    return {
-      email: staff.email,
-      role: 'staff',
-      mustChangePassword: staff.mustChangePassword,
-      sessionVersion: staff.sessionVersion,
     }
   }
 
@@ -238,6 +240,7 @@ export function verifySessionToken(token?: string): SessionUser | null {
       role: decoded.role,
       mustChangePassword: decoded.mustChangePassword,
       sessionVersion: decoded.sessionVersion,
+      expiresAt: decoded.exp * 1000,
     }
   } catch {
     return null
@@ -258,7 +261,7 @@ export async function verifyActiveSessionToken(
   if (session.role === 'admin') {
     const admin = await getAdminByEmail(session.email)
     if (!admin?.active || admin.sessionVersion !== session.sessionVersion) return null
-    return { email: admin.email, role: 'admin', mustChangePassword: false, sessionVersion: admin.sessionVersion }
+    return { email: admin.email, role: 'admin', mustChangePassword: false, sessionVersion: admin.sessionVersion, expiresAt: session.expiresAt }
   }
 
   const staff = await getStaffByEmail(session.email)
@@ -270,6 +273,7 @@ export async function verifyActiveSessionToken(
     role: 'staff',
     mustChangePassword: staff.mustChangePassword,
     sessionVersion: staff.sessionVersion,
+    expiresAt: session.expiresAt,
   }
 }
 

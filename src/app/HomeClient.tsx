@@ -1,5 +1,4 @@
 'use client'
-import { useEffect, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
@@ -11,37 +10,15 @@ import { Testimonials } from '@/components/sections/Testimonials'
 import { HomeCTA } from '@/components/sections/HomeCTA'
 import { ease } from '@/lib/utils'
 
+const activeMessage = {
+  titleLines: ['One Platform', 'Every OTA'],
+  lastLine: 'Complete Control',
+  subtitle: "we make property listing and management effortless across multiple ota's",
+  theme: { glowA: 'rgba(102, 177, 89, 0.18)', accent: '#66B159' },
+}
+
 export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt: string }[] }) {
-
   const tickerSpeed = 40
-  const [messageIndex, setMessageIndex] = useState(0)
-
-  const heroMessages = useMemo(
-    () => [
-      {
-        titleLines: ['One Platform', 'Every OTA'],
-        lastLine: 'Complete Control',
-        subtitle: 'we make property listing and management effortless across multiple ota\'s',
-        theme: {
-          glowA: 'rgba(102, 177, 89, 0.18)',
-          glowB: 'rgba(102, 177, 89, 0.14)',
-          grid: 'rgba(255,255,255,0.025)',
-          accent: '#66B159',
-        },
-      },
-    ],
-    []
-  )
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      setMessageIndex((prev) => (prev + 1) % heroMessages.length)
-    }, 5600)
-
-    return () => window.clearInterval(id)
-  }, [heroMessages.length])
-
-  const activeMessage = heroMessages[messageIndex]
 
   return (
     <div className="min-h-screen bg-zinc-1000">

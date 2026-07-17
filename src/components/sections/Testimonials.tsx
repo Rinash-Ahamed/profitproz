@@ -3,7 +3,6 @@ import { useRef, useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useInView } from '@/hooks/useInView'
 import { ease } from '@/lib/utils'
-import { AnimatedSection } from '@/components/animations/AnimatedSection'
 
 const testimonials = [
   {
@@ -91,7 +90,7 @@ export function Testimonials() {
             dragConstraints={{ right: 0, left: -carouselWidth }}
             transition={{ duration: 0.8, ease: ease.out }}
           >
-            {testimonials.map((t, i) => (
+            {testimonials.map((t) => (
               <div
                 key={t.author}
                 className="min-w-[90vw] sm:min-w-[450px] rounded-2xl border border-zinc-800 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-7 flex flex-col justify-between shadow-[0_20px_60px_rgba(0,0,0,0.2)]"

@@ -23,5 +23,5 @@ export function useInView<T extends HTMLElement = HTMLElement>(threshold = 0.15,
     return () => obs.disconnect()
   }, [threshold, once])
 
-  return { ref: ref as any, inView }
+  return { ref, inView }
 }
