@@ -9,6 +9,7 @@ export type StaffRecord = {
   employeeId?: string
   name: string
   email: string
+  personalEmail?: string
   passwordHash: string
   active: boolean
   mustChangePassword: boolean
@@ -169,6 +170,7 @@ function mapDocToStaff(doc: DocumentSnapshot): StaffRecord {
     employeeId: data.employeeId || '',
     name: data.name || '',
     email: data.email || '',
+    personalEmail: data.personalEmail || '',
     passwordHash: data.passwordHash || '',
     active: typeof data.active === 'boolean' ? data.active : true,
     mustChangePassword: typeof data.mustChangePassword === 'boolean' ? data.mustChangePassword : true,
@@ -332,7 +334,7 @@ export async function updateAdminPassword(id: string, passwordHash: string): Pro
   return mapDocToAdmin(updatedDoc)
 }
 
-export async function createStaffAccount(input: { name: string; email?: string; passwordHash: string; employeeId: string; department: string; role: string; annualCtc: number }): Promise<StaffRecord> {
+export async function createStaffAccount(input: { name: string; email?: string; personalEmail: string; passwordHash: string; employeeId: string; department: string; role: string; annualCtc: number }): Promise<StaffRecord> {
   const db = ensureDb()
   const generatedEmail = input.email?.trim().toLowerCase() || emailFromStaffName(input.name)
   const staffCollection = db.collection(COLLECTIONS.STAFF)
@@ -349,6 +351,7 @@ export async function createStaffAccount(input: { name: string; email?: string; 
     const newStaffData = {
       name: toTitleCase(input.name.trim()),
       email: generatedEmail,
+      personalEmail: input.personalEmail.trim().toLowerCase(),
       employeeId: input.employeeId,
       passwordHash: input.passwordHash,
       active: false,

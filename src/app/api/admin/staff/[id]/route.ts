@@ -38,6 +38,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const input = body as {
     name?: unknown
     email?: unknown
+    personalEmail?: unknown
     employeeId?: unknown
     department?: unknown
     role?: unknown
@@ -56,6 +57,12 @@ export async function PATCH(request: Request, context: RouteContext) {
     const email = input.email.trim().toLowerCase()
     if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ message: 'A valid email is required.' }, { status: 400 })
     updates.email = email
+  }
+
+  if (typeof input.personalEmail === 'string') {
+    const personalEmail = input.personalEmail.trim().toLowerCase()
+    if (!personalEmail || personalEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail)) return NextResponse.json({ message: 'A valid personal email is required.' }, { status: 400 })
+    updates.personalEmail = personalEmail
   }
 
   if (typeof input.employeeId === 'string') {

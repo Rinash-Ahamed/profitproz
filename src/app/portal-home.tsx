@@ -36,6 +36,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   // Staff creation state
   const [staffFirstName, setStaffFirstName] = useState('')
   const [staffLastName, setStaffLastName] = useState('')
+  const [staffPersonalEmail, setStaffPersonalEmail] = useState('')
   const [staffEmployeeId, setStaffEmployeeId] = useState('')
   const [staffDepartment, setStaffDepartment] = useState('')
   const [staffRole, setStaffRole] = useState('')
@@ -289,7 +290,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       const response = await fetch('/api/admin/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName: staffFirstName, lastName: staffLastName, annualCtc: Number(staffCtc), employeeId: staffEmployeeId, department: staffDepartment, role: staffRole }),
+        body: JSON.stringify({ firstName: staffFirstName, lastName: staffLastName, personalEmail: staffPersonalEmail, annualCtc: Number(staffCtc), employeeId: staffEmployeeId, department: staffDepartment, role: staffRole }),
       })
       const data = (await response.json()) as { message?: string; initialPassword?: string; staff: PublicStaffRecord }
 
@@ -300,6 +301,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
       setStaffFirstName('')
       setStaffLastName('')
+      setStaffPersonalEmail('')
       setStaffEmployeeId('')
       setStaffDepartment('')
       setStaffRole('')
@@ -1108,9 +1110,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             </div>
                             <div>
                               <label htmlFor="staffEmail" className="label-upper mb-2 block text-ghost">
-                                Employee email (auto-generated)
+                                Company email (auto-generated)
                               </label>
                               <input id="staffEmail" value={emailFromStaffName(staffFirstName)} className={`${inputClass} bg-zinc-950 text-sub`} readOnly />
+                            </div>
+                            <div>
+                              <label htmlFor="staffPersonalEmail" className="label-upper mb-2 block text-ghost">Personal email</label>
+                              <input id="staffPersonalEmail" type="email" autoComplete="email" value={staffPersonalEmail} onChange={(e) => setStaffPersonalEmail(e.target.value)} className={inputClass} placeholder="employee@example.com" required />
                             </div>
                             <div>
                               <label htmlFor="staffEmployeeId" className="label-upper mb-2 block text-ghost">
@@ -1209,7 +1215,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                       <td className="px-6 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${staff.active ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-amber-500/20 bg-amber-500/10 text-amber-400'}`}>{staff.active ? 'Active' : 'Pending'}</span></td>
                                       <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                          <button type="button" onClick={() => setOfferStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`Generate offer letter for ${staff.name}`} title="Generate offer letter"><FileText className="h-4 w-4" /></button>
+                                          {!staff.active ? <button type="button" onClick={() => setOfferStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`Generate offer letter for ${staff.name}`} title="Generate offer letter"><FileText className="h-4 w-4" /></button> : null}
                                           {!staff.active ? <button type="button" onClick={() => activateAcknowledgedStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-green-500/20 hover:text-green-400 transition-colors" aria-label={`Acknowledge offer and activate ${staff.name}`} title="Acknowledge & activate"><CheckCircle2 className="h-4 w-4" /></button> : null}
                                           <button type="button" onClick={() => setEditingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors" aria-label={`Edit ${staff.name}`} title="Edit employee"><Edit className="h-4 w-4" /></button>
                                           <button type="button" onClick={() => handleResetPassword(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-amber-500/20 hover:text-amber-400 transition-colors" aria-label={`Reset password for ${staff.name}`} title="Reset password"><RefreshCw className="h-4 w-4" /></button>
@@ -1820,6 +1826,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 function getOfferRoleContent(roleValue: string, departmentValue: string) {
   const role = roleValue.toLowerCase()
   const department = departmentValue.toLowerCase()
+  if (/telemarketing|telemarketer|telecaller|tele-caller|telesales|tele sales/.test(role)) return {
+    summary: 'In this role, you will support business growth through professional telecalling, lead qualification, consistent prospect follow-ups, and accurate coordination with the sales team. You will represent ProfitPro clearly and courteously while introducing our services to potential hotel clients.',
+    responsibilities: ['Make outbound telecalls to prospective hotel owners, managers, and other qualified leads.', 'Introduce ProfitPro services clearly, understand prospect requirements, and qualify sales opportunities.', 'Schedule appointments or product discussions for the business development team and share complete lead context.', 'Follow up with interested prospects through approved calling and messaging channels within agreed timelines.', 'Maintain accurate call logs, lead status, notes, and next actions in the designated CRM or tracker.', 'Work toward assigned calling, lead-generation, appointment, and conversion targets while submitting regular performance reports.', 'Support OTA onboarding by collecting required property details and documents, coordinating platform setup, tracking pending actions, and helping selected OTA listings go live.'],
+  }
   if (/business development|sales|bdm/.test(`${role} ${department}`)) return {
     summary: 'In this role, you will report to the Head of Business Development and/or the Managing Director. Your primary responsibility is to promote and expand our hotel revenue management services by identifying business opportunities, conducting lead-generation activities, building strong client relationships, and driving sustainable revenue growth.',
     responsibilities: ['Identify and acquire new hotel clients.', "Present, promote, and market ProfitPro's hotel revenue management solutions.", 'Develop and maintain long-term relationships with hotel owners and management teams.', 'Work toward monthly and quarterly sales targets while monitoring market and competitor activity.', 'Coordinate with revenue management and operations teams to ensure smooth client onboarding.'],
@@ -1877,7 +1887,7 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
       offer_date: displayDate(offerDate),
       joining_date: displayDate(joiningDate),
       employee_name: staff.name,
-      employee_email: staff.email,
+      employee_email: staff.personalEmail || '',
       role: staff.role || '',
       department: staff.department || '',
       location,
@@ -1953,6 +1963,7 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
 function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; onClose: () => void; onSave: (staff: PublicStaffRecord) => void }) {
   const [name, setName] = useState(staff.name)
   const [email, setEmail] = useState(staff.email)
+  const [personalEmail, setPersonalEmail] = useState(staff.personalEmail || '')
   const [employeeId, setEmployeeId] = useState(staff.employeeId || '')
   const [department, setDepartment] = useState(staff.department || '')
   const [role, setRole] = useState(staff.role || '')
@@ -1978,6 +1989,7 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
     const updates = {
       ...(name !== staff.name && { name }),
       ...(email !== staff.email && { email }),
+      ...(personalEmail !== (staff.personalEmail || '') && { personalEmail }),
       ...(employeeId !== (staff.employeeId || '') && { employeeId }),
       ...(department !== (staff.department || '') && { department }),
       ...(role !== (staff.role || '') && { role }),
@@ -2032,8 +2044,12 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
                 <input id="edit-staffName" value={name} onChange={(e) => setName(e.target.value)} className={inputClass} required />
               </div>
               <div>
-                <label htmlFor="edit-staffEmail" className="label-upper mb-2 block text-ghost">Employee email</label>
+                <label htmlFor="edit-staffEmail" className="label-upper mb-2 block text-ghost">Company email</label>
                 <input id="edit-staffEmail" type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputClass} required />
+              </div>
+              <div>
+                <label htmlFor="edit-staffPersonalEmail" className="label-upper mb-2 block text-ghost">Personal email</label>
+                <input id="edit-staffPersonalEmail" type="email" autoComplete="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} className={inputClass} placeholder="employee@example.com" required />
               </div>
               <div>
                 <label htmlFor="edit-staffEmployeeId" className="label-upper mb-2 block text-ghost">Employee ID</label>
