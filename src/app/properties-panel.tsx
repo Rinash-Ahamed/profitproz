@@ -56,7 +56,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
     <div className="space-y-5">
       <div className="surface flex flex-wrap items-center justify-between gap-4 rounded-lg p-6">
         <div>
-          <p className="text-lg font-semibold text-ink">{readOnly ? 'Client Property Directory' : 'Hospitality Clients'}</p>
+          <p className="text-lg font-semibold text-ink">{readOnly ? 'Client Property Directory' : 'Our Clients'}</p>
           <p className="mt-1 text-sm text-sub">{readOnly ? 'View the hospitality properties served by ProfitPro.' : 'Manage hotels, resorts, stays, and other client properties.'}</p>
         </div>
         {!readOnly ? <button type="button" onClick={() => setShowCreate(true)} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white hover:bg-[#73bd66]">
