@@ -60,6 +60,7 @@ export type PropertyType = 'hotel' | 'resort' | 'homestay' | 'serviced-apartment
 
 export type PropertyRecord = {
   id: string
+  contractNumber: string
   name: string
   propertyType: PropertyType
   contactName: string
@@ -78,7 +79,7 @@ export type PropertyRecord = {
   updatedAt?: string
 }
 
-export type PropertyInput = Omit<PropertyRecord, 'id' | 'createdAt' | 'updatedAt'>
+export type PropertyInput = Omit<PropertyRecord, 'id' | 'contractNumber' | 'createdAt' | 'updatedAt'>
 
 const privateKey = normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
 
@@ -209,6 +210,7 @@ function mapDocToProperty(doc: DocumentSnapshot): PropertyRecord {
 
   return {
     id: doc.id,
+    contractNumber: typeof data.contractNumber === 'string' ? data.contractNumber : '',
     name: typeof data.name === 'string' ? data.name : '',
     propertyType: ['hotel', 'resort', 'homestay', 'serviced-apartment', 'hostel', 'other'].includes(data.propertyType) ? data.propertyType as PropertyType : 'hotel',
     contactName: typeof data.contactName === 'string' ? data.contactName : '',
@@ -573,16 +575,65 @@ export async function getPropertyById(id: string): Promise<PropertyRecord | null
   return snapshot.exists ? mapDocToProperty(snapshot) : null
 }
 
+const CONTRACT_SEQUENCE_START = 31
+
+function formatContractNumber(sequence: number, dateValue?: string) {
+  const date = dateValue ? new Date(dateValue.includes('T') ? dateValue : `${dateValue}T00:00:00Z`) : new Date()
+  const validDate = Number.isNaN(date.valueOf()) ? new Date() : date
+  const month = String(validDate.getUTCMonth() + 1).padStart(2, '0')
+  const year = String(validDate.getUTCFullYear())
+  return `PP-RMS-${month}-${year}-${String(sequence).padStart(4, '0')}`
+}
+
 export async function createProperty(input: PropertyInput): Promise<PropertyRecord> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.PROPERTIES).doc(createDocumentId())
-  await docRef.set({
-    ...input,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
+  const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('contract-sequence')
+
+  await db.runTransaction(async (transaction) => {
+    const counter = await transaction.get(counterRef)
+    const storedLastNumber = counter.data()?.lastNumber
+    const lastNumber = Number.isInteger(storedLastNumber) ? Math.max(storedLastNumber, CONTRACT_SEQUENCE_START) : CONTRACT_SEQUENCE_START
+    const nextNumber = lastNumber + 1
+
+    transaction.set(counterRef, { lastNumber: nextNumber, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    transaction.set(docRef, {
+      ...input,
+      contractNumber: formatContractNumber(nextNumber, input.contractStartDate),
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
   })
+
   const snapshot = await docRef.get()
   return mapDocToProperty(snapshot)
+}
+
+export async function ensurePropertyContractNumber(id: string): Promise<PropertyRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.PROPERTIES).doc(id)
+  const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('contract-sequence')
+
+  await db.runTransaction(async (transaction) => {
+    const property = await transaction.get(docRef)
+    if (!property.exists) throw new Error('PROPERTY_NOT_FOUND')
+    if (typeof property.data()?.contractNumber === 'string' && property.data()?.contractNumber) return
+
+    const counter = await transaction.get(counterRef)
+    const storedLastNumber = counter.data()?.lastNumber
+    const lastNumber = Number.isInteger(storedLastNumber) ? Math.max(storedLastNumber, CONTRACT_SEQUENCE_START) : CONTRACT_SEQUENCE_START
+    const nextNumber = lastNumber + 1
+
+    transaction.set(counterRef, { lastNumber: nextNumber, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    transaction.update(docRef, {
+      contractNumber: formatContractNumber(nextNumber, property.data()?.contractStartDate),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+  })
+
+  const property = await docRef.get()
+  if (!property.exists) throw new Error('PROPERTY_NOT_FOUND')
+  return mapDocToProperty(property)
 }
 
 export async function updateProperty(id: string, updates: Partial<PropertyInput>): Promise<PropertyRecord> {

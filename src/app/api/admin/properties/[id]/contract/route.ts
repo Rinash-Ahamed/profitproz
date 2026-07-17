@@ -2,7 +2,7 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { getContractFilename, renderPropertyContract } from '@/lib/contract-template'
-import { getPropertyById, logAdminAction } from '@/lib/firestore'
+import { ensurePropertyContractNumber, getPropertyById, logAdminAction } from '@/lib/firestore'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -15,8 +15,9 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!id || id.length > 128) return NextResponse.json({ message: 'A valid property ID is required.' }, { status: 400 })
 
   try {
-    const property = await getPropertyById(id)
-    if (!property) return NextResponse.json({ message: 'Property was not found.' }, { status: 404 })
+    const existingProperty = await getPropertyById(id)
+    if (!existingProperty) return NextResponse.json({ message: 'Property was not found.' }, { status: 404 })
+    const property = existingProperty.contractNumber ? existingProperty : await ensurePropertyContractNumber(id)
 
     const filename = getContractFilename(property)
     const contract = renderPropertyContract(property)

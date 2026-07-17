@@ -94,7 +94,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
                   <td className="px-6 py-4 font-semibold text-[#66B159]">{property.commissionPercent}%</td>
                   <td className="px-6 py-4 text-sub"><p>{property.contractStartDate ? new Date(`${property.contractStartDate}T00:00:00`).toLocaleDateString('en-IN') : 'Not set'}</p>{!readOnly && property.signedContractUrl ? <a href={property.signedContractUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View signed contract</a> : null}</td>
                   <td className="px-6 py-4"><PropertyStatusBadge status={property.status} /></td>
-                  {!readOnly ? <td className="px-6 py-4"><button type="button" onClick={() => setContractProperty(property)} className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-[#66B159]/30 bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"><FileText className="h-4 w-4" /> Contract PDF</button></td> : null}
+                  {!readOnly ? <td className="px-6 py-4">{property.signedContractUrl ? <span className="text-xs text-ghost">Signed</span> : <button type="button" onClick={() => setContractProperty(property)} className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-[#66B159]/30 bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"><FileText className="h-4 w-4" /> Contract PDF</button>}</td> : null}
                   {!readOnly ? <td className="px-6 py-4"><div className="flex gap-2"><button type="button" onClick={() => setEditing(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label={`Edit ${property.name}`}><Edit className="h-4 w-4" /></button><button type="button" disabled={deletingId === property.id} onClick={() => deleteRecord(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete ${property.name}`}>{deletingId === property.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button></div></td> : null}
                 </tr>
               ))}
@@ -172,6 +172,7 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
+  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -207,7 +208,7 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
 
     void loadContract()
     return () => controller.abort()
-  }, [property.id])
+  }, [property.id, reloadKey])
 
   async function downloadPdf() {
     const preview = previewRef.current
@@ -269,7 +270,7 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
           </div>
         </div>
 
-        {error ? <p className="m-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 sm:m-6">{error}</p> : null}
+        {error ? <div className="m-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 sm:m-6"><span>{error}</span><button type="button" onClick={() => setReloadKey((current) => current + 1)} className="rounded-md border border-red-300/30 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-red-500/10">Retry preview</button></div> : null}
         <div className="max-h-[calc(100vh-9rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">
           {loading ? <div className="flex min-h-96 items-center justify-center gap-3 text-sm text-sub"><Loader2 className="h-5 w-5 animate-spin" /> Generating contract preview…</div> : null}
           <div ref={previewRef} className={loading ? 'hidden' : 'mx-auto min-w-fit [&_.docx-wrapper]:!bg-transparent [&_.docx-wrapper]:!p-0'} />
