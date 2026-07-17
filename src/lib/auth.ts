@@ -9,6 +9,7 @@ export type SessionUser = {
   role: UserRole
   mustChangePassword?: boolean
   sessionVersion: number
+  expiresAt?: number
 }
 
 type LoginUser = SessionUser & {
@@ -238,6 +239,7 @@ export function verifySessionToken(token?: string): SessionUser | null {
       role: decoded.role,
       mustChangePassword: decoded.mustChangePassword,
       sessionVersion: decoded.sessionVersion,
+      expiresAt: decoded.exp * 1000,
     }
   } catch {
     return null
@@ -258,7 +260,7 @@ export async function verifyActiveSessionToken(
   if (session.role === 'admin') {
     const admin = await getAdminByEmail(session.email)
     if (!admin?.active || admin.sessionVersion !== session.sessionVersion) return null
-    return { email: admin.email, role: 'admin', mustChangePassword: false, sessionVersion: admin.sessionVersion }
+    return { email: admin.email, role: 'admin', mustChangePassword: false, sessionVersion: admin.sessionVersion, expiresAt: session.expiresAt }
   }
 
   const staff = await getStaffByEmail(session.email)
@@ -270,6 +272,7 @@ export async function verifyActiveSessionToken(
     role: 'staff',
     mustChangePassword: staff.mustChangePassword,
     sessionVersion: staff.sessionVersion,
+    expiresAt: session.expiresAt,
   }
 }
 

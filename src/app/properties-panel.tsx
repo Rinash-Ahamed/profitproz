@@ -1,9 +1,10 @@
 'use client'
 
-import { FormEvent, useEffect, useRef, useState } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Building2, Download, Edit, FileText, Loader2, Plus, Trash2, X } from 'lucide-react'
+import { Building2, Download, Edit, FileText, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
 import type { PropertyInput, PropertyRecord } from '@/lib/firestore'
+import { DatePickerInput } from '@/components/ui/DatePickerInput'
 
 type PropertiesPanelProps = {
   properties: PropertyRecord[]
@@ -35,6 +36,19 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
   const [contractProperty, setContractProperty] = useState<PropertyRecord | null>(null)
   const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const visibleProperties = useMemo(() => {
+    const query = search.trim().toLowerCase()
+    return properties
+      .filter((property) => !query || property.name.toLowerCase().includes(query))
+      .sort((a, b) => {
+        if (query) {
+          const rankDifference = Number(!a.name.toLowerCase().startsWith(query)) - Number(!b.name.toLowerCase().startsWith(query))
+          if (rankDifference) return rankDifference
+        }
+        return a.name.localeCompare(b.name)
+      })
+  }, [properties, search])
 
   async function deleteRecord(property: PropertyRecord) {
     if (!window.confirm(`Delete ${property.name}? This permanently removes the property record.`)) return
@@ -59,9 +73,15 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
           <p className="text-lg font-semibold text-ink">{readOnly ? 'Client Property Directory' : 'Our Clients'}</p>
           <p className="mt-1 text-sm text-sub">{readOnly ? 'View the hospitality properties served by ProfitPro.' : 'Manage hotels, resorts, stays, and other client properties.'}</p>
         </div>
-        {!readOnly ? <button type="button" onClick={() => setShowCreate(true)} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white hover:bg-[#73bd66]">
-          <Plus className="h-4 w-4" /> Add property
-        </button> : null}
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" />
+            <input value={search} onChange={(event) => setSearch(event.target.value)} className="h-11 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search property name" aria-label="Search revenue management properties" />
+          </label>
+          {!readOnly ? <button type="button" onClick={() => setShowCreate(true)} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white hover:bg-[#73bd66]">
+            <Plus className="h-4 w-4" /> Add property
+          </button> : null}
+        </div>
       </div>
 
       {error ? <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
@@ -84,9 +104,9 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
             <tbody>
               {loading ? (
                 <tr><td colSpan={readOnly ? 6 : 8} className="py-12 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
-              ) : properties.length === 0 ? (
-                <tr><td colSpan={readOnly ? 6 : 8} className="px-6 py-12 text-center"><Building2 className="mx-auto h-8 w-8 text-zinc-600" /><p className="mt-3 font-medium text-ink">No client properties yet</p>{!readOnly ? <p className="mt-1 text-sm text-sub">Add your first property to start the client register.</p> : null}</td></tr>
-              ) : properties.map((property) => (
+              ) : visibleProperties.length === 0 ? (
+                <tr><td colSpan={readOnly ? 6 : 8} className="px-6 py-12 text-center"><Building2 className="mx-auto h-8 w-8 text-zinc-600" /><p className="mt-3 font-medium text-ink">{search ? 'No matching properties' : 'No client properties yet'}</p>{!readOnly && !search ? <p className="mt-1 text-sm text-sub">Add your first property to start the client register.</p> : null}</td></tr>
+              ) : visibleProperties.map((property) => (
                 <tr key={property.id} className="border-b border-zinc-800 last:border-none">
                   <td className="px-6 py-4"><p className="font-medium text-ink">{property.name}</p><p className="mt-1 text-xs capitalize text-sub">{property.propertyType.replace('-', ' ')} · {property.city}{property.address ? ` · ${property.address}` : ''}</p>{property.notes ? <p className="mt-2 max-w-72 whitespace-pre-wrap text-xs text-sub">{property.notes}</p> : null}</td>
                   <td className="px-6 py-4"><p className="text-ink">{property.contactName || 'Not provided'}</p>{property.contactEmail ? <p className="mt-1 text-xs text-sub">{property.contactEmail}</p> : null}{property.contactPhone ? <p className="mt-1 text-xs text-sub">{property.contactPhone}</p> : null}{!property.contactEmail && !property.contactPhone ? <p className="mt-1 text-xs text-sub">No contact details</p> : null}</td>
@@ -152,7 +172,7 @@ function PropertyModal({ title, initial, propertyId, onClose, onSaved }: { title
             <Field label="GSTIN (if applicable)"><input value={form.gstNumber} onChange={(e) => update('gstNumber', e.target.value.toUpperCase())} minLength={15} maxLength={15} className={inputClass} placeholder="22AAAAA0000A1Z5" /></Field>
             <Field label="Number of rooms *"><input type="number" min="0" max="100000" step="1" value={form.roomCount} onChange={(e) => update('roomCount', Number(e.target.value))} className={inputClass} required /></Field>
             <Field label="Revenue commission % *"><input type="number" min="0" max="100" step="0.01" value={form.commissionPercent} onChange={(e) => update('commissionPercent', Number(e.target.value))} className={inputClass} required /></Field>
-            <Field label="Contract start date"><input type="date" value={form.contractStartDate} onChange={(e) => update('contractStartDate', e.target.value)} className={inputClass} /></Field>
+            <Field label="Contract start date"><DatePickerInput value={form.contractStartDate} onChange={(value) => update('contractStartDate', value)} className={inputClass} /></Field>
             <Field label="Signed contract link"><input type="url" inputMode="url" value={form.signedContractUrl} onChange={(e) => update('signedContractUrl', e.target.value)} maxLength={2048} className={inputClass} placeholder="https://..." /><span className="mt-1 block text-xs text-sub">Required before changing the status to Active.</span></Field>
             <Field label="Status"><select value={form.status} onChange={(e) => update('status', e.target.value as PropertyInput['status'])} className={inputClass}><option value="pending">Pending</option><option value="active">Active</option><option value="inactive">Inactive</option></select></Field>
             <Field label="Address" wide><input value={form.address} onChange={(e) => update('address', e.target.value)} maxLength={500} className={inputClass} /></Field>

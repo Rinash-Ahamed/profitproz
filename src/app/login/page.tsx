@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   description: 'Admin and Staff login for ProfitPro.',
 }
 
-export default function LoginPage() {
-  return <LoginForm />
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ reason?: string }> }) {
+  const params = await searchParams
+  return <LoginForm notice={params.reason === 'session-expired' ? 'Your session expired. Please sign in again.' : ''} />
 }

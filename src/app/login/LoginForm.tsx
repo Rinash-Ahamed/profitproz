@@ -10,7 +10,7 @@ type LoginResponse = {
   redirectTo?: string
 }
 
-export function LoginForm() {
+export function LoginForm({ notice = '' }: { notice?: string }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -160,6 +160,12 @@ export function LoginForm() {
                     {error}
                   </div>
                 )}
+
+                {notice && !error ? (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-5 text-amber-100">
+                    {notice}
+                  </div>
+                ) : null}
 
                 <button
                   type="submit"

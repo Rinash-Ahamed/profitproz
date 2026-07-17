@@ -3,11 +3,14 @@
 import { FormEvent, useEffect, useMemo, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Building2, CheckCircle2, ClipboardList, Edit, FileDown, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Trash2, User, UserPlus, Users, XCircle } from 'lucide-react'
+import { Building2, CheckCircle2, ClipboardList, Edit, Eye, EyeOff, FileDown, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Search, Trash2, User, UserPlus, Users, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
 import type { ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, TimesheetRecord } from '@/lib/firestore'
+import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
+import { ClientServicesPanel } from '@/app/client-services-panel'
 import { PropertiesPanel } from '@/app/properties-panel'
+import { DatePickerInput } from '@/components/ui/DatePickerInput'
 
 type PortalHomeProps = {
   user: SessionUser
@@ -39,9 +42,11 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffCtc, setStaffCtc] = useState('')
   // Staff list state
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
+  const [staffSearch, setStaffSearch] = useState('')
   const [salaryList, setSalaryList] = useState<SalaryRecord[]>([])
   const [editingStaff, setEditingStaff] = useState<PublicStaffRecord | null>(null)
   const [propertyList, setPropertyList] = useState<PropertyRecord[]>([])
+  const [onboardingList, setOnboardingList] = useState<OnboardingRecord[]>([])
   // Timesheet state
   const [timesheetList, setTimesheetList] = useState<TimesheetRecord[]>([])
   const [showTimesheetFilters, setShowTimesheetFilters] = useState(false)
@@ -68,6 +73,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
   const [profilePhone, setProfilePhone] = useState('')
   const [profileAddress, setProfileAddress] = useState('')
   const [profileDetails, setProfileDetails] = useState('')
@@ -90,6 +97,30 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }, 3000)
     return () => clearTimeout(timer)
   }, [message, error])
+
+  useEffect(() => {
+    if (!user.expiresAt) return
+
+    let redirecting = false
+    const expireSession = () => {
+      if (redirecting) return
+      redirecting = true
+      fetch('/api/logout', { method: 'POST', credentials: 'same-origin', keepalive: true })
+        .finally(() => window.location.replace('/login?reason=session-expired'))
+    }
+    const checkSessionLimit = () => {
+      if (Date.now() >= user.expiresAt!) expireSession()
+    }
+    const timer = window.setTimeout(expireSession, Math.max(0, user.expiresAt - Date.now()))
+
+    document.addEventListener('visibilitychange', checkSessionLimit)
+    window.addEventListener('focus', checkSessionLimit)
+    return () => {
+      window.clearTimeout(timer)
+      document.removeEventListener('visibilitychange', checkSessionLimit)
+      window.removeEventListener('focus', checkSessionLimit)
+    }
+  }, [user.expiresAt])
 
   useEffect(() => {
     if (user.role !== 'admin') return
@@ -123,9 +154,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
     if (activeTab === 'properties') {
       setLoading(true)
-      fetch('/api/admin/properties')
-        .then((res) => res.json())
-        .then((data) => { if (data.properties) setPropertyList(data.properties) })
+      Promise.all([fetch('/api/admin/properties'), fetch('/api/admin/onboardings', { credentials: 'same-origin', cache: 'no-store' })])
+        .then(async ([propertyRes, onboardingRes]) => {
+          const [propertyData, onboardingData] = await Promise.all([propertyRes.json(), onboardingRes.json()])
+          if (propertyData.properties) setPropertyList(propertyData.properties)
+          if (onboardingData.onboardings) setOnboardingList(onboardingData.onboardings)
+        })
         .catch(() => setError('Could not load client properties.'))
         .finally(() => setLoading(false))
     }
@@ -227,9 +261,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
     if (activeTab === 'properties') {
       setLoading(true)
-      fetch('/api/properties')
-        .then((res) => res.json())
-        .then((data) => { if (data.properties) setPropertyList(data.properties) })
+      Promise.all([fetch('/api/properties'), fetch('/api/onboardings')])
+        .then(async ([propertyRes, onboardingRes]) => {
+          const [propertyData, onboardingData] = await Promise.all([propertyRes.json(), onboardingRes.json()])
+          if (propertyData.properties) setPropertyList(propertyData.properties)
+          if (onboardingData.onboardings) setOnboardingList(onboardingData.onboardings)
+        })
         .catch(() => setError('Could not load client properties.'))
         .finally(() => setLoading(false))
     }
@@ -618,6 +655,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
       setCurrentPassword('')
       setNewPassword('')
+      setShowCurrentPassword(false)
+      setShowNewPassword(false)
       setProfilePhone('')
       setProfileAddress('')
       setProfileDetails('')
@@ -638,6 +677,22 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   const calculatedMonthlySalary = Number(staffCtc) > 0 ? Number(staffCtc) / 12 : 0
+  const visibleStaffList = useMemo(() => {
+    const query = staffSearch.trim().toLowerCase()
+    return staffList
+      .filter((staff) => {
+        if (!query) return true
+        return [staff.name, staff.email, staff.employeeId, staff.department, staff.role]
+          .some((value) => value?.toLowerCase().includes(query))
+      })
+      .sort((a, b) => {
+        if (query) {
+          const rankDifference = Number(!a.name.toLowerCase().startsWith(query)) - Number(!b.name.toLowerCase().startsWith(query))
+          if (rankDifference) return rankDifference
+        }
+        return a.name.localeCompare(b.name)
+      })
+  }, [staffList, staffSearch])
 
   const inputClass =
     'h-12 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 text-sm text-ink placeholder:text-ghost transition-colors focus:border-[#66B159] focus:outline-none focus:ring-1 focus:ring-[#66B159]/40'
@@ -798,21 +853,28 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           <button
             type="button"
             onFocus={() => setIsProfileOpen(true)}
+            onClick={() => setIsProfileOpen((open) => !open)}
+            aria-label="Open profile menu"
+            aria-haspopup="menu"
+            aria-expanded={isProfileOpen}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-sub transition-colors hover:bg-zinc-700 hover:text-ink"
           >
             <User className="h-5 w-5" />
           </button>
           {isProfileOpen && (
-            <div className="surface absolute right-0 top-12 w-64 rounded-lg p-4 shadow-2xl">
-              <p className="mb-3 truncate text-sm text-ink">{user.email}</p>
-              <button
-                type="button"
-                onClick={logout}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sub transition-colors hover:bg-zinc-800 hover:text-ink"
-              >
-                <LogOut className="h-4 w-4" aria-hidden="true" />
-                Logout
-              </button>
+            <div className="absolute right-0 top-10 w-64 pt-2" role="menu">
+              <div className="surface rounded-lg p-4 shadow-2xl">
+                <p className="mb-3 truncate text-sm text-ink">{user.email}</p>
+                <button
+                  type="button"
+                  onClick={logout}
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-sub transition-colors hover:bg-zinc-800 hover:text-ink"
+                >
+                  <LogOut className="h-4 w-4" aria-hidden="true" />
+                  Logout
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1070,6 +1132,16 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         </form>
                       ) : (
                         <div className="surface rounded-lg">
+                          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 p-4 sm:px-6">
+                            <div>
+                              <p className="font-semibold text-ink">Employees</p>
+                              <p className="mt-1 text-xs text-sub">{visibleStaffList.length} of {staffList.length} shown</p>
+                            </div>
+                            <label className="relative block">
+                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" />
+                              <input value={staffSearch} onChange={(event) => setStaffSearch(event.target.value)} className="h-11 w-72 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employees" aria-label="Search employees" />
+                            </label>
+                          </div>
                           <div className="overflow-x-auto">
                             <table className="w-full text-sm">
                               <thead className="border-b border-zinc-700 text-left">
@@ -1088,8 +1160,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                       <Loader2 className="mx-auto h-6 w-6 animate-spin" />
                                     </td>
                                   </tr>
+                                ) : visibleStaffList.length === 0 ? (
+                                  <tr><td colSpan={5} className="px-6 py-10 text-center text-sub">No matching employees.</td></tr>
                                 ) : (
-                                  staffList.map((staff) => (
+                                  visibleStaffList.map((staff) => (
                                     <tr key={staff.id} className="border-b border-zinc-800 last:border-none">
                                       <td className="px-6 py-4">
                                         <p className="font-medium text-ink">{staff.name}</p>
@@ -1123,7 +1197,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       )}
                     </div>
                   ),
-                  properties: <PropertiesPanel properties={propertyList} loading={loading} onChange={setPropertyList} />,
+                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} />,
                   timesheets: (
                     <div className="surface rounded-lg">
                       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
@@ -1375,29 +1449,40 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <label htmlFor="currentPassword" className="label-upper mb-2 block text-ghost">
                         Current password
                       </label>
-                      <input
-                        id="currentPassword"
-                        type="password"
-                        value={currentPassword}
-                        onChange={(event) => setCurrentPassword(event.target.value)}
-                        className={inputClass}
-                        placeholder="Temporary password"
-                        required
-                      />
+                      <div className="relative">
+                        <input
+                          id="currentPassword"
+                          type={showCurrentPassword ? 'text' : 'password'}
+                          value={currentPassword}
+                          onChange={(event) => setCurrentPassword(event.target.value)}
+                          className={`${inputClass} pr-12`}
+                          placeholder="Temporary password"
+                          required
+                        />
+                        <button type="button" onClick={() => setShowCurrentPassword((visible) => !visible)} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ghost transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}>
+                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                     <div>
                       <label htmlFor="newPassword" className="label-upper mb-2 block text-ghost">
                         New password
                       </label>
-                      <input
-                        id="newPassword"
-                        type="password"
-                        value={newPassword}
-                        onChange={(event) => setNewPassword(event.target.value)}
-                        className={inputClass}
-                        placeholder="At least 12 characters"
-                        required
-                      />
+                      <div className="relative">
+                        <input
+                          id="newPassword"
+                          type={showNewPassword ? 'text' : 'password'}
+                          value={newPassword}
+                          onChange={(event) => setNewPassword(event.target.value)}
+                          className={`${inputClass} pr-12`}
+                          placeholder="At least 8 characters"
+                          minLength={8}
+                          required
+                        />
+                        <button type="button" onClick={() => setShowNewPassword((visible) => !visible)} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ghost transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}>
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
                   </div>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -1413,7 +1498,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <div>
                       <label htmlFor="emergencyContactName" className="label-upper mb-2 block text-ghost">Emergency contact name</label>
-                      <input id="emergencyContactName" value={emergencyContactName} onChange={(event) => setEmergencyContactName(event.target.value)} className={inputClass} placeholder="Name of emergency contact" required />
+                      <input id="emergencyContactName" value={emergencyContactName} onChange={(event) => setEmergencyContactName(event.target.value.replace(/\d/g, ''))} className={inputClass} placeholder="Name of emergency contact" required />
                     </div>
                     <div>
                       <label htmlFor="emergencyContactPhone" className="label-upper mb-2 block text-ghost">Emergency contact phone</label>
@@ -1422,7 +1507,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   </div>
                   <div className="mt-4">
                     <label htmlFor="profileDetails" className="label-upper mb-2 block text-ghost">Additional details</label>
-                    <textarea id="profileDetails" rows={3} value={profileDetails} onChange={(event) => setProfileDetails(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} placeholder="Emergency contact, role details, or other relevant information" required />
+                    <textarea id="profileDetails" rows={3} value={profileDetails} onChange={(event) => setProfileDetails(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} placeholder="Optional role details or other relevant information" />
                   </div>
 
                   {message && <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p>}
@@ -1465,7 +1550,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       </div>
                     </div>
                   ),
-                  properties: <PropertiesPanel properties={propertyList} loading={loading} onChange={setPropertyList} readOnly />,
+                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} readOnly />,
                   expenses: (
                     <div className="staff-workspace space-y-6 text-left">
                       <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitExpense}>
@@ -1566,27 +1651,40 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitTimesheet}>
                         <div className="mb-6">
                           <p className="text-lg font-semibold text-ink">Submit Timesheet</p>
-                          <p className="mt-1 text-sm text-sub">Select a Sunday-to-Saturday week, then mark the days you worked.</p>
+                          <p className="mt-1 text-sm text-sub">Select your work week, then choose the days you worked.</p>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div>
                             <label htmlFor="timesheetWorkDate" className="label-upper mb-2 block text-ghost">
                               Week starts (Sunday)
                             </label>
-                            <input id="timesheetWorkDate" type="date" value={timesheetWorkDate} onChange={(event) => { setTimesheetWorkDate(event.target.value); setTimesheetWorkedDates([]) }} className={inputClass} required />
+                            <DatePickerInput id="timesheetWorkDate" value={timesheetWorkDate} onChange={(value) => {
+                              setTimesheetWorkDate(value)
+                              setTimesheetWorkedDates([])
+                              const start = new Date(`${value}T00:00:00`)
+                              if (value && !Number.isNaN(start.getTime()) && start.getDay() === 0) {
+                                start.setDate(start.getDate() + 6)
+                                const year = start.getFullYear()
+                                const month = String(start.getMonth() + 1).padStart(2, '0')
+                                const day = String(start.getDate()).padStart(2, '0')
+                                setTimesheetWeekEnd(`${year}-${month}-${day}`)
+                              } else {
+                                setTimesheetWeekEnd('')
+                              }
+                            }} className={inputClass} required />
                           </div>
                           <div>
                             <label htmlFor="timesheetWeekEnd" className="label-upper mb-2 block text-ghost">Week ends (Saturday)</label>
-                            <input id="timesheetWeekEnd" type="date" value={timesheetWeekEnd} onChange={(event) => setTimesheetWeekEnd(event.target.value)} className={inputClass} required />
+                            <DatePickerInput id="timesheetWeekEnd" value={timesheetWeekEnd} onChange={setTimesheetWeekEnd} className={inputClass} min={timesheetWorkDate || undefined} required />
                           </div>
                           <div>
                             <label htmlFor="timesheetLocation" className="label-upper mb-2 block text-ghost">Work location</label>
                             <select id="timesheetLocation" value={timesheetLocation} onChange={(event) => setTimesheetLocation(event.target.value as 'remote' | 'office')} className={inputClass}><option value="remote">Remote</option><option value="office">Office</option></select>
                           </div>
                         </div>
-                        <fieldset className="mt-5">
+                        {timesheetWorkDate ? <fieldset className="mt-5">
                           <legend className="label-upper mb-3 block text-ghost">Days worked</legend>
-                          {!timesheetWorkDate ? <p className="text-sm text-sub">Choose the Sunday your work week starts to select dates.</p> : new Date(`${timesheetWorkDate}T00:00:00`).getDay() !== 0 ? <p className="text-sm text-red-600">Please choose a Sunday as the week start.</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                          {new Date(`${timesheetWorkDate}T00:00:00`).getDay() !== 0 ? <p className="text-sm text-red-600">Please choose a Sunday as the week start.</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
                             {weekDays.map((day) => {
                               const selected = timesheetWorkedDates.includes(day.value)
                               return <label key={day.value} className={`cursor-pointer rounded-lg border px-3 py-3 text-center transition-colors ${selected ? 'border-[#66B159] bg-[#66B159]/15 text-[#36722f]' : 'border-zinc-200 bg-white text-ink hover:border-[#66B159]/60'}`}>
@@ -1595,7 +1693,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                               </label>
                             })}
                           </div>}
-                        </fieldset>
+                        </fieldset> : null}
                         <div className="mt-4">
                           <label htmlFor="timesheetNotes" className="label-upper mb-2 block text-ghost">
                             Notes (optional)
@@ -1662,7 +1760,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   ),
                   leaves: (
                     <div className="staff-workspace space-y-6 text-left">
-                      <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}><p className="text-lg font-semibold text-ink">Request Leave</p><div className="mt-5 grid gap-4 sm:grid-cols-2"><div><label className="label-upper mb-2 block text-ghost">Start date</label><input type="date" value={leaveStartDate} onChange={(event) => setLeaveStartDate(event.target.value)} className={inputClass} required /></div><div><label className="label-upper mb-2 block text-ghost">End date</label><input type="date" value={leaveEndDate} onChange={(event) => setLeaveEndDate(event.target.value)} className={inputClass} required /></div></div><div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div><button type="submit" className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white">Submit leave request</button></form>
+                      <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}><p className="text-lg font-semibold text-ink">Request Leave</p><div className="mt-5 grid gap-4 sm:grid-cols-2"><div><label className="label-upper mb-2 block text-ghost">Start date</label><DatePickerInput value={leaveStartDate} onChange={setLeaveStartDate} className={inputClass} required /></div><div><label className="label-upper mb-2 block text-ghost">End date</label><DatePickerInput value={leaveEndDate} onChange={setLeaveEndDate} className={inputClass} min={leaveStartDate || undefined} required /></div></div><div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div><button type="submit" className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white">Submit leave request</button></form>
                       <div className="staff-work-card rounded-lg"><div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">My Leave Requests</p></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800"><td className="px-6 py-4 text-ink">{leave.startDate} to {leave.endDate}</td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td></tr>)}</tbody></table></div></div>
                     </div>
                   ),

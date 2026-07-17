@@ -2,6 +2,7 @@ import { getApps, initializeApp, cert } from 'firebase-admin/app'
 import { getFirestore, Timestamp, FieldValue, DocumentSnapshot, Query } from 'firebase-admin/firestore'
 import crypto from 'crypto'
 import 'server-only'
+import type { OnboardingDetailsInput, OnboardingRecord, OnboardingPlatformProgress, OtaPlatform } from './onboarding'
 
 export type StaffRecord = {
   id: string
@@ -126,6 +127,7 @@ const COLLECTIONS = {
   ADMINS: 'admins',
   STAFF: 'staff',
   PROPERTIES: 'properties',
+  OTA_ONBOARDINGS: 'ota_onboardings',
   EXPENSES: 'expenses',
   EXPENSE_RECEIPTS: 'expense_receipts',
   TIMESHEETS: 'timesheets',
@@ -225,6 +227,36 @@ function mapDocToProperty(doc: DocumentSnapshot): PropertyRecord {
     status: data.status === 'active' && typeof data.signedContractUrl === 'string' && data.signedContractUrl ? 'active' : data.status === 'inactive' ? 'inactive' : 'pending',
     signedContractUrl: typeof data.signedContractUrl === 'string' ? data.signedContractUrl : '',
     notes: typeof data.notes === 'string' ? data.notes : '',
+    createdAt: mapTimestamp(data.createdAt),
+    updatedAt: mapTimestamp(data.updatedAt),
+  }
+}
+
+function mapDocToOnboarding(doc: DocumentSnapshot): OnboardingRecord {
+  const data = doc.data() || {}
+  const platforms = Array.isArray(data.platforms)
+    ? data.platforms.flatMap((item: unknown) => {
+        if (!item || typeof item !== 'object') return []
+        const progress = item as Record<string, unknown>
+        if (typeof progress.platform !== 'string') return []
+        return [{
+          platform: progress.platform as OtaPlatform,
+          status: progress.status === 'live' ? 'live' as const : 'pending' as const,
+          notes: typeof progress.notes === 'string' ? progress.notes : '',
+        }]
+      })
+    : []
+
+  return {
+    id: doc.id,
+    propertyName: typeof data.propertyName === 'string' ? data.propertyName : '',
+    clientName: typeof data.clientName === 'string' ? data.clientName : '',
+    propertyAddress: typeof data.propertyAddress === 'string' ? data.propertyAddress : '',
+    emailAddress: typeof data.emailAddress === 'string' ? data.emailAddress : '',
+    phone: typeof data.phone === 'string' ? data.phone : '',
+    ratePerPlatform: typeof data.ratePerPlatform === 'number' ? data.ratePerPlatform : 0,
+    invoiceNotes: typeof data.invoiceNotes === 'string' ? data.invoiceNotes : '',
+    platforms,
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
@@ -567,6 +599,86 @@ export async function listProperties(): Promise<PropertyRecord[]> {
   const db = ensureDb()
   const snapshot = await db.collection(COLLECTIONS.PROPERTIES).get()
   return snapshot.docs.map(mapDocToProperty)
+}
+
+export async function listOnboardings(): Promise<OnboardingRecord[]> {
+  const db = ensureDb()
+  const snapshot = await db.collection(COLLECTIONS.OTA_ONBOARDINGS).get()
+  return snapshot.docs.map(mapDocToOnboarding)
+}
+
+export async function createOnboarding(input: OnboardingDetailsInput): Promise<OnboardingRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(createDocumentId())
+  const platforms: OnboardingPlatformProgress[] = input.platforms.map((platform) => ({ platform, status: 'pending', notes: '' }))
+  await docRef.set({ ...input, platforms, createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
+  return mapDocToOnboarding(await docRef.get())
+}
+
+export async function updateOnboardingDetails(id: string, input: OnboardingDetailsInput): Promise<OnboardingRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
+    const existing = mapDocToOnboarding(snapshot)
+    const existingPlatforms = new Map(existing.platforms.map((progress) => [progress.platform, progress]))
+    const platforms = input.platforms.map((platform) => existingPlatforms.get(platform) || { platform, status: 'pending' as const, notes: '' })
+    transaction.update(docRef, { ...input, platforms, updatedAt: FieldValue.serverTimestamp() })
+  })
+
+  return mapDocToOnboarding(await docRef.get())
+}
+
+export async function updateOnboardingPlatform(id: string, input: OnboardingPlatformProgress): Promise<OnboardingRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
+    const record = mapDocToOnboarding(snapshot)
+    const index = record.platforms.findIndex((item) => item.platform === input.platform)
+    if (index === -1) throw new Error('ONBOARDING_PLATFORM_NOT_FOUND')
+    const platforms = [...record.platforms]
+    platforms[index] = input
+    transaction.update(docRef, { platforms, updatedAt: FieldValue.serverTimestamp() })
+  })
+
+  return mapDocToOnboarding(await docRef.get())
+}
+
+export async function deleteOnboarding(id: string): Promise<void> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
+  const snapshot = await docRef.get()
+  if (!snapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
+  await docRef.delete()
+}
+
+export async function getOrCreateOnboardingInvoiceSequence(id: string): Promise<number> {
+  const db = ensureDb()
+  const onboardingRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
+  const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('ota-invoice-sequence')
+
+  return db.runTransaction(async (transaction) => {
+    const onboardingSnapshot = await transaction.get(onboardingRef)
+    if (!onboardingSnapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
+
+    const existingSequence = onboardingSnapshot.data()?.invoiceSequence
+    if (Number.isInteger(existingSequence) && existingSequence > 0) return existingSequence as number
+
+    const counterSnapshot = await transaction.get(counterRef)
+    const lastSequence = counterSnapshot.exists && Number.isInteger(counterSnapshot.data()?.lastSequence)
+      ? counterSnapshot.data()!.lastSequence as number
+      : 0
+    const nextSequence = lastSequence + 1
+
+    transaction.set(counterRef, { lastSequence: nextSequence, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
+    transaction.update(onboardingRef, { invoiceSequence: nextSequence, updatedAt: FieldValue.serverTimestamp() })
+    return nextSequence
+  })
 }
 
 export async function getPropertyById(id: string): Promise<PropertyRecord | null> {

@@ -51,8 +51,9 @@ export async function PATCH(request: Request) {
     emergencyContactPhone: typeof input.emergencyContactPhone === 'string' ? input.emergencyContactPhone.trim() : '',
   }
 
-  if (!/^[0-9]{7,15}$/.test(profileInput.phone) || !/^[0-9]{7,15}$/.test(profileInput.emergencyContactPhone) || !profileInput.address || profileInput.address.length > 500 || !profileInput.details || profileInput.details.length > 2000 || !profileInput.emergencyContactName || profileInput.emergencyContactName.length > 100) {
-    return NextResponse.json({ message: 'Enter valid contact, emergency contact, address, and details fields.' }, { status: 400 })
+  if (/\d/.test(profileInput.emergencyContactName)) return NextResponse.json({ message: 'Emergency contact name cannot contain digits.' }, { status: 400 })
+  if (!/^[0-9]{7,15}$/.test(profileInput.phone) || !/^[0-9]{7,15}$/.test(profileInput.emergencyContactPhone) || !profileInput.address || profileInput.address.length > 500 || profileInput.details.length > 2000 || !profileInput.emergencyContactName || profileInput.emergencyContactName.length > 100) {
+    return NextResponse.json({ message: 'Enter valid contact, emergency contact, and address fields. Phone numbers must contain digits only.' }, { status: 400 })
   }
 
   const profile = await updateStaffProfile(staff.id, {

@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   }
 
   const security = await getSecuritySettings()
-  const passwordError = getPasswordValidationMessage(newPassword, security)
+  const passwordError = getPasswordValidationMessage(newPassword, { ...security, minPasswordLength: 8 })
   if (passwordError) return NextResponse.json({ message: passwordError }, { status: 400 })
 
   const profile = {
@@ -45,8 +45,9 @@ export async function POST(request: Request) {
 
   let updatedStaff: Awaited<ReturnType<typeof updateStaffPassword>>
   if (staff.mustChangePassword) {
-    if (!/^[0-9]{7,15}$/.test(profile.phone) || !/^[0-9]{7,15}$/.test(profile.emergencyContactPhone) || !profile.address || profile.address.length > 500 || !profile.details || profile.details.length > 2000 || !profile.emergencyContactName || profile.emergencyContactName.length > 100) {
-      return NextResponse.json({ message: 'Complete your contact, emergency contact, address, and details fields.' }, { status: 400 })
+    if (/\d/.test(profile.emergencyContactName)) return NextResponse.json({ message: 'Emergency contact name cannot contain digits.' }, { status: 400 })
+    if (!/^[0-9]{7,15}$/.test(profile.phone) || !/^[0-9]{7,15}$/.test(profile.emergencyContactPhone) || !profile.address || profile.address.length > 500 || profile.details.length > 2000 || !profile.emergencyContactName || profile.emergencyContactName.length > 100) {
+      return NextResponse.json({ message: 'Complete your contact, emergency contact, and address fields with valid phone numbers containing digits only.' }, { status: 400 })
     }
     updatedStaff = await completeStaffOnboarding(staff.id, { passwordHash: await hashPassword(newPassword), ...profile })
   } else {
