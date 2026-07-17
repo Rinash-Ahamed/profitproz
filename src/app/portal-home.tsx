@@ -1116,7 +1116,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             </div>
                             <div>
                               <label htmlFor="staffPersonalEmail" className="label-upper mb-2 block text-ghost">Personal email</label>
-                              <input id="staffPersonalEmail" type="email" autoComplete="email" value={staffPersonalEmail} onChange={(e) => setStaffPersonalEmail(e.target.value)} className={inputClass} placeholder="employee@example.com" required />
+                              <input id="staffPersonalEmail" type="email" autoComplete="email" value={staffPersonalEmail} onChange={(e) => setStaffPersonalEmail(e.target.value)} className={inputClass} required />
                             </div>
                             <div>
                               <label htmlFor="staffEmployeeId" className="label-upper mb-2 block text-ghost">
@@ -1134,7 +1134,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                               <label htmlFor="staffRole" className="label-upper mb-2 block text-ghost">
                                 Role
                               </label>
-                              <input id="staffRole" value={staffRole} onChange={(e) => setStaffRole(e.target.value)} className={inputClass} placeholder="e.g., Revenue Manager" required />
+                              <input id="staffRole" value={staffRole} onChange={(e) => setStaffRole(e.target.value)} className={inputClass} required />
                             </div>
                           </div>
 
@@ -1922,11 +1922,9 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
         // remains crisp when viewed at 100% or printed.
         const canvas = await html2canvas(pages[index], { scale: 4, useCORS: true, backgroundColor: '#ffffff', logging: false })
         if (index > 0) pdf.addPage('a4', 'portrait')
-        const ratio = canvas.width / canvas.height
-        let width = pageWidth
-        let height = width / ratio
-        if (height > pageHeight) { height = pageHeight; width = height * ratio }
-        pdf.addImage(canvas.toDataURL('image/jpeg', 1), 'JPEG', (pageWidth - width) / 2, (pageHeight - height) / 2, width, height, undefined, 'NONE')
+        // Every offer section is exactly A4. Exact origin placement prevents a
+        // fractional vertical shift, and PNG preserves crisp text baselines.
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST')
       }
       pdf.save(`ProfitPro_Offer_Letter_${staff.employeeId || staff.name.replace(/\s+/g, '_')}.pdf`)
     } catch (caught) {
@@ -2049,7 +2047,7 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
               </div>
               <div>
                 <label htmlFor="edit-staffPersonalEmail" className="label-upper mb-2 block text-ghost">Personal email</label>
-                <input id="edit-staffPersonalEmail" type="email" autoComplete="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} className={inputClass} placeholder="employee@example.com" required />
+                <input id="edit-staffPersonalEmail" type="email" autoComplete="email" value={personalEmail} onChange={(e) => setPersonalEmail(e.target.value)} className={inputClass} required />
               </div>
               <div>
                 <label htmlFor="edit-staffEmployeeId" className="label-upper mb-2 block text-ghost">Employee ID</label>
@@ -2061,7 +2059,7 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
               </div>
               <div>
                 <label htmlFor="edit-staffRole" className="label-upper mb-2 block text-ghost">Role</label>
-                <input id="edit-staffRole" value={role} onChange={(e) => setRole(e.target.value)} className={inputClass} placeholder="e.g., Revenue Manager" required />
+                <input id="edit-staffRole" value={role} onChange={(e) => setRole(e.target.value)} className={inputClass} required />
               </div>
               <div>
                 <label htmlFor="edit-staffAnnualCtc" className="label-upper mb-2 block text-ghost">Annual CTC</label>

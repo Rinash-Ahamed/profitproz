@@ -263,18 +263,9 @@ function InvoiceModal({ record, onClose }: { record: OnboardingRecord; onClose: 
       const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true })
       const pageWidth = pdf.internal.pageSize.getWidth()
       const pageHeight = pdf.internal.pageSize.getHeight()
-      const canvasRatio = canvas.width / canvas.height
-      let renderWidth = pageWidth
-      let renderHeight = renderWidth / canvasRatio
-
-      if (renderHeight > pageHeight) {
-        renderHeight = pageHeight
-        renderWidth = renderHeight * canvasRatio
-      }
-
-      const offsetX = (pageWidth - renderWidth) / 2
-      const offsetY = (pageHeight - renderHeight) / 2
-      pdf.addImage(canvas.toDataURL('image/jpeg', 1), 'JPEG', offsetX, offsetY, renderWidth, renderHeight, undefined, 'NONE')
+      // The template is exactly A4. Placing it at the exact page origin avoids
+      // fractional centering offsets, while PNG keeps small text edges lossless.
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST')
       pdf.save(`${invoiceNumber}.pdf`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to download invoice PDF.')
