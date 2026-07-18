@@ -4,6 +4,7 @@ import { hashPassword } from '@/lib/auth'
 import { createStaffAccount, listStaffAccounts, listStaffAccountsPage, logAdminAction, toPublicStaff } from '@/lib/firestore'
 import { readPagination } from '@/lib/pagination'
 import { requireAdminSession as requireAdmin } from '@/lib/api-auth'
+import { isStaffDepartment, isStaffRole } from '@/lib/staff-options'
 
 function createTemporaryPassword() {
   return crypto.randomBytes(24).toString('base64url')
@@ -69,6 +70,9 @@ export async function POST(request: Request) {
 
   if (!first || first.length > 80 || !last || last.length > 80 || !staffEmployeeId || staffEmployeeId.length > 50 || !staffDepartment || staffDepartment.length > 100 || !staffRole || staffRole.length > 100) {
     return NextResponse.json({ message: 'First name, last name, employee ID, department, and role are required.' }, { status: 400 })
+  }
+  if (!isStaffDepartment(staffDepartment) || !isStaffRole(staffRole)) {
+    return NextResponse.json({ message: 'Select a valid department and role.' }, { status: 400 })
   }
 
   if (!staffPersonalEmail || staffPersonalEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffPersonalEmail)) {

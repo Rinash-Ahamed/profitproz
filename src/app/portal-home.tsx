@@ -16,6 +16,7 @@ import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
 import { LEAVE_ALLOWANCES, leaveTypeLabel, type LeaveType } from '@/lib/leave'
 import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
+import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
 
 type PortalHomeProps = {
   user: SessionUser
@@ -1238,13 +1239,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                               <label htmlFor="staffDepartment" className="label-upper mb-2 block text-ghost">
                                 Department
                               </label>
-                              <input id="staffDepartment" value={staffDepartment} onChange={(e) => setStaffDepartment(e.target.value)} className={inputClass} required />
+                              <select id="staffDepartment" value={staffDepartment} onChange={(e) => setStaffDepartment(e.target.value)} className={inputClass} required><option value="" disabled>Select department</option>{STAFF_DEPARTMENTS.map((department) => <option key={department} value={department}>{department}</option>)}</select>
                             </div>
                             <div>
                               <label htmlFor="staffRole" className="label-upper mb-2 block text-ghost">
                                 Role
                               </label>
-                              <input id="staffRole" value={staffRole} onChange={(e) => setStaffRole(e.target.value)} className={inputClass} required />
+                              <select id="staffRole" value={staffRole} onChange={(e) => setStaffRole(e.target.value)} className={inputClass} required><option value="" disabled>Select role</option>{STAFF_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}</select>
                             </div>
                           </div>
 
@@ -1992,7 +1993,7 @@ function getOfferRoleContent(roleValue: string, departmentValue: string) {
     summary: 'In this role, you will support business growth through professional telecalling, lead qualification, consistent prospect follow-ups, and accurate coordination with the sales team. You will represent ProfitPro clearly and courteously while introducing our services to potential hotel clients.',
     responsibilities: ['Make outbound telecalls to prospective hotel owners, managers, and other qualified leads.', 'Introduce ProfitPro services clearly, understand prospect requirements, and qualify sales opportunities.', 'Schedule appointments or product discussions for the business development team and share complete lead context.', 'Follow up with interested prospects through approved calling and messaging channels within agreed timelines.', 'Maintain accurate call logs, lead status, notes, and next actions in the designated CRM or tracker.', 'Work toward assigned calling, lead-generation, appointment, and conversion targets while submitting regular performance reports.', 'Support OTA onboarding by collecting required property details and documents, coordinating platform setup, tracking pending actions, and helping selected OTA listings go live.'],
   }
-  if (/business development|sales|bdm/.test(`${role} ${department}`)) return {
+  if (/business development|business developement|sales|bdm/.test(`${role} ${department}`)) return {
     summary: 'In this role, you will report to the Head of Business Development and/or the Managing Director. Your primary responsibility is to promote and expand our hotel revenue management services by identifying business opportunities, conducting lead-generation activities, building strong client relationships, and driving sustainable revenue growth.',
     responsibilities: ['Identify and acquire new hotel clients.', "Present, promote, and market ProfitPro's hotel revenue management solutions.", 'Develop and maintain long-term relationships with hotel owners and management teams.', 'Work toward monthly and quarterly sales targets while monitoring market and competitor activity.', 'Coordinate with revenue management and operations teams to ensure smooth client onboarding.'],
   }
@@ -2213,11 +2214,11 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
               </div>
               <div>
                 <label htmlFor="edit-staffDepartment" className="label-upper mb-2 block text-ghost">Department</label>
-                <input id="edit-staffDepartment" value={department} onChange={(e) => setDepartment(e.target.value)} className={inputClass} required />
+                <select id="edit-staffDepartment" value={department} onChange={(e) => setDepartment(e.target.value)} className={inputClass} required>{department && !(STAFF_DEPARTMENTS as readonly string[]).includes(department) ? <option value={department}>{department} (existing)</option> : null}{STAFF_DEPARTMENTS.map((option) => <option key={option} value={option}>{option}</option>)}</select>
               </div>
               <div>
                 <label htmlFor="edit-staffRole" className="label-upper mb-2 block text-ghost">Role</label>
-                <input id="edit-staffRole" value={role} onChange={(e) => setRole(e.target.value)} className={inputClass} required />
+                <select id="edit-staffRole" value={role} onChange={(e) => setRole(e.target.value)} className={inputClass} required>{role && !(STAFF_ROLES as readonly string[]).includes(role) ? <option value={role}>{role} (existing)</option> : null}{STAFF_ROLES.map((option) => <option key={option} value={option}>{option}</option>)}</select>
               </div>
               <div>
                 <label htmlFor="edit-staffAnnualCtc" className="label-upper mb-2 block text-ghost">Annual CTC</label>
