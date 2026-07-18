@@ -15,6 +15,14 @@ export function formatDateOnly(date: Date) {
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
 }
 
+export function todayLocalDateOnly(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+export function formatDateOnlyDisplay(value: string) {
+  return parseDateOnly(value) ? value.split('-').reverse().join('-') : ''
+}
+
 export function addDateOnlyDays(value: string, days: number) {
   const date = parseDateOnly(value)
   if (!date) return ''

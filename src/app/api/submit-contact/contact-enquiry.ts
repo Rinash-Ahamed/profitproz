@@ -1,3 +1,5 @@
+import { escapeHtml } from '@/lib/html'
+
 type EnquiryData = {
   name: string
   email?: string
@@ -6,15 +8,6 @@ type EnquiryData = {
   rooms?: string
   service: string
   message?: string
-}
-
-function escapeHtml(value: unknown) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
 }
 
 export function getContactEnquiryHtml({ name, email, phone, hotel, rooms, service, message }: EnquiryData): string {

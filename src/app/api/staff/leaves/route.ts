@@ -1,20 +1,19 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { createLeaveRequest, listLeaveRequests, listLeaveRequestsPage } from '@/lib/firestore'
 import { readPagination } from '@/lib/pagination'
 import { countDateOnlyDaysInclusive } from '@/lib/date-only'
 import { LEAVE_ALLOWANCES, type LeaveType } from '@/lib/leave'
+import { requireStaffSession } from '@/lib/api-auth'
 
 export async function GET(request: Request) {
-  const cookieStore = await cookies(); const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
+  const user = await requireStaffSession()
   if (!user || user.role !== 'staff') return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
   const pagination = readPagination(request)
   if (pagination) { const page = await listLeaveRequestsPage(pagination, user.email); return NextResponse.json({ leaves: page.items, nextCursor: page.nextCursor }) }
   return NextResponse.json({ leaves: await listLeaveRequests(user.email) })
 }
 export async function POST(request: Request) {
-  const cookieStore = await cookies(); const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
+  const user = await requireStaffSession()
   if (!user || user.role !== 'staff') return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
   let body: { startDate?: unknown; endDate?: unknown; leaveType?: unknown; reason?: unknown }
   try { body = await request.json() } catch { return NextResponse.json({ message: 'Invalid leave request.' }, { status: 400 }) }

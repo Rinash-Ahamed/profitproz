@@ -6,12 +6,16 @@ import { Building2, Download, Edit, FileText, Loader2, Plus, Search, Trash2, X }
 import type { PropertyInput, PropertyRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
+import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
+import { escapeHtml } from '@/lib/html'
+import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 
 type PropertiesPanelProps = {
   properties: PropertyRecord[]
   loading: boolean
   onChange: (properties: PropertyRecord[]) => void
   readOnly?: boolean
+  editorOnly?: boolean
 }
 
 const emptyProperty: PropertyInput = {
@@ -31,7 +35,7 @@ const emptyProperty: PropertyInput = {
   notes: '',
 }
 
-export function PropertiesPanel({ properties, loading, onChange, readOnly = false }: PropertiesPanelProps) {
+export function PropertiesPanel({ properties, loading, onChange, readOnly = false, editorOnly = false }: PropertiesPanelProps) {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<PropertyRecord | null>(null)
   const [contractProperty, setContractProperty] = useState<PropertyRecord | null>(null)
@@ -99,25 +103,25 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
                 <th className="px-6 py-4 font-medium text-sub">Commission</th>
                 <th className="px-6 py-4 font-medium text-sub">Contract</th>
                 <th className="px-6 py-4 font-medium text-sub">Status</th>
-                {!readOnly ? <th className="px-6 py-4 font-medium text-sub">Agreement</th> : null}
+                {!readOnly && !editorOnly ? <th className="px-6 py-4 font-medium text-sub">Agreement</th> : null}
                 {!readOnly ? <th className="px-6 py-4 font-medium text-sub">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={readOnly ? 6 : 8} className="py-12 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
+                <tr><td colSpan={readOnly ? 6 : editorOnly ? 7 : 8} className="py-12 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
               ) : visibleProperties.length === 0 ? (
-                <tr><td colSpan={readOnly ? 6 : 8} className="px-6 py-12 text-center"><Building2 className="mx-auto h-8 w-8 text-zinc-600" /><p className="mt-3 font-medium text-ink">{search ? 'No matching properties' : 'No client properties yet'}</p>{!readOnly && !search ? <p className="mt-1 text-sm text-sub">Add your first property to start the client register.</p> : null}</td></tr>
+                <tr><td colSpan={readOnly ? 6 : editorOnly ? 7 : 8} className="px-6 py-12 text-center"><Building2 className="mx-auto h-8 w-8 text-zinc-600" /><p className="mt-3 font-medium text-ink">{search ? 'No matching properties' : 'No client properties yet'}</p>{!readOnly && !search ? <p className="mt-1 text-sm text-sub">Add your first property to start the client register.</p> : null}</td></tr>
               ) : visibleProperties.map((property) => (
                 <tr key={property.id} className="border-b border-zinc-800 last:border-none">
                   <td className="px-6 py-4"><p className="font-medium text-ink">{property.name}</p><p className="mt-1 text-xs capitalize text-sub">{property.propertyType.replace('-', ' ')} · {property.city}{property.address ? ` · ${property.address}` : ''}</p>{property.notes ? <p className="mt-2 max-w-72 whitespace-pre-wrap text-xs text-sub">{property.notes}</p> : null}</td>
                   <td className="px-6 py-4"><p className="text-ink">{property.contactName || 'Not provided'}</p>{property.contactEmail ? <p className="mt-1 text-xs text-sub">{property.contactEmail}</p> : null}{property.contactPhone ? <p className="mt-1 text-xs text-sub">{property.contactPhone}</p> : null}{!property.contactEmail && !property.contactPhone ? <p className="mt-1 text-xs text-sub">No contact details</p> : null}</td>
                   <td className="px-6 py-4 text-sub">{property.roomCount.toLocaleString('en-IN')}</td>
                   <td className="px-6 py-4 font-semibold text-[#66B159]">{property.commissionPercent}%</td>
-                  <td className="px-6 py-4 text-sub"><p>{property.contractStartDate ? new Date(`${property.contractStartDate}T00:00:00`).toLocaleDateString('en-IN') : 'Not set'}</p>{!readOnly && property.signedContractUrl ? <a href={property.signedContractUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View signed contract</a> : null}</td>
+                  <td className="px-6 py-4 text-sub"><p>{property.contractStartDate ? new Date(`${property.contractStartDate}T00:00:00`).toLocaleDateString('en-IN') : 'Not set'}</p>{!readOnly && !editorOnly && property.signedContractUrl ? <a href={property.signedContractUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View signed contract</a> : null}</td>
                   <td className="px-6 py-4"><PropertyStatusBadge status={property.status} /></td>
-                  {!readOnly ? <td className="px-6 py-4">{property.signedContractUrl ? <span className="text-xs text-ghost">Signed</span> : <button type="button" onClick={() => setContractProperty(property)} className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-[#66B159]/30 bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"><FileText className="h-4 w-4" /> Contract PDF</button>}</td> : null}
-                  {!readOnly ? <td className="px-6 py-4"><div className="flex gap-2">{property.status === 'active' ? <button type="button" onClick={() => setInvoiceProperty(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159]" aria-label={`Generate revenue invoice for ${property.name}`} title="Generate revenue invoice"><FileText className="h-4 w-4" /></button> : null}<button type="button" onClick={() => setEditing(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label={`Edit ${property.name}`}><Edit className="h-4 w-4" /></button><button type="button" disabled={deletingId === property.id} onClick={() => deleteRecord(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete ${property.name}`}>{deletingId === property.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button></div></td> : null}
+                  {!readOnly && !editorOnly ? <td className="px-6 py-4">{property.signedContractUrl ? <span className="text-xs text-ghost">Signed</span> : <button type="button" onClick={() => setContractProperty(property)} className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-[#66B159]/30 bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20" aria-label={`Generate contract PDF for ${property.name}`} title="Generate contract PDF"><FileText className="h-4 w-4" /> Contract PDF</button>}</td> : null}
+                  {!readOnly ? <td className="px-6 py-4"><div className="flex gap-2">{!editorOnly && property.status === 'active' ? <button type="button" onClick={() => setInvoiceProperty(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159]" aria-label={`Generate revenue invoice for ${property.name}`} title="Generate revenue invoice"><FileText className="h-4 w-4" /></button> : null}<button type="button" onClick={() => setEditing(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label={`Edit ${property.name}`} title="Edit property"><Edit className="h-4 w-4" /></button>{!editorOnly ? <button type="button" disabled={deletingId === property.id} onClick={() => deleteRecord(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete ${property.name}`} title="Delete property">{deletingId === property.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button> : null}</div></td> : null}
                 </tr>
               ))}
             </tbody>
@@ -125,8 +129,8 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
         </div>
       </div>
 
-      {showCreate ? <PropertyModal title="Add Client Property" initial={emptyProperty} onClose={() => setShowCreate(false)} onSaved={(property) => { onChange([...properties, property].sort((a, b) => a.name.localeCompare(b.name))); setShowCreate(false); setContractProperty(property) }} /> : null}
-      {editing ? <PropertyModal title="Edit Client Property" initial={editing} propertyId={editing.id} onClose={() => setEditing(null)} onSaved={(property) => { onChange(properties.map((item) => item.id === property.id ? property : item).sort((a, b) => a.name.localeCompare(b.name))); setEditing(null) }} /> : null}
+      {showCreate ? <PropertyModal title="Add Client Property" initial={emptyProperty} editorOnly={editorOnly} onClose={() => setShowCreate(false)} onSaved={(property) => { onChange([...properties, property].sort((a, b) => a.name.localeCompare(b.name))); setShowCreate(false); if (!editorOnly) setContractProperty(property) }} /> : null}
+      {editing ? <PropertyModal title="Edit Client Property" initial={editing} propertyId={editing.id} editorOnly={editorOnly} onClose={() => setEditing(null)} onSaved={(property) => { onChange(properties.map((item) => item.id === property.id ? property : item).sort((a, b) => a.name.localeCompare(b.name))); setEditing(null) }} /> : null}
       {contractProperty ? <ContractPreviewModal property={contractProperty} onClose={() => setContractProperty(null)} /> : null}
       {invoiceProperty ? <RevenueInvoiceModal property={invoiceProperty} onClose={() => setInvoiceProperty(null)} /> : null}
     </div>
@@ -135,14 +139,10 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
 
 type InvoiceSettings = { accountName: string; bankName: string; accountNumber: string; ifscCode: string; upiVpa: string; upiNumber: string; companyAddress: string }
 const emptyInvoiceSettings: InvoiceSettings = { accountName: '', bankName: '', accountNumber: '', ifscCode: '', upiVpa: '', upiNumber: '', companyAddress: '' }
-const localDate = () => { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}` }
-const displayDate = (value: string) => value.split('-').reverse().join('-')
-const escapeTemplateValue = (value: string | number) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
-
 function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; onClose: () => void }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [invoiceDate, setInvoiceDate] = useState(localDate())
-  const [dueDate, setDueDate] = useState(localDate())
+  const [invoiceDate, setInvoiceDate] = useState(todayLocalDateOnly())
+  const [dueDate, setDueDate] = useState(todayLocalDateOnly())
   const [billingPeriod, setBillingPeriod] = useState('')
   const [managedRevenue, setManagedRevenue] = useState('')
   const [notes, setNotes] = useState('Revenue management services provided for the stated billing period.')
@@ -172,7 +172,7 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
   const rendered = useMemo(() => {
     if (!template) return ''
     const values: Record<string, string | number> = {
-      invoice_number: invoiceNumber, invoice_date: displayDate(invoiceDate), due_date: displayDate(dueDate),
+      invoice_number: invoiceNumber, invoice_date: formatDateOnlyDisplay(invoiceDate), due_date: formatDateOnlyDisplay(dueDate),
       billing_period: billingPeriod, client_name: property.contactName || property.name, property_name: property.name,
       property_address: [property.address, property.city].filter(Boolean).join(', '), email_address: property.contactEmail,
       phone: property.contactPhone, managed_revenue: Number(managedRevenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }),
@@ -181,7 +181,7 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
       account_name: settings.accountName, bank_name: settings.bankName, account_number: settings.accountNumber,
       ifsc_code: settings.ifscCode, upi_vpa: settings.upiVpa, upi_number: settings.upiNumber, company_address: settings.companyAddress,
     }
-    return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeTemplateValue(value)), template)
+    return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeHtml(value)), template)
   }, [billingPeriod, dueDate, invoiceDate, invoiceNumber, managedRevenue, notes, property, settings, subtotal, template])
 
   async function downloadPdf() {
@@ -200,13 +200,12 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
       }
       const page = iframeRef.current?.contentDocument?.querySelector('.invoice-page') as HTMLElement | null
       if (!page) throw new Error('Revenue invoice preview is not ready.')
-      await iframeRef.current?.contentDocument?.fonts?.ready
+      await waitForPdfAssets(page)
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
-      const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 8
-      const canvas = await html2canvas(page, { scale: memory <= 4 ? 3 : 4, useCORS: true, backgroundColor: '#ffffff', logging: false })
+      const canvas = await html2canvas(page, { scale: getPdfRenderScale(), useCORS: true, backgroundColor: '#ffffff', logging: false })
       const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true })
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight(), undefined, 'FAST')
-      canvas.width = 1; canvas.height = 1
+      releasePdfCanvas(canvas)
       const issuedInvoiceNumber = `PP-RMS-${month}-${year.slice(-2)}-${String(issuedSequence).padStart(3, '0')}`
       pdf.save(`${issuedInvoiceNumber}.pdf`)
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Failed to download revenue invoice.') } finally { setDownloading(false) }
@@ -216,8 +215,8 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
   return createPortal(<div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Generate revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {sequence ? invoiceNumber : 'Number assigned on download'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Billing period</span><input value={billingPeriod} onChange={(event) => setBillingPeriod(event.target.value)} maxLength={80} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="border-b border-zinc-800 p-5"><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} /></label>{error ? <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}</div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
 }
 
-function PropertyModal({ title, initial, propertyId, onClose, onSaved }: { title: string; initial: PropertyInput; propertyId?: string; onClose: () => void; onSaved: (property: PropertyRecord) => void }) {
-  const [form, setForm] = useState<PropertyInput>({ ...initial })
+function PropertyModal({ title, initial, propertyId, editorOnly = false, onClose, onSaved }: { title: string; initial: PropertyInput; propertyId?: string; editorOnly?: boolean; onClose: () => void; onSaved: (property: PropertyRecord) => void }) {
+  const [form, setForm] = useState<PropertyInput>({ ...emptyProperty, ...initial })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const inputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none focus:ring-1 focus:ring-[#66B159]/40'
@@ -231,7 +230,7 @@ function PropertyModal({ title, initial, propertyId, onClose, onSaved }: { title
       const response = await fetch(propertyId ? `/api/admin/properties/${encodeURIComponent(propertyId)}` : '/api/admin/properties', {
         method: propertyId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(editorOnly ? Object.fromEntries(Object.entries(form).filter(([field]) => !['gstNumber', 'signedContractUrl', 'status'].includes(field))) : form),
       })
       const data = await response.json() as { property?: PropertyRecord; message?: string }
       if (!response.ok || !data.property) throw new Error(data.message || 'Failed to save property.')
@@ -255,12 +254,12 @@ function PropertyModal({ title, initial, propertyId, onClose, onSaved }: { title
             <Field label="Contact person"><input value={form.contactName} onChange={(e) => update('contactName', e.target.value)} maxLength={100} className={inputClass} /></Field>
             <Field label="Contact email"><input type="email" value={form.contactEmail} onChange={(e) => update('contactEmail', e.target.value)} maxLength={254} className={inputClass} /></Field>
             <Field label="Contact phone"><input type="tel" value={form.contactPhone} onChange={(e) => update('contactPhone', e.target.value)} maxLength={20} className={inputClass} placeholder="+91 98765 43210" /></Field>
-            <Field label="GSTIN (if applicable)"><input value={form.gstNumber} onChange={(e) => update('gstNumber', e.target.value.toUpperCase())} minLength={15} maxLength={15} className={inputClass} placeholder="22AAAAA0000A1Z5" /></Field>
+            {!editorOnly ? <Field label="GSTIN (if applicable)"><input value={form.gstNumber} onChange={(e) => update('gstNumber', e.target.value.toUpperCase())} minLength={15} maxLength={15} className={inputClass} placeholder="22AAAAA0000A1Z5" /></Field> : null}
             <Field label="Number of rooms *"><input type="number" min="0" max="100000" step="1" value={form.roomCount} onChange={(e) => update('roomCount', Number(e.target.value))} className={inputClass} required /></Field>
             <Field label="Revenue commission % *"><input type="number" min="0" max="100" step="0.01" value={form.commissionPercent} onChange={(e) => update('commissionPercent', Number(e.target.value))} className={inputClass} required /></Field>
             <Field label="Contract start date"><DatePickerInput value={form.contractStartDate} onChange={(value) => update('contractStartDate', value)} className={inputClass} /></Field>
-            <Field label="Signed contract link"><input type="url" inputMode="url" value={form.signedContractUrl} onChange={(e) => update('signedContractUrl', e.target.value)} maxLength={2048} className={inputClass} placeholder="https://..." /><span className="mt-1 block text-xs text-sub">Required before changing the status to Active.</span></Field>
-            <Field label="Status"><select value={form.status} onChange={(e) => update('status', e.target.value as PropertyInput['status'])} className={inputClass}><option value="pending">Pending</option><option value="active">Active</option><option value="inactive">Inactive</option></select></Field>
+            {!editorOnly ? <Field label="Signed contract link"><input type="url" inputMode="url" value={form.signedContractUrl} onChange={(e) => update('signedContractUrl', e.target.value)} maxLength={2048} className={inputClass} placeholder="https://..." /><span className="mt-1 block text-xs text-sub">Required before changing the status to Active.</span></Field> : null}
+            {!editorOnly ? <Field label="Status"><select value={form.status} onChange={(e) => update('status', e.target.value as PropertyInput['status'])} className={inputClass}><option value="pending">Pending</option><option value="active">Active</option><option value="inactive">Inactive</option></select></Field> : null}
             <Field label="Address" wide><input value={form.address} onChange={(e) => update('address', e.target.value)} maxLength={500} className={inputClass} /></Field>
             <Field label="Notes" wide><textarea rows={3} value={form.notes} onChange={(e) => update('notes', e.target.value)} maxLength={2000} className={`${inputClass} h-auto resize-y py-3`} placeholder="Contract terms or other client details" /></Field>
           </div>
@@ -372,7 +371,7 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               {downloading ? 'Preparing PDF…' : 'Download PDF'}
             </button>
-            <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-lg text-sub hover:bg-zinc-800 hover:text-ink" aria-label="Close contract preview"><X className="h-5 w-5" /></button>
+            <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-lg text-sub hover:bg-zinc-800 hover:text-ink" aria-label="Close contract preview" title="Close preview"><X className="h-5 w-5" /></button>
           </div>
         </div>
 
@@ -385,11 +384,6 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
     </div>,
     document.body,
   )
-}
-
-function getPdfRenderScale() {
-  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 8
-  return memory <= 4 || window.innerWidth < 768 ? 3 : 4
 }
 
 function Field({ label, wide = false, children }: { label: string; wide?: boolean; children: React.ReactNode }) {

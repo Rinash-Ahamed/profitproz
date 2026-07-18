@@ -1,20 +1,13 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { deleteOnboarding, logAdminAction, updateOnboardingDetails, updateOnboardingPlatform } from '@/lib/firestore'
 import { parseOnboardingDetails, parseOnboardingProgress } from '@/lib/onboarding-validation'
+import { requireAdminSession as requireAdmin, requireClientServiceEditor } from '@/lib/api-auth'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value)
-  return user?.role === 'admin' ? user : null
-}
-
 export async function PATCH(request: Request, context: RouteContext) {
-  const user = await requireAdmin()
-  if (!user) return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
+  const user = await requireClientServiceEditor('otaOnboarding')
+  if (!user) return NextResponse.json({ message: 'OTA Onboarding edit access is required.' }, { status: 403 })
   const { id } = await context.params
   if (!id || id.length > 128) return NextResponse.json({ message: 'A valid onboarding ID is required.' }, { status: 400 })
 
@@ -26,6 +19,9 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const updatesDetails = Boolean(body && typeof body === 'object' && !Array.isArray(body) && (body as Record<string, unknown>).action === 'details')
+  if (user.role === 'staff' && updatesDetails) {
+    return NextResponse.json({ message: 'Employees can update platform status and notes only.' }, { status: 403 })
+  }
   const parsedDetails = updatesDetails ? parseOnboardingDetails(body) : null
   const parsedProgress = updatesDetails ? null : parseOnboardingProgress(body)
   const parsed = parsedDetails || parsedProgress
@@ -38,7 +34,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         actorEmail: user.email,
         action: 'ONBOARDING_DETAILS_UPDATE',
         targetId: id,
-        details: `Admin updated onboarding and invoice details for ${onboarding.propertyName}.`,
+        details: `${user.role === 'admin' ? 'Admin' : 'Employee'} updated onboarding details for ${onboarding.propertyName}.`,
       })
       return NextResponse.json({ onboarding })
     }
@@ -49,7 +45,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       actorEmail: user.email,
       action: 'ONBOARDING_PLATFORM_UPDATE',
       targetId: id,
-      details: `Admin marked ${parsedProgress.value.platform} as ${parsedProgress.value.status} for ${onboarding.propertyName}.`,
+      details: `${user.role === 'admin' ? 'Admin' : 'Employee'} marked ${parsedProgress.value.platform} as ${parsedProgress.value.status} for ${onboarding.propertyName}.`,
     })
     return NextResponse.json({ onboarding })
   } catch (error) {

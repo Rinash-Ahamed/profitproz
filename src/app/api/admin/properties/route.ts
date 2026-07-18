@@ -1,15 +1,8 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { createProperty, listProperties, listPropertiesPage, logAdminAction, type PropertyInput } from '@/lib/firestore'
 import { parsePropertyPayload } from '@/lib/property-validation'
 import { readPagination } from '@/lib/pagination'
-
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
-  return user?.role === 'admin' ? user : null
-}
+import { requireAdminSession as requireAdmin, requireClientServiceEditor } from '@/lib/api-auth'
 
 export async function GET(request: Request) {
   const user = await requireAdmin()
@@ -32,8 +25,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireAdmin()
-  if (!user) return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
+  const user = await requireClientServiceEditor('revenueManagement')
+  if (!user) return NextResponse.json({ message: 'Revenue Management access is required.' }, { status: 403 })
 
   let body: unknown
   try {
@@ -54,7 +47,7 @@ export async function POST(request: Request) {
       actorEmail: user.email,
       action: 'PROPERTY_CREATE',
       targetId: property.id,
-      details: `Admin created client property: ${property.name}.`,
+      details: `${user.role === 'admin' ? 'Admin' : 'Employee'} created client property: ${property.name}.`,
     })
     return NextResponse.json({ property }, { status: 201 })
   } catch (error) {

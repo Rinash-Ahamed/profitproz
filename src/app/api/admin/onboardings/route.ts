@@ -1,15 +1,8 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { createOnboarding, listOnboardings, listOnboardingsPage, logAdminAction } from '@/lib/firestore'
 import { parseOnboardingDetails } from '@/lib/onboarding-validation'
 import { readPagination } from '@/lib/pagination'
-
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value)
-  return user?.role === 'admin' ? user : null
-}
+import { requireAdminSession as requireAdmin, requireClientServiceEditor } from '@/lib/api-auth'
 
 export async function GET(request: Request) {
   const user = await requireAdmin()
@@ -32,8 +25,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireAdmin()
-  if (!user) return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
+  const user = await requireClientServiceEditor('otaOnboarding')
+  if (!user) return NextResponse.json({ message: 'OTA Onboarding access is required.' }, { status: 403 })
 
   let body: unknown
   try {
@@ -51,7 +44,7 @@ export async function POST(request: Request) {
       actorEmail: user.email,
       action: 'ONBOARDING_CREATE',
       targetId: onboarding.id,
-      details: `Admin created OTA onboarding for ${onboarding.propertyName}.`,
+      details: `${user.role === 'admin' ? 'Admin' : 'Employee'} created OTA onboarding for ${onboarding.propertyName}.`,
     })
     return NextResponse.json({ onboarding }, { status: 201 })
   } catch (error) {

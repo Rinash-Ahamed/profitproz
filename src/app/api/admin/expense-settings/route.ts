@@ -1,13 +1,6 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { getExpenseFieldSettings, logAdminAction, saveExpenseFieldSettings } from '@/lib/firestore'
-
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
-  return user?.role === 'admin' ? user : null
-}
+import { requireAdminSession as requireAdmin } from '@/lib/api-auth'
 
 export async function GET() {
   if (!await requireAdmin()) return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })

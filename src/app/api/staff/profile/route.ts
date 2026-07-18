@@ -1,7 +1,6 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { getStaffByEmail, toPublicStaff, updateStaffProfile } from '@/lib/firestore'
+import { requireStaffSession } from '@/lib/api-auth'
 
 function toEmployeeFacingProfile(staff: Parameters<typeof toPublicStaff>[0]) {
   const { employeeId: _employeeId, ...profile } = toPublicStaff(staff)
@@ -9,8 +8,7 @@ function toEmployeeFacingProfile(staff: Parameters<typeof toPublicStaff>[0]) {
 }
 
 export async function GET() {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
+  const user = await requireStaffSession()
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Staff access is required.' }, { status: 403 })
@@ -26,8 +24,7 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
+  const user = await requireStaffSession()
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Staff access is required.' }, { status: 403 })
