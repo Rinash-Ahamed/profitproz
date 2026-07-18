@@ -1,11 +1,10 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, createSessionToken, getPasswordValidationMessage, hashPassword, verifyPassword, verifyActiveSessionToken } from '@/lib/auth'
+import { authConfig, createSessionToken, getPasswordValidationMessage, hashPassword, verifyPassword } from '@/lib/auth'
 import { completeStaffOnboarding, getSecuritySettings, getStaffByEmail, updateStaffPassword } from '@/lib/firestore'
+import { requireStaffSession } from '@/lib/api-auth'
 
 export async function POST(request: Request) {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff', allowMustChangePassword: true })
+  const user = await requireStaffSession({ allowMustChangePassword: true })
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Staff access is required.' }, { status: 403 })

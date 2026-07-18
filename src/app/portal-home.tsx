@@ -10,9 +10,13 @@ import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
 import { ClientServicesPanel } from '@/app/client-services-panel'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
-import { addDateOnlyDays, countDateOnlyDaysInclusive, dateOnlyDay, formatDateOnlyForLocale } from '@/lib/date-only'
+import { LeaveDateSummary } from '@/components/ui/LeaveDateSummary'
+import { addDateOnlyDays, countDateOnlyDaysInclusive, dateOnlyDay, formatDateOnlyDisplay, formatDateOnlyForLocale, todayLocalDateOnly } from '@/lib/date-only'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
 import { LEAVE_ALLOWANCES, leaveTypeLabel, type LeaveType } from '@/lib/leave'
+import { escapeHtml } from '@/lib/html'
+import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
+import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
 
 type PortalHomeProps = {
   user: SessionUser
@@ -43,6 +47,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffDepartment, setStaffDepartment] = useState('')
   const [staffRole, setStaffRole] = useState('')
   const [staffCtc, setStaffCtc] = useState('')
+  const [staffRevenueAccess, setStaffRevenueAccess] = useState(false)
+  const [staffOnboardingAccess, setStaffOnboardingAccess] = useState(false)
   // Staff list state
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
   const [staffSearch, setStaffSearch] = useState('')
@@ -67,6 +73,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [leaveEndDate, setLeaveEndDate] = useState('')
   const [leaveType, setLeaveType] = useState<LeaveType>('sick')
   const [leaveReason, setLeaveReason] = useState('')
+  const [deletingLeaveId, setDeletingLeaveId] = useState('')
   const requestedLeaveDays = countDateOnlyDaysInclusive(leaveStartDate, leaveEndDate)
   const selectedLeaveYear = leaveStartDate.slice(0, 4) || String(new Date().getFullYear())
   const usedLeaveDays = leaveList.reduce((total, leave) => {
@@ -77,9 +84,14 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const exceedsLeaveBalance = requestedLeaveDays > remainingLeaveDays
   const [expenseCity, setExpenseCity] = useState('')
   const [expenseType, setExpenseType] = useState<'travel' | 'food' | 'fuel' | 'other'>('travel')
+  const [customExpenseType, setCustomExpenseType] = useState('')
   const [expenseAmount, setExpenseAmount] = useState('')
   const [expenseNotes, setExpenseNotes] = useState('')
   const [expenseReceiptUrl, setExpenseReceiptUrl] = useState('')
+  const [expenseDate, setExpenseDate] = useState(todayLocalDateOnly())
+  const [deletingExpenseId, setDeletingExpenseId] = useState('')
+  const [adminExpenseName, setAdminExpenseName] = useState('')
+  const [expenseTrackingView, setExpenseTrackingView] = useState<'staff' | 'admin'>('staff')
   const [expenseSettings, setExpenseSettings] = useState<ExpenseFieldSettings>({ cityRequired: true, descriptionRequired: true, receiptRequired: true })
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false })
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
@@ -174,9 +186,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
     if (activeTab === 'timesheets') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/timesheets'), fetch('/api/admin/staff')])
+      Promise.all([fetch('/api/admin/timesheets'), fetch('/api/admin/staff'), fetch('/api/admin/leaves')])
         .then(async (responses) => {
-          const [timesheetRes, staffRes] = responses
+          const [timesheetRes, staffRes, leaveRes] = responses
           const timesheetData = await timesheetRes.json()
           if (timesheetData.timesheets) {
             setTimesheetList(timesheetData.timesheets)
@@ -185,6 +197,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           if (staffData.staff) {
             setStaffList(staffData.staff)
           }
+          const leaveData = await leaveRes.json()
+          if (leaveData.leaves) setLeaveList(leaveData.leaves)
         })
         .catch(() => setError('Could not load data for this view.'))
         .finally(() => setLoading(false))
@@ -256,12 +270,11 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
     if (activeTab === 'timesheets') {
       setLoading(true)
-      fetch('/api/staff/timesheets')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.timesheets) {
-            setTimesheetList(data.timesheets)
-          }
+      Promise.all([fetch('/api/staff/timesheets'), fetch('/api/staff/leaves')])
+        .then(async ([timesheetRes, leaveRes]) => {
+          const [timesheetData, leaveData] = await Promise.all([timesheetRes.json(), leaveRes.json()])
+          if (timesheetData.timesheets) setTimesheetList(timesheetData.timesheets)
+          if (leaveData.leaves) setLeaveList(leaveData.leaves)
         })
         .catch(() => setError('Could not load your timesheets.'))
         .finally(() => setLoading(false))
@@ -286,6 +299,11 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   }, [activeTab, user.mustChangePassword, user.role])
 
+  useEffect(() => {
+    if (user.role !== 'staff') return
+    setTimesheetWorkedDates((current) => current.filter((date) => !isApprovedLeaveDate(leaveList, user.email, date)))
+  }, [leaveList, user.email, user.role])
+
   async function logout() {
     await fetch('/api/logout', { method: 'POST' })
     window.location.href = '/login'
@@ -301,7 +319,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       const response = await fetch('/api/admin/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName: staffFirstName, lastName: staffLastName, personalEmail: staffPersonalEmail, annualCtc: Number(staffCtc), employeeId: staffEmployeeId, department: staffDepartment, role: staffRole }),
+        body: JSON.stringify({ firstName: staffFirstName, lastName: staffLastName, personalEmail: staffPersonalEmail, annualCtc: Number(staffCtc), employeeId: staffEmployeeId, department: staffDepartment, role: staffRole, clientAccess: { revenueManagement: staffRevenueAccess, otaOnboarding: staffOnboardingAccess } }),
       })
       const data = (await response.json()) as { message?: string; initialPassword?: string; staff: PublicStaffRecord }
 
@@ -317,6 +335,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       setStaffDepartment('')
       setStaffRole('')
       setStaffCtc('')
+      setStaffRevenueAccess(false)
+      setStaffOnboardingAccess(false)
       setMessage('Employee added successfully.')
       if (data.initialPassword) {
         window.prompt('Copy this one-time temporary password and share it through a secure channel:', data.initialPassword)
@@ -483,10 +503,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     setError('')
 
     try {
-      const response = await fetch('/api/staff/expenses', {
+      const response = await fetch(user.role === 'admin' ? '/api/admin/expenses' : '/api/staff/expenses', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ city: expenseCity, expenseType, description: expenseNotes, amount: Number(expenseAmount), receiptUrl: expenseReceiptUrl }),
+        body: JSON.stringify({ city: expenseCity, expenseType, customExpenseType: expenseType === 'other' ? customExpenseType : '', description: expenseNotes, amount: Number(expenseAmount), receiptUrl: expenseReceiptUrl, expenseDate, ...(user.role === 'admin' ? { adminName: adminExpenseName } : {}) }),
       })
       const data = (await response.json()) as { message?: string; expense?: ExpenseRecord }
 
@@ -497,14 +517,51 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
       setExpenseCity('')
       setExpenseAmount('')
+      setCustomExpenseType('')
       setExpenseNotes('')
       setExpenseReceiptUrl('')
+      setExpenseDate(todayLocalDateOnly())
+      if (user.role === 'admin') setAdminExpenseName('')
       setExpenseList((prev) => [data.expense!, ...prev])
-      setMessage('Expense submitted for admin approval.')
+      setMessage(user.role === 'admin' ? 'Expense recorded successfully.' : 'Expense submitted for admin approval.')
     } catch {
       setError('Unable to submit expense right now.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function withdrawExpense(expense: ExpenseRecord) {
+    if (expense.status !== 'pending' || !window.confirm('Withdraw this Pending expense?')) return
+    setDeletingExpenseId(expense.id)
+    setError('')
+    try {
+      const response = await fetch(`/api/staff/expenses/${encodeURIComponent(expense.id)}`, { method: 'DELETE' })
+      const data = await response.json() as { message?: string }
+      if (!response.ok) throw new Error(data.message || 'Unable to withdraw expense.')
+      setExpenseList((current) => current.filter((item) => item.id !== expense.id))
+      setMessage('Expense withdrawn.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to withdraw expense.')
+    } finally {
+      setDeletingExpenseId('')
+    }
+  }
+
+  async function withdrawAdminExpense(expense: ExpenseRecord) {
+    if (expense.submittedByRole !== 'admin' || expense.staffEmail.toLowerCase() !== user.email.toLowerCase() || !window.confirm('Withdraw this Admin expense?')) return
+    setDeletingExpenseId(expense.id)
+    setError('')
+    try {
+      const response = await fetch(`/api/admin/expenses/${encodeURIComponent(expense.id)}`, { method: 'DELETE' })
+      const data = await response.json() as { message?: string }
+      if (!response.ok) throw new Error(data.message || 'Unable to withdraw Admin expense.')
+      setExpenseList((current) => current.filter((item) => item.id !== expense.id))
+      setMessage('Admin expense withdrawn.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to withdraw Admin expense.')
+    } finally {
+      setDeletingExpenseId('')
     }
   }
 
@@ -557,6 +614,23 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     const data = await response.json() as { leave?: LeaveRequestRecord; message?: string }
     if (!response.ok || !data.leave) { setError(data.message || 'Unable to update leave request.'); return }
     setLeaveList((current) => current.map((leave) => leave.id === id ? data.leave! : leave))
+  }
+
+  async function withdrawLeaveRequest(leave: LeaveRequestRecord) {
+    if (leave.status !== 'pending' || !window.confirm('Withdraw this Pending leave request?')) return
+    setDeletingLeaveId(leave.id)
+    setError('')
+    try {
+      const response = await fetch(`/api/staff/leaves/${encodeURIComponent(leave.id)}`, { method: 'DELETE' })
+      const data = await response.json() as { message?: string }
+      if (!response.ok) throw new Error(data.message || 'Unable to withdraw leave request.')
+      setLeaveList((current) => current.filter((item) => item.id !== leave.id))
+      setMessage('Leave request withdrawn.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to withdraw leave request.')
+    } finally {
+      setDeletingLeaveId('')
+    }
   }
 
   async function clearAuditLogs() {
@@ -667,6 +741,31 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     URL.revokeObjectURL(url)
   }
 
+  function handleExportExpenses() {
+    const exportExpenses = expenseList.filter((expense) => expenseTrackingView === 'admin' ? expense.submittedByRole === 'admin' : expense.submittedByRole !== 'admin')
+    if (exportExpenses.length === 0) {
+      setError('No expense data is available to export.')
+      return
+    }
+    const csvValue = (value: unknown) => {
+      const text = String(value ?? '')
+      const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text
+      return `"${safeText.replaceAll('"', '""')}"`
+    }
+    const rows = exportExpenses.map((expense) => [expense.expenseDate, expense.staffName || expense.staffEmail, expense.staffEmail, expense.submittedByRole || 'staff', expense.expenseType === 'other' ? expense.customExpenseType || 'Other' : expense.expenseType, expense.city, expense.description, expense.amount, expense.status, expense.receiptUrl || ''].map(csvValue).join(','))
+    // The separator directive makes Excel use comma-delimited columns even on
+    // Windows installations whose regional list separator is semicolon.
+    const csv = ['sep=,', 'Expense Date,Submitted By,Email,Source,Type,City,Description,Amount,Status,Receipt Link', ...rows].join('\r\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${expenseTrackingView}-expense-report-${todayLocalDateOnly()}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setLoading(true)
@@ -774,6 +873,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   const pendingTimesheets = timesheetList.filter((timesheet) => timesheet.status === 'pending')
   const pendingExpenses = expenseList.filter((expense) => expense.status === 'pending')
+  const visibleTrackedExpenses = expenseList.filter((expense) => expenseTrackingView === 'admin' ? expense.submittedByRole === 'admin' : expense.submittedByRole !== 'admin')
   const approvedExpenseTotal = expenseList
     .filter((expense) => expense.status === 'approved')
     .reduce((total, expense) => total + expense.amount, 0)
@@ -1139,13 +1239,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                               <label htmlFor="staffDepartment" className="label-upper mb-2 block text-ghost">
                                 Department
                               </label>
-                              <input id="staffDepartment" value={staffDepartment} onChange={(e) => setStaffDepartment(e.target.value)} className={inputClass} required />
+                              <select id="staffDepartment" value={staffDepartment} onChange={(e) => setStaffDepartment(e.target.value)} className={inputClass} required><option value="" disabled>Select department</option>{STAFF_DEPARTMENTS.map((department) => <option key={department} value={department}>{department}</option>)}</select>
                             </div>
                             <div>
                               <label htmlFor="staffRole" className="label-upper mb-2 block text-ghost">
                                 Role
                               </label>
-                              <input id="staffRole" value={staffRole} onChange={(e) => setStaffRole(e.target.value)} className={inputClass} required />
+                              <select id="staffRole" value={staffRole} onChange={(e) => setStaffRole(e.target.value)} className={inputClass} required><option value="" disabled>Select role</option>{STAFF_ROLES.map((role) => <option key={role} value={role}>{role}</option>)}</select>
                             </div>
                           </div>
 
@@ -1159,6 +1259,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                               <input id="staffMonthlySalary" value={calculatedMonthlySalary ? `Rs. ${calculatedMonthlySalary.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : ''} className={`${inputClass} cursor-not-allowed text-sub`} placeholder="CTC / 12" readOnly />
                             </div>
                           </div>
+
+                          <fieldset className="mt-4 rounded-lg border border-zinc-700 bg-zinc-950/30 p-4">
+                            <legend className="label-upper px-1 text-ghost">Client service access</legend>
+                            <p className="mb-3 text-xs text-sub">Select the client services this employee may create and update. Invoices, payments, contracts, and deletion remain Admin-only.</p>
+                            <div className="flex flex-wrap gap-5">
+                              <label className="flex cursor-pointer items-center gap-2 text-sm text-ink"><input type="checkbox" checked={staffRevenueAccess} onChange={(event) => setStaffRevenueAccess(event.target.checked)} className="h-4 w-4 accent-[#66B159]" /> Revenue Management</label>
+                              <label className="flex cursor-pointer items-center gap-2 text-sm text-ink"><input type="checkbox" checked={staffOnboardingAccess} onChange={(event) => setStaffOnboardingAccess(event.target.checked)} className="h-4 w-4 accent-[#66B159]" /> OTA Onboarding</label>
+                            </div>
+                          </fieldset>
 
                           {message && <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p>}
                           {error && <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
@@ -1222,6 +1331,11 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                        <td className="px-6 py-4 text-sub">
                                          <p>{staff.department || 'N/A'}</p>
                                          <p className="mt-1 text-xs text-ghost">{staff.role || 'Role not set'}</p>
+                                         <div className="mt-2 flex max-w-52 flex-wrap gap-1">
+                                           {staff.clientAccess?.revenueManagement ? <span className="rounded border border-[#66B159]/25 bg-[#66B159]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#66B159]">Revenue access</span> : null}
+                                           {staff.clientAccess?.otaOnboarding ? <span className="rounded border border-[#66B159]/25 bg-[#66B159]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#66B159]">Onboarding access</span> : null}
+                                           {!staff.clientAccess?.revenueManagement && !staff.clientAccess?.otaOnboarding ? <span className="text-[10px] text-ghost">Client view only</span> : null}
+                                         </div>
                                        </td>
                                       <td className="px-6 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${staff.active ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-amber-500/20 bg-amber-500/10 text-amber-400'}`}>{staff.active ? 'Active' : 'Pending'}</span></td>
                                       <td className="px-6 py-4">
@@ -1296,7 +1410,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                 <tr key={ts.id} className="border-b border-zinc-800 last:border-none">
                                   <td className="px-6 py-4 text-ink">{ts.staffEmail}</td>
                                   <td className="px-6 py-4 text-sub">{ts.weekStart || ts.workDate} to {ts.weekEnd || ts.workDate}</td>
-                                  <td className="px-6 py-4 text-sub">{ts.workedDates.length ? ts.workedDates.map((date) => new Date(`${date}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short' })).join(', ') : 'Not recorded'}</td>
+                                  <td className="px-6 py-4 text-sub"><TimesheetDaysSummary timesheet={ts} leaves={leaveList} /></td>
                                   <td className="px-6 py-4 text-sub">{ts.workLocation}</td>
                                   <td className="px-6 py-4"><StatusBadge status={ts.status} /></td>
                                   <td className="px-6 py-4">
@@ -1316,16 +1430,44 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     </div>
                   ),
                   expenses: (
-                    <div className="surface rounded-lg">
-                      <div className="border-b border-zinc-800 p-6">
-                        <p className="text-lg font-semibold text-ink">Expense Approvals</p>
-                        <p className="mt-1 text-sm text-sub">Review submitted employee expenses.</p>
-                      </div>
+                    <div className="space-y-6">
+                      <form className="surface rounded-lg p-6 sm:p-7" onSubmit={submitExpense}>
+                        <div className="mb-5">
+                          <p className="text-lg font-semibold text-ink">Record Admin Expense</p>
+                          <p className="mt-1 text-sm text-sub">Track company expenses directly. Admin entries are recorded as approved.</p>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          <div><label htmlFor="adminExpenseName" className="label-upper mb-2 block text-ghost">Admin name</label><input id="adminExpenseName" value={adminExpenseName} onChange={(event) => setAdminExpenseName(event.target.value.replace(/\d/g, ''))} maxLength={160} className={inputClass} required /></div>
+                          <div><label htmlFor="adminExpenseDate" className="label-upper mb-2 block text-ghost">Expense date</label><DatePickerInput id="adminExpenseDate" value={expenseDate} onChange={setExpenseDate} className={inputClass} required /></div>
+                          <div><label htmlFor="adminExpenseType" className="label-upper mb-2 block text-ghost">Expense type</label><select id="adminExpenseType" value={expenseType} onChange={(event) => { const value = event.target.value as typeof expenseType; setExpenseType(value); if (value !== 'other') setCustomExpenseType('') }} className={inputClass}><option value="travel">Travel</option><option value="food">Food</option><option value="fuel">Fuel</option><option value="other">Other</option></select></div>
+                          {expenseType === 'other' ? <div><label htmlFor="adminCustomExpenseType" className="label-upper mb-2 block text-ghost">Specify expense type</label><input id="adminCustomExpenseType" value={customExpenseType} onChange={(event) => setCustomExpenseType(event.target.value)} maxLength={100} className={inputClass} required /></div> : null}
+                          <div><label htmlFor="adminExpenseAmount" className="label-upper mb-2 block text-ghost">Amount</label><input id="adminExpenseAmount" type="number" inputMode="decimal" min="0.01" step="0.01" value={expenseAmount} onChange={(event) => setExpenseAmount(event.target.value)} className={inputClass} required /></div>
+                          <div><label htmlFor="adminExpenseCity" className="label-upper mb-2 block text-ghost">City</label><input id="adminExpenseCity" value={expenseCity} onChange={(event) => setExpenseCity(event.target.value)} maxLength={100} className={inputClass} /></div>
+                          <div><label htmlFor="adminExpenseReceipt" className="label-upper mb-2 block text-ghost">Receipt link (optional)</label><input id="adminExpenseReceipt" type="url" inputMode="url" value={expenseReceiptUrl} onChange={(event) => setExpenseReceiptUrl(event.target.value)} maxLength={2048} className={inputClass} placeholder="https://..." /></div>
+                        </div>
+                        <div className="mt-4"><label htmlFor="adminExpenseDescription" className="label-upper mb-2 block text-ghost">Description</label><textarea id="adminExpenseDescription" rows={2} value={expenseNotes} onChange={(event) => setExpenseNotes(event.target.value)} maxLength={2000} className={`${inputClass} h-auto resize-y py-3`} /></div>
+                        {message ? <p className="mt-4 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p> : null}
+                        {error ? <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+                        <button type="submit" disabled={loading} className="mt-5 flex h-11 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-5 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Record expense</button>
+                      </form>
+
+                      <div className="surface rounded-lg">
+                        <div className="border-b border-zinc-800 p-6">
+                          <div className="flex flex-wrap items-center justify-between gap-4">
+                            <div><p className="text-lg font-semibold text-ink">{expenseTrackingView === 'admin' ? 'Admin Expenses' : 'Staff Expense Approvals'}</p><p className="mt-1 text-sm text-sub">{expenseTrackingView === 'admin' ? 'Review expenses recorded directly by Admin users.' : 'Review and decide employee expense claims.'}</p></div>
+                            <button type="button" onClick={handleExportExpenses} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
+                          </div>
+                          <div className="mt-5 flex flex-wrap gap-2 rounded-lg border border-zinc-800 bg-zinc-950/30 p-1.5">
+                            <button type="button" onClick={() => setExpenseTrackingView('staff')} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'staff' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Staff Expenses</button>
+                            <button type="button" onClick={() => setExpenseTrackingView('admin')} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'admin' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Admin Expenses</button>
+                          </div>
+                        </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead className="border-b border-zinc-700 text-left">
                             <tr>
-                                  <th className="px-6 py-4 font-medium text-sub">Staff</th>
+                                  <th className="px-6 py-4 font-medium text-sub">{expenseTrackingView === 'admin' ? 'Recorded by' : 'Staff'}</th>
+                                  <th className="px-6 py-4 font-medium text-sub">Expense date</th>
                                   <th className="px-6 py-4 font-medium text-sub">Claim</th>
                               <th className="px-6 py-4 font-medium text-sub">Amount</th>
                               <th className="px-6 py-4 font-medium text-sub">Status</th>
@@ -1334,25 +1476,29 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           </thead>
                           <tbody>
                             {loading ? (
-                              <tr><td colSpan={5} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
-                            ) : expenseList.length === 0 ? (
-                              <tr><td colSpan={5} className="py-10 text-center text-sub">No expenses submitted yet.</td></tr>
+                              <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
+                            ) : visibleTrackedExpenses.length === 0 ? (
+                              <tr><td colSpan={6} className="py-10 text-center text-sub">{expenseTrackingView === 'admin' ? 'No Admin expenses recorded yet.' : 'No staff expenses submitted yet.'}</td></tr>
                             ) : (
-                              expenseList.map((expense) => (
+                              visibleTrackedExpenses.map((expense) => (
                                 <tr key={expense.id} className="border-b border-zinc-800 last:border-none">
                                   <td className="px-6 py-4">
                                     <p className="font-medium text-ink">{expense.staffName || expense.staffEmail}</p>
                                     <p className="text-xs text-sub">{expense.staffEmail}</p>
+                                    {expense.submittedByRole === 'admin' ? <span className="mt-1 inline-block rounded border border-[#66B159]/25 bg-[#66B159]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#66B159]">Admin expense</span> : null}
                                   </td>
+                                  <td className="whitespace-nowrap px-6 py-4 text-sub">{formatDateOnlyDisplay(expense.expenseDate) || 'Not recorded'}</td>
                                   <td className="px-6 py-4">
-                                    <p className="font-medium capitalize text-ink">{expense.expenseType || expense.title}</p>
+                                    <p className="font-medium capitalize text-ink">{expense.expenseType === 'other' ? expense.customExpenseType || 'Other' : expense.expenseType || expense.title}</p>
                                     <p className="mt-1 text-xs text-sub">{expense.city || 'No city'}{expense.description ? ` · ${expense.description}` : ''}</p>
                                     {expense.receiptUrl || expense.receiptDataUrl ? <a href={expense.receiptUrl || expense.receiptDataUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View receipt</a> : <p className="mt-1 text-xs text-sub">No receipt reference</p>}
                                   </td>
                                   <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
                                   <td className="px-6 py-4"><StatusBadge status={expense.status} /></td>
                                   <td className="px-6 py-4">
-                                    {expense.status === 'pending' ? (
+                                    {expense.submittedByRole === 'admin' && expense.staffEmail.toLowerCase() === user.email.toLowerCase() ? (
+                                      <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawAdminExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw Admin expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button>
+                                    ) : expense.status === 'pending' ? (
                                       <div className="flex items-center gap-2">
                                         <button type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'approved')} className="flex h-8 items-center gap-1.5 rounded-md bg-green-500/10 px-2.5 text-xs text-green-400 transition-colors hover:bg-green-500/20"><CheckCircle2 className="h-3.5 w-3.5" />Approve</button>
                                         <button type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'rejected')} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs text-red-400 transition-colors hover:bg-red-500/20"><XCircle className="h-3.5 w-3.5" />Reject</button>
@@ -1365,12 +1511,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           </tbody>
                         </table>
                       </div>
+                      </div>
                     </div>
                   ),
                   leaves: (
                     <div className="surface rounded-lg">
                       <div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">Leave Requests</p><p className="mt-1 text-sm text-sub">Review employee leave requests.</p></div>
-                      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="px-6 py-4 text-sub"><p>{leave.startDate} to {leave.endDate}</p><p className="mt-1 text-xs text-ghost">{leaveTypeLabel(leave.leaveType)} · {leave.durationDays} {leave.durationDays === 1 ? 'day' : 'days'}</p></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <div className="flex gap-2"><button onClick={() => updateLeaveStatus(leave.id, 'approved')} className="text-sm text-green-400">Approve</button><button onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="text-sm text-red-400">Reject</button></div> : null}</td></tr>)}</tbody></table></div>
+                      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="px-6 py-4 text-sub"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <div className="flex gap-2"><button onClick={() => updateLeaveStatus(leave.id, 'approved')} className="text-sm text-green-400">Approve</button><button onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="text-sm text-red-400">Reject</button></div> : null}</td></tr>)}</tbody></table></div>
                     </div>
                   ),
                   payroll: (
@@ -1596,7 +1743,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       </div>
                     </div>
                   ),
-                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} readOnly />,
+                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} readOnly revenueEditor={user.clientAccess?.revenueManagement === true} onboardingEditor={user.clientAccess?.otaOnboarding === true} />,
                   expenses: (
                     <div className="staff-workspace space-y-6 text-left">
                       <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitExpense}>
@@ -1606,6 +1753,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                           <div>
+                            <label htmlFor="expenseDate" className="label-upper mb-2 block text-ghost">Expense date</label>
+                            <DatePickerInput id="expenseDate" value={expenseDate} onChange={setExpenseDate} className={inputClass} required />
+                          </div>
+                          <div>
                             <label htmlFor="expenseCity" className="label-upper mb-2 block text-ghost">
                               City{expenseSettings.cityRequired ? ' *' : ''}
                             </label>
@@ -1613,10 +1764,11 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           </div>
                           <div>
                             <label htmlFor="expenseType" className="label-upper mb-2 block text-ghost">Expense type</label>
-                            <select id="expenseType" value={expenseType} onChange={(event) => setExpenseType(event.target.value as typeof expenseType)} className={inputClass}>
+                            <select id="expenseType" value={expenseType} onChange={(event) => { const value = event.target.value as typeof expenseType; setExpenseType(value); if (value !== 'other') setCustomExpenseType('') }} className={inputClass}>
                               <option value="travel">Travel</option><option value="food">Food</option><option value="fuel">Fuel</option><option value="other">Other</option>
                             </select>
                           </div>
+                          {expenseType === 'other' ? <div><label htmlFor="customExpenseType" className="label-upper mb-2 block text-ghost">Specify expense type</label><input id="customExpenseType" value={customExpenseType} onChange={(event) => setCustomExpenseType(event.target.value)} maxLength={100} className={inputClass} required /></div> : null}
                           <div>
                             <label htmlFor="expenseAmount" className="label-upper mb-2 block text-ghost">
                               Total expense
@@ -1665,24 +1817,28 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             <thead className="border-b border-zinc-700 text-left">
                               <tr>
                                 <th className="px-6 py-4 font-medium text-sub">Expense</th>
+                                <th className="px-6 py-4 font-medium text-sub">Expense date</th>
                                 <th className="px-6 py-4 font-medium text-sub">Amount</th>
                                 <th className="px-6 py-4 font-medium text-sub">Status</th>
+                                <th className="px-6 py-4 font-medium text-sub">Actions</th>
                               </tr>
                             </thead>
                             <tbody>
                               {loading ? (
-                                <tr><td colSpan={3} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
+                                <tr><td colSpan={5} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
                               ) : expenseList.length === 0 ? (
-                                <tr><td colSpan={3} className="py-10 text-center text-sub">No expenses submitted yet.</td></tr>
+                                <tr><td colSpan={5} className="py-10 text-center text-sub">No expenses submitted yet.</td></tr>
                               ) : (
                                 expenseList.map((expense) => (
                                   <tr key={expense.id} className="border-b border-zinc-800 last:border-none">
                                     <td className="px-6 py-4">
-                                      <p className="font-medium text-ink">{expense.expenseType}</p>
-                                      <p className="text-xs text-sub">{expense.city || 'No city'}{expense.receiptUrl ? ' · Receipt link added' : ''}</p>
+                                      <p className="font-medium text-ink">{expense.expenseType === 'other' ? expense.customExpenseType || 'Other' : expense.expenseType}</p>
+                                      <p className="text-xs text-sub">{expense.city || 'No city'}{expense.receiptName ? ' · Receipt submitted' : ''}</p>
                                     </td>
+                                    <td className="whitespace-nowrap px-6 py-4 text-sub">{formatDateOnlyDisplay(expense.expenseDate) || 'Not recorded'}</td>
                                     <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
                                     <td className="px-6 py-4"><StatusBadge status={expense.status} />{expense.decisionNote ? <p className="mt-1 max-w-48 text-xs text-sub">{expense.decisionNote}</p> : null}{expense.approvedAt || expense.rejectedAt ? <p className="mt-1 text-xs text-sub">{new Date(expense.approvedAt || expense.rejectedAt || '').toLocaleDateString('en-IN')}</p> : null}</td>
+                                    <td className="px-6 py-4">{expense.status === 'pending' ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : <span className="text-xs text-ghost">Locked</span>}</td>
                                   </tr>
                                 ))
                               )}
@@ -1728,9 +1884,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           {dateOnlyDay(timesheetWorkDate) !== 0 ? <p className="text-sm text-red-600">Please choose a Sunday as the week start.</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
                             {weekDays.map((day) => {
                               const selected = timesheetWorkedDates.includes(day.value)
-                              return <label key={day.value} className={`cursor-pointer rounded-lg border px-3 py-3 text-center transition-colors ${selected ? 'border-[#66B159] bg-[#66B159]/15 text-[#36722f]' : 'border-zinc-200 bg-white text-ink hover:border-[#66B159]/60'}`}>
-                                <input type="checkbox" checked={selected} onChange={() => setTimesheetWorkedDates((current) => selected ? current.filter((date) => date !== day.value) : [...current, day.value])} className="sr-only" />
-                                <span className="block text-xs font-semibold">{day.label}</span><span className="mt-1 block text-xs opacity-70">{day.day}</span>
+                              const leaveApproved = isApprovedLeaveDate(leaveList, user.email, day.value)
+                              return <label key={day.value} className={`rounded-lg border px-3 py-3 text-center transition-colors ${leaveApproved ? 'cursor-not-allowed border-amber-300 bg-amber-50 text-amber-800' : selected ? 'cursor-pointer border-[#66B159] bg-[#66B159]/15 text-[#36722f]' : 'cursor-pointer border-zinc-200 bg-white text-ink hover:border-[#66B159]/60'}`}>
+                                <input type="checkbox" checked={selected} disabled={leaveApproved} onChange={() => setTimesheetWorkedDates((current) => selected ? current.filter((date) => date !== day.value) : [...current, day.value])} className="sr-only" />
+                                <span className="block text-xs font-semibold">{day.label}</span><span className="mt-1 block text-xs opacity-70">{day.day}</span>{leaveApproved ? <span className="mt-1 block text-[10px] font-semibold">Leave approved</span> : null}
                               </label>
                             })}
                           </div>}
@@ -1787,7 +1944,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                       <p className="font-medium text-ink">{timesheet.weekStart || timesheet.workDate} to {timesheet.weekEnd || timesheet.workDate}</p>
                                       {timesheet.notes ? <p className="text-xs text-sub">{timesheet.notes}</p> : null}
                                     </td>
-                                    <td className="px-6 py-4 text-sub">{timesheet.workedDates.length ? timesheet.workedDates.map((date) => new Date(`${date}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short' })).join(', ') : 'Not recorded'}</td>
+                                    <td className="px-6 py-4 text-sub"><TimesheetDaysSummary timesheet={timesheet} leaves={leaveList} /></td>
                                     <td className="px-6 py-4 text-sub">{timesheet.workLocation}</td>
                                     <td className="px-6 py-4"><StatusBadge status={timesheet.status} />{timesheet.decisionNote ? <p className="mt-1 max-w-48 text-xs text-sub">{timesheet.decisionNote}</p> : null}{timesheet.approvedAt || timesheet.rejectedAt ? <p className="mt-1 text-xs text-sub">{new Date(timesheet.approvedAt || timesheet.rejectedAt || '').toLocaleDateString('en-IN')}</p> : null}</td>
                                   </tr>
@@ -1802,7 +1959,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   leaves: (
                     <div className="staff-workspace space-y-6 text-left">
                       <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}><p className="text-lg font-semibold text-ink">Request Leave</p><div className="mt-5 grid gap-4 sm:grid-cols-3"><div><label className="label-upper mb-2 block text-ghost">Leave type</label><select value={leaveType} onChange={(event) => setLeaveType(event.target.value as LeaveType)} className={inputClass}><option value="sick">Sick leave</option><option value="flexi">Flexi leave</option></select></div><div><label className="label-upper mb-2 block text-ghost">Start date</label><DatePickerInput value={leaveStartDate} onChange={setLeaveStartDate} className={inputClass} required /></div><div><label className="label-upper mb-2 block text-ghost">End date</label><DatePickerInput value={leaveEndDate} onChange={setLeaveEndDate} className={inputClass} min={leaveStartDate || undefined} required /></div></div><div className={`mt-3 rounded-lg border px-4 py-3 text-sm ${exceedsLeaveBalance ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-zinc-700 bg-zinc-900/60 text-sub'}`}><p>{leaveTypeLabel(leaveType)} allowance for {selectedLeaveYear}: {remainingLeaveDays} of {LEAVE_ALLOWANCES[leaveType]} days remaining.</p>{requestedLeaveDays > 0 ? <p className="mt-1 font-medium">Selected duration: {requestedLeaveDays} {requestedLeaveDays === 1 ? 'day' : 'days'}{exceedsLeaveBalance ? ' — exceeds available balance' : ''}</p> : null}</div><div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div><button type="submit" disabled={requestedLeaveDays < 1 || exceedsLeaveBalance} className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Submit leave request</button></form>
-                      <div className="staff-work-card rounded-lg"><div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">My Leave Requests</p></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800"><td className="px-6 py-4 text-ink"><p>{leave.startDate} to {leave.endDate}</p><p className="mt-1 text-xs text-ghost">{leaveTypeLabel(leave.leaveType)} · {leave.durationDays} {leave.durationDays === 1 ? 'day' : 'days'}</p></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td></tr>)}</tbody></table></div></div>
+                      <div className="staff-work-card rounded-lg"><div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">My Leave Requests</p></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800"><td className="px-6 py-4 text-ink"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <button type="button" disabled={deletingLeaveId === leave.id} onClick={() => withdrawLeaveRequest(leave)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw leave request">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : <span className="text-xs text-ghost">Locked</span>}</td></tr>)}</tbody></table></div></div>
                     </div>
                   ),
                 }[activeTab]}
@@ -1836,7 +1993,7 @@ function getOfferRoleContent(roleValue: string, departmentValue: string) {
     summary: 'In this role, you will support business growth through professional telecalling, lead qualification, consistent prospect follow-ups, and accurate coordination with the sales team. You will represent ProfitPro clearly and courteously while introducing our services to potential hotel clients.',
     responsibilities: ['Make outbound telecalls to prospective hotel owners, managers, and other qualified leads.', 'Introduce ProfitPro services clearly, understand prospect requirements, and qualify sales opportunities.', 'Schedule appointments or product discussions for the business development team and share complete lead context.', 'Follow up with interested prospects through approved calling and messaging channels within agreed timelines.', 'Maintain accurate call logs, lead status, notes, and next actions in the designated CRM or tracker.', 'Work toward assigned calling, lead-generation, appointment, and conversion targets while submitting regular performance reports.', 'Support OTA onboarding by collecting required property details and documents, coordinating platform setup, tracking pending actions, and helping selected OTA listings go live.'],
   }
-  if (/business development|sales|bdm/.test(`${role} ${department}`)) return {
+  if (/business development|business developement|sales|bdm/.test(`${role} ${department}`)) return {
     summary: 'In this role, you will report to the Head of Business Development and/or the Managing Director. Your primary responsibility is to promote and expand our hotel revenue management services by identifying business opportunities, conducting lead-generation activities, building strong client relationships, and driving sustainable revenue growth.',
     responsibilities: ['Identify and acquire new hotel clients.', "Present, promote, and market ProfitPro's hotel revenue management solutions.", 'Develop and maintain long-term relationships with hotel owners and management teams.', 'Work toward monthly and quarterly sales targets while monitoring market and competitor activity.', 'Coordinate with revenue management and operations teams to ensure smooth client onboarding.'],
   }
@@ -1859,8 +2016,7 @@ function getOfferRoleContent(roleValue: string, departmentValue: string) {
 }
 
 function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClose: () => void }) {
-  const today = new Date()
-  const initialDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const initialDate = todayLocalDateOnly()
   const [offerDate, setOfferDate] = useState(initialDate)
   const [joiningDate, setJoiningDate] = useState(initialDate)
   const [location, setLocation] = useState('Coimbatore, Tamil Nadu')
@@ -1885,13 +2041,11 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
 
   const renderedOffer = useMemo(() => {
     if (!template) return ''
-    const displayDate = (value: string) => value.split('-').reverse().join('-')
-    const escapeValue = (value: string | number) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;')
     const annualCtc = staff.annualCtc || 0
     const roleContent = getOfferRoleContent(staff.role || '', staff.department || '')
     const values: Record<string, string | number> = {
-      offer_date: displayDate(offerDate),
-      joining_date: displayDate(joiningDate),
+      offer_date: formatDateOnlyDisplay(offerDate),
+      joining_date: formatDateOnlyDisplay(joiningDate),
       employee_name: staff.name,
       employee_email: staff.personalEmail || '',
       role: staff.role || '',
@@ -1901,8 +2055,8 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
       annual_ctc: annualCtc.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
       monthly_salary: (annualCtc / 12).toLocaleString('en-IN', { maximumFractionDigits: 2 }),
     }
-    const populated = Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeValue(value)), template)
-    const responsibilities = roleContent.responsibilities.map((item) => `<li>${escapeValue(item)}</li>`).join('')
+    const populated = Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeHtml(value)), template)
+    const responsibilities = roleContent.responsibilities.map((item) => `<li>${escapeHtml(item)}</li>`).join('')
     return populated.replaceAll('{{key_responsibilities}}', responsibilities)
   }, [joiningDate, location, offerDate, staff, template])
 
@@ -1913,12 +2067,7 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
     setDownloading(true)
     setError('')
     try {
-      const images = pages.flatMap((page) => Array.from(page.querySelectorAll('img')))
-      await Promise.all(images.map((image) => image.complete ? Promise.resolve() : new Promise<void>((resolve) => {
-        image.addEventListener('load', () => resolve(), { once: true })
-        image.addEventListener('error', () => resolve(), { once: true })
-      })))
-      await previewDocument.fonts?.ready
+      await waitForPdfAssets(pages)
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
       const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true })
       const pageWidth = pdf.internal.pageSize.getWidth()
@@ -1926,14 +2075,12 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
       for (let index = 0; index < pages.length; index += 1) {
         // Render at roughly 380 DPI on an A4 page so small offer-letter text
         // remains crisp when viewed at 100% or printed.
-        const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 8
-        const canvas = await html2canvas(pages[index], { scale: memory <= 4 || window.innerWidth < 768 ? 3 : 4, useCORS: true, backgroundColor: '#ffffff', logging: false })
+        const canvas = await html2canvas(pages[index], { scale: getPdfRenderScale(), useCORS: true, backgroundColor: '#ffffff', logging: false })
         if (index > 0) pdf.addPage('a4', 'portrait')
         // Every offer section is exactly A4. Exact origin placement prevents a
         // fractional vertical shift, and PNG preserves crisp text baselines.
         pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST')
-        canvas.width = 1
-        canvas.height = 1
+        releasePdfCanvas(canvas)
       }
       pdf.save(`ProfitPro_Offer_Letter_${staff.employeeId || staff.name.replace(/\s+/g, '_')}.pdf`)
     } catch (caught) {
@@ -1975,6 +2122,8 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
   const [department, setDepartment] = useState(staff.department || '')
   const [role, setRole] = useState(staff.role || '')
   const [annualCtc, setAnnualCtc] = useState(staff.annualCtc ? String(staff.annualCtc) : '')
+  const [revenueAccess, setRevenueAccess] = useState(staff.clientAccess?.revenueManagement === true)
+  const [onboardingAccess, setOnboardingAccess] = useState(staff.clientAccess?.otaOnboarding === true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -2001,6 +2150,7 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
       ...(department !== (staff.department || '') && { department }),
       ...(role !== (staff.role || '') && { role }),
       ...(Number(annualCtc) !== (staff.annualCtc || 0) && { annualCtc: Number(annualCtc) }),
+      ...((revenueAccess !== (staff.clientAccess?.revenueManagement === true) || onboardingAccess !== (staff.clientAccess?.otaOnboarding === true)) && { clientAccess: { revenueManagement: revenueAccess, otaOnboarding: onboardingAccess } }),
     }
 
     if (Object.keys(updates).length === 0) {
@@ -2064,17 +2214,24 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
               </div>
               <div>
                 <label htmlFor="edit-staffDepartment" className="label-upper mb-2 block text-ghost">Department</label>
-                <input id="edit-staffDepartment" value={department} onChange={(e) => setDepartment(e.target.value)} className={inputClass} required />
+                <select id="edit-staffDepartment" value={department} onChange={(e) => setDepartment(e.target.value)} className={inputClass} required>{department && !(STAFF_DEPARTMENTS as readonly string[]).includes(department) ? <option value={department}>{department} (existing)</option> : null}{STAFF_DEPARTMENTS.map((option) => <option key={option} value={option}>{option}</option>)}</select>
               </div>
               <div>
                 <label htmlFor="edit-staffRole" className="label-upper mb-2 block text-ghost">Role</label>
-                <input id="edit-staffRole" value={role} onChange={(e) => setRole(e.target.value)} className={inputClass} required />
+                <select id="edit-staffRole" value={role} onChange={(e) => setRole(e.target.value)} className={inputClass} required>{role && !(STAFF_ROLES as readonly string[]).includes(role) ? <option value={role}>{role} (existing)</option> : null}{STAFF_ROLES.map((option) => <option key={option} value={option}>{option}</option>)}</select>
               </div>
               <div>
                 <label htmlFor="edit-staffAnnualCtc" className="label-upper mb-2 block text-ghost">Annual CTC</label>
                 <input id="edit-staffAnnualCtc" type="number" inputMode="decimal" min="0.01" step="0.01" value={annualCtc} onChange={(e) => setAnnualCtc(e.target.value)} className={inputClass} required />
               </div>
             </div>
+            <fieldset className="rounded-lg border border-zinc-700 bg-zinc-950/30 p-4">
+              <legend className="label-upper px-1 text-ghost">Client service access</legend>
+              <div className="flex flex-wrap gap-5">
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-ink"><input type="checkbox" checked={revenueAccess} onChange={(event) => setRevenueAccess(event.target.checked)} className="h-4 w-4 accent-[#66B159]" /> Revenue Management</label>
+                <label className="flex cursor-pointer items-center gap-2 text-sm text-ink"><input type="checkbox" checked={onboardingAccess} onChange={(event) => setOnboardingAccess(event.target.checked)} className="h-4 w-4 accent-[#66B159]" /> OTA Onboarding</label>
+              </div>
+            </fieldset>
             {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
           </div>
 
@@ -2088,6 +2245,28 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
       </div>
     </div>
   )
+}
+
+function isApprovedLeaveDate(leaves: LeaveRequestRecord[], staffEmail: string, date: string) {
+  const normalizedEmail = staffEmail.trim().toLowerCase()
+  return leaves.some((leave) => leave.status === 'approved' && leave.staffEmail.trim().toLowerCase() === normalizedEmail && date >= leave.startDate && date <= leave.endDate)
+}
+
+function TimesheetDaysSummary({ timesheet, leaves }: { timesheet: TimesheetRecord; leaves: LeaveRequestRecord[] }) {
+  const weekStart = timesheet.weekStart || timesheet.workDate
+  const workedDates = new Set(timesheet.workedDates.length ? timesheet.workedDates : timesheet.workDate ? [timesheet.workDate] : [])
+  const days = Array.from({ length: 7 }, (_, index) => addDateOnlyDays(weekStart, index))
+    .filter(Boolean)
+    .map((date) => ({ date, worked: workedDates.has(date), leaveApproved: isApprovedLeaveDate(leaves, timesheet.staffEmail, date) }))
+    .filter((day) => day.worked || day.leaveApproved)
+
+  if (days.length === 0) return <>Not recorded</>
+
+  return <div className="flex max-w-md flex-wrap gap-1.5">
+    {days.map((day) => <span key={day.date} className={`rounded border px-2 py-1 text-xs ${day.leaveApproved ? 'border-amber-300 bg-amber-50 font-semibold text-amber-800' : 'border-zinc-700 bg-zinc-900 text-sub'}`}>
+      {formatDateOnlyForLocale(day.date, { weekday: 'short', day: '2-digit', month: 'short' })}{day.leaveApproved ? ' · Leave approved' : ' · Worked'}
+    </span>)}
+  </div>
 }
 
 function DashboardMetric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string | number; detail: string }) {

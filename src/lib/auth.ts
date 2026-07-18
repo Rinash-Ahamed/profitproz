@@ -10,6 +10,10 @@ export type SessionUser = {
   mustChangePassword?: boolean
   sessionVersion: number
   expiresAt?: number
+  clientAccess?: {
+    revenueManagement: boolean
+    otaOnboarding: boolean
+  }
 }
 
 type LoginUser = SessionUser & {
@@ -274,6 +278,7 @@ export async function verifyActiveSessionToken(
     mustChangePassword: staff.mustChangePassword,
     sessionVersion: staff.sessionVersion,
     expiresAt: session.expiresAt,
+    clientAccess: staff.clientAccess,
   }
 }
 

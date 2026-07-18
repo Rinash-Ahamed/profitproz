@@ -1,19 +1,13 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import crypto from 'node:crypto'
-import { authConfig, hashPassword, verifyActiveSessionToken } from '@/lib/auth'
+import { hashPassword } from '@/lib/auth'
 import { createStaffAccount, listStaffAccounts, listStaffAccountsPage, logAdminAction, toPublicStaff } from '@/lib/firestore'
 import { readPagination } from '@/lib/pagination'
+import { requireAdminSession as requireAdmin } from '@/lib/api-auth'
+import { isStaffDepartment, isStaffRole } from '@/lib/staff-options'
 
 function createTemporaryPassword() {
   return crypto.randomBytes(24).toString('base64url')
-}
-
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
-
-  return user?.role === 'admin' ? user : null
 }
 
 export async function GET(request: Request) {
@@ -50,7 +44,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid employee request.' }, { status: 400 })
   }
 
-  const { firstName, lastName, personalEmail, employeeId, department, role, annualCtc } = body as {
+  const { firstName, lastName, personalEmail, employeeId, department, role, annualCtc, clientAccess } = body as {
     firstName?: unknown
     lastName?: unknown
     personalEmail?: unknown
@@ -58,6 +52,7 @@ export async function POST(request: Request) {
     department?: unknown
     role?: unknown
     annualCtc?: unknown
+    clientAccess?: unknown
   }
   const first = typeof firstName === 'string' ? firstName.trim() : ''
   const last = typeof lastName === 'string' ? lastName.trim() : ''
@@ -67,9 +62,17 @@ export async function POST(request: Request) {
   const staffDepartment = typeof department === 'string' ? department.trim() : ''
   const staffRole = typeof role === 'string' ? role.trim() : ''
   const ctc = Number(annualCtc)
+  const accessInput = clientAccess && typeof clientAccess === 'object' && !Array.isArray(clientAccess) ? clientAccess as Record<string, unknown> : {}
+  const staffClientAccess = {
+    revenueManagement: accessInput.revenueManagement === true,
+    otaOnboarding: accessInput.otaOnboarding === true,
+  }
 
   if (!first || first.length > 80 || !last || last.length > 80 || !staffEmployeeId || staffEmployeeId.length > 50 || !staffDepartment || staffDepartment.length > 100 || !staffRole || staffRole.length > 100) {
     return NextResponse.json({ message: 'First name, last name, employee ID, department, and role are required.' }, { status: 400 })
+  }
+  if (!isStaffDepartment(staffDepartment) || !isStaffRole(staffRole)) {
+    return NextResponse.json({ message: 'Select a valid department and role.' }, { status: 400 })
   }
 
   if (!staffPersonalEmail || staffPersonalEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffPersonalEmail)) {
@@ -91,6 +94,7 @@ export async function POST(request: Request) {
       role: staffRole,
       annualCtc: ctc,
       passwordHash: await hashPassword(temporaryPassword),
+      clientAccess: staffClientAccess,
     })
 
     await logAdminAction({

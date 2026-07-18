@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer'
 import 'server-only'
+import { escapeHtml } from './html'
 
 const smtpPort = Number(process.env.SMTP_PORT || 587)
 
@@ -72,13 +73,4 @@ export function queueMail(input: Parameters<typeof sendMail>[0]) {
   const queued = deliveryQueue.then(deliver, deliver)
   deliveryQueue = queued.catch(() => undefined)
   return queued
-}
-
-export function escapeHtml(value: unknown) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
 }

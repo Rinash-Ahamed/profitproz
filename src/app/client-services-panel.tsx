@@ -13,9 +13,11 @@ type ClientServicesPanelProps = {
   onPropertiesChange: (properties: PropertyRecord[]) => void
   onOnboardingsChange: (onboardings: OnboardingRecord[]) => void
   readOnly?: boolean
+  revenueEditor?: boolean
+  onboardingEditor?: boolean
 }
 
-export function ClientServicesPanel({ properties, onboardings, loading, onPropertiesChange, onOnboardingsChange, readOnly = false }: ClientServicesPanelProps) {
+export function ClientServicesPanel({ properties, onboardings, loading, onPropertiesChange, onOnboardingsChange, readOnly = false, revenueEditor = false, onboardingEditor = false }: ClientServicesPanelProps) {
   const [service, setService] = useState<'revenue' | 'onboarding'>('revenue')
 
   return (
@@ -26,8 +28,8 @@ export function ClientServicesPanel({ properties, onboardings, loading, onProper
       </div>
 
       {service === 'revenue'
-        ? <PropertiesPanel properties={properties} loading={loading} onChange={onPropertiesChange} readOnly={readOnly} />
-        : <OnboardingPanel onboardings={onboardings} loading={loading} onChange={onOnboardingsChange} readOnly={readOnly} />}
+        ? <PropertiesPanel properties={properties} loading={loading} onChange={onPropertiesChange} readOnly={readOnly && !revenueEditor} editorOnly={revenueEditor} />
+        : <OnboardingPanel onboardings={onboardings} loading={loading} onChange={onOnboardingsChange} readOnly={readOnly && !onboardingEditor} editorOnly={onboardingEditor} />}
     </div>
   )
 }

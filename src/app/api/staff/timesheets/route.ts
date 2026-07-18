@@ -1,13 +1,11 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { createTimesheet, listTimesheets, listTimesheetsPage } from '@/lib/firestore'
+import { createTimesheet, listLeaveRequests, listTimesheets, listTimesheetsPage } from '@/lib/firestore'
 import { addDateOnlyDays, dateOnlyDay, parseDateOnly } from '@/lib/date-only'
 import { readPagination } from '@/lib/pagination'
+import { requireStaffSession } from '@/lib/api-auth'
 
 export async function GET(request: Request) {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
+  const user = await requireStaffSession()
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
@@ -19,8 +17,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'staff' })
+  const user = await requireStaffSession()
 
   if (!user || user.role !== 'staff') {
     return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
@@ -36,12 +33,22 @@ export async function POST(request: Request) {
 
   const isSundayToSaturday = dateOnlyDay(weekStart) === 0 && weekEnd === addDateOnlyDays(weekStart, 6)
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart) || !/^\d{4}-\d{2}-\d{2}$/.test(weekEnd) || !workLocation || workedDates.length === 0 || workedDates.length > 7 || notes.length > 2000 || !isSundayToSaturday) {
-    return NextResponse.json({ message: 'Select a Sunday-to-Saturday week, at least one worked day, and a work location.' }, { status: 400 })
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart) || !/^\d{4}-\d{2}-\d{2}$/.test(weekEnd) || !workLocation || workedDates.length > 7 || notes.length > 2000 || !isSundayToSaturday) {
+    return NextResponse.json({ message: 'Select a valid Sunday-to-Saturday week and work location.' }, { status: 400 })
   }
 
   if (workedDates.some((date) => !parseDateOnly(date) || date < weekStart || date > weekEnd)) {
     return NextResponse.json({ message: 'Worked dates must be within the selected week.' }, { status: 400 })
+  }
+
+  const approvedLeaves = (await listLeaveRequests(user.email)).filter((leave) => leave.status === 'approved')
+  const isApprovedLeaveDate = (date: string) => approvedLeaves.some((leave) => date >= leave.startDate && date <= leave.endDate)
+  if (workedDates.some(isApprovedLeaveDate)) {
+    return NextResponse.json({ message: 'Approved leave dates cannot be submitted as worked days.' }, { status: 400 })
+  }
+  const weekHasApprovedLeave = Array.from({ length: 7 }, (_, index) => addDateOnlyDays(weekStart, index)).some(isApprovedLeaveDate)
+  if (workedDates.length === 0 && !weekHasApprovedLeave) {
+    return NextResponse.json({ message: 'Select at least one worked day.' }, { status: 400 })
   }
 
   return NextResponse.json({ timesheet: await createTimesheet({ staffEmail: user.email, weekStart, weekEnd, workedDates, workLocation, notes }) })

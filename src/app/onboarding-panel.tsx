@@ -6,15 +6,19 @@ import { CheckCircle2, ChevronDown, Download, Edit, FileText, Loader2, Plus, Sav
 import { OTA_PLATFORMS, type OnboardingPlatformProgress, type OnboardingRecord, type OtaPlatform } from '@/lib/onboarding'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
+import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
+import { escapeHtml } from '@/lib/html'
+import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 
 type OnboardingPanelProps = {
   onboardings: OnboardingRecord[]
   loading: boolean
   onChange: (onboardings: OnboardingRecord[]) => void
   readOnly?: boolean
+  editorOnly?: boolean
 }
 
-export function OnboardingPanel({ onboardings, loading, onChange, readOnly = false }: OnboardingPanelProps) {
+export function OnboardingPanel({ onboardings, loading, onChange, readOnly = false, editorOnly = false }: OnboardingPanelProps) {
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<OnboardingRecord | null>(null)
   const [invoiceRecord, setInvoiceRecord] = useState<OnboardingRecord | null>(null)
@@ -105,7 +109,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
             return (
               <section key={record.id}>
                 <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-                  <button type="button" onClick={() => setExpandedId(expanded ? '' : record.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <button type="button" onClick={() => setExpandedId(expanded ? '' : record.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label={`${expanded ? 'Collapse' : 'Expand'} platform progress for ${record.propertyName}`} title={`${expanded ? 'Collapse' : 'Expand'} platform progress`}>
                     <ChevronDown className={`h-4 w-4 shrink-0 text-sub transition-transform ${expanded ? 'rotate-180' : ''}`} />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold text-ink">{record.propertyName}</span>
@@ -116,13 +120,13 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
                     <span className={`rounded-full border px-3 py-1 text-xs font-medium ${liveCount === record.platforms.length ? 'border-green-500/25 bg-green-500/10 text-green-300' : 'border-amber-500/25 bg-amber-500/10 text-amber-300'}`}>
                       {liveCount === record.platforms.length ? 'Onboarding complete' : 'Onboarding in progress'}
                     </span>
-                    {!readOnly && paymentStatus === 'pending' ? <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">Payment pending</span> : null}
-                    {paymentStatus === 'complete' ? <span className="rounded-full border border-green-500/25 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-300">Payment complete</span> : null}
+                    {!readOnly && !editorOnly && paymentStatus === 'pending' ? <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">Payment pending</span> : null}
+                    {!readOnly && !editorOnly && paymentStatus === 'complete' ? <span className="rounded-full border border-green-500/25 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-300">Payment complete</span> : null}
                     {!readOnly ? <div className="ml-1 flex items-center gap-1">
-                      {liveCount === record.platforms.length && paymentStatus !== 'complete' ? <button type="button" onClick={() => setInvoiceRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159]" aria-label={`${paymentStatus === 'pending' ? 'Open' : 'Generate'} invoice for ${record.propertyName}`} title={paymentStatus === 'pending' ? 'Open invoice PDF' : 'Generate invoice'}><FileText className="h-4 w-4" /></button> : null}
-                      {paymentStatus === 'pending' ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => completePayment(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50" aria-label={`Mark payment complete for ${record.propertyName}`} title="Mark payment complete">{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}</button> : null}
-                      <button type="button" onClick={() => setEditing(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={`Edit onboarding details for ${record.propertyName}`} title="Edit onboarding"><Edit className="h-4 w-4" /></button>
-                      <button type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete onboarding for ${record.propertyName}`} title="Delete onboarding">{deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button>
+                      {!editorOnly && liveCount === record.platforms.length && paymentStatus !== 'complete' ? <button type="button" onClick={() => setInvoiceRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159]" aria-label={`${paymentStatus === 'pending' ? 'Open' : 'Generate'} invoice for ${record.propertyName}`} title={paymentStatus === 'pending' ? 'Open invoice PDF' : 'Generate invoice'}><FileText className="h-4 w-4" /></button> : null}
+                      {!editorOnly && paymentStatus === 'pending' ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => completePayment(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50" aria-label={`Mark payment complete for ${record.propertyName}`} title="Mark payment complete">{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}</button> : null}
+                      {!editorOnly ? <button type="button" onClick={() => setEditing(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={`Edit onboarding details for ${record.propertyName}`} title="Edit onboarding"><Edit className="h-4 w-4" /></button> : null}
+                      {!editorOnly ? <button type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete onboarding for ${record.propertyName}`} title="Delete onboarding">{deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button> : null}
                     </div> : null}
                   </div>
                 </div>
@@ -151,26 +155,6 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
   )
 }
 
-function localIsoDate(date = new Date()) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-function displayDate(value: string) {
-  return value.split('-').reverse().join('-')
-}
-
-function escapeInvoiceValue(value: string | number) {
-  return String(value)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;')
-}
-
 type InvoicePaymentSettings = {
   accountName: string
   bankName: string
@@ -194,7 +178,7 @@ const emptyInvoicePaymentSettings: InvoicePaymentSettings = {
 function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingRecord; onGenerated: (record: OnboardingRecord) => void; onClose: () => void }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const onGeneratedRef = useRef(onGenerated)
-  const [invoiceDate, setInvoiceDate] = useState(localIsoDate())
+  const [invoiceDate, setInvoiceDate] = useState(todayLocalDateOnly())
   const [template, setTemplate] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<InvoicePaymentSettings>(emptyInvoicePaymentSettings)
   const [invoiceSequence, setInvoiceSequence] = useState(0)
@@ -239,8 +223,8 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
     if (!template || !invoiceSequence) return ''
     const values: Record<string, string | number> = {
       invoice_number: invoiceNumber,
-      invoice_date: displayDate(invoiceDate),
-      due_date: displayDate(dueDate),
+      invoice_date: formatDateOnlyDisplay(invoiceDate),
+      due_date: formatDateOnlyDisplay(dueDate),
       client_name: record.clientName,
       property_name: record.propertyName,
       property_address: record.propertyAddress,
@@ -260,7 +244,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       upi_number: paymentSettings.upiNumber,
       company_address: paymentSettings.companyAddress,
     }
-    return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeInvoiceValue(value)), template)
+    return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeHtml(value)), template)
   }, [dueDate, invoiceDate, invoiceNumber, invoiceSequence, paymentSettings, record, subtotal, template])
 
   async function downloadPdf() {
@@ -270,20 +254,14 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
     setDownloading(true)
     setError('')
     try {
-      const images = Array.from(page.querySelectorAll('img'))
-      await Promise.all(images.map((image) => image.complete ? Promise.resolve() : new Promise<void>((resolve) => {
-        image.addEventListener('load', () => resolve(), { once: true })
-        image.addEventListener('error', () => resolve(), { once: true })
-      })))
-      await document.fonts?.ready
+      await waitForPdfAssets(page)
 
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
         import('html2canvas'),
         import('jspdf'),
       ])
-      const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 8
       const canvas = await html2canvas(page, {
-        scale: memory <= 4 || window.innerWidth < 768 ? 3 : 4,
+        scale: getPdfRenderScale(),
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
@@ -294,8 +272,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       // The template is exactly A4. Placing it at the exact page origin avoids
       // fractional centering offsets, while PNG keeps small text edges lossless.
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST')
-      canvas.width = 1
-      canvas.height = 1
+      releasePdfCanvas(canvas)
       pdf.save(`${invoiceNumber}.pdf`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to download invoice PDF.')
@@ -321,7 +298,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
             </label>
             <div className="w-36">
               <span className="label-upper mb-2 block text-ghost">Due date</span>
-              <div className="flex h-11 items-center rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-sub">{displayDate(dueDate)}</div>
+              <div className="flex h-11 items-center rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-sub">{formatDateOnlyDisplay(dueDate)}</div>
             </div>
             <button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {downloading ? 'Preparing…' : 'Download PDF'}

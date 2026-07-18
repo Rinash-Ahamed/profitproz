@@ -24,6 +24,10 @@ export type StaffRecord = {
   emergencyContactPhone?: string
   department?: string
   role?: string
+  clientAccess: {
+    revenueManagement: boolean
+    otaOnboarding: boolean
+  }
   annualCtc?: number
   createdAt?: string
   updatedAt?: string
@@ -186,6 +190,10 @@ function mapDocToStaff(doc: DocumentSnapshot): StaffRecord {
     emergencyContactPhone: data.emergencyContactPhone || '',
     department: data.department || '',
     role: data.role || '',
+    clientAccess: {
+      revenueManagement: data.clientAccess?.revenueManagement === true,
+      otaOnboarding: data.clientAccess?.otaOnboarding === true,
+    },
     annualCtc: typeof data.annualCtc === 'number' ? data.annualCtc : 0,
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
@@ -314,7 +322,7 @@ export async function updateAdminPassword(id: string, passwordHash: string): Pro
   return mapDocToAdmin(updatedDoc)
 }
 
-export async function createStaffAccount(input: { name: string; email?: string; personalEmail: string; passwordHash: string; employeeId: string; department: string; role: string; annualCtc: number }): Promise<StaffRecord> {
+export async function createStaffAccount(input: { name: string; email?: string; personalEmail: string; passwordHash: string; employeeId: string; department: string; role: string; annualCtc: number; clientAccess: StaffRecord['clientAccess'] }): Promise<StaffRecord> {
   const db = ensureDb()
   const generatedEmail = input.email?.trim().toLowerCase() || emailFromStaffName(input.name)
   const staffCollection = db.collection(COLLECTIONS.STAFF)
@@ -347,6 +355,7 @@ export async function createStaffAccount(input: { name: string; email?: string; 
       emergencyContactPhone: '',
       department: input.department,
       role: input.role,
+      clientAccess: input.clientAccess,
       annualCtc: input.annualCtc,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -494,6 +503,7 @@ export type ExpenseRecord = {
   title: string
   city: string
   expenseType: 'travel' | 'food' | 'fuel' | 'other'
+  customExpenseType: string
   description: string
   amount: number
   notes: string
@@ -506,6 +516,8 @@ export type ExpenseRecord = {
   rejectedAt?: string
   createdAt?: string
   updatedAt?: string
+  submittedByRole?: 'admin' | 'staff'
+  expenseDate: string
 }
 
 export type AuditLogRecord = {
@@ -557,6 +569,7 @@ function mapDocToExpense(doc: DocumentSnapshot): ExpenseRecord {
     title: data.title || '',
     city: data.city || '',
     expenseType: ['travel', 'food', 'fuel', 'other'].includes(data.expenseType) ? data.expenseType : 'other',
+    customExpenseType: typeof data.customExpenseType === 'string' ? data.customExpenseType : '',
     description: data.description || data.notes || '',
     amount: data.amount || 0,
     notes: data.notes || '',
@@ -569,6 +582,8 @@ function mapDocToExpense(doc: DocumentSnapshot): ExpenseRecord {
     rejectedAt: mapTimestamp(data.rejectedAt),
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
+    submittedByRole: data.submittedByRole === 'admin' ? 'admin' : 'staff',
+    expenseDate: typeof data.expenseDate === 'string' ? data.expenseDate : mapTimestamp(data.createdAt)?.slice(0, 10) || '',
   }
 }
 
@@ -937,7 +952,7 @@ export function listExpensesPage(page: PaginationRequest, staffEmail?: string) {
   return paginateQuery(query, mapDocToExpense, page)
 }
 
-export async function createExpense(input: { staffEmail: string; staffName: string; title: string; city: string; expenseType: ExpenseRecord['expenseType']; description: string; amount: number; receiptName: string; receiptUrl?: string }): Promise<ExpenseRecord> {
+export async function createExpense(input: { staffEmail: string; staffName: string; title: string; city: string; expenseType: ExpenseRecord['expenseType']; customExpenseType?: string; description: string; amount: number; receiptName: string; receiptUrl?: string; submittedByRole?: 'admin' | 'staff'; status?: 'pending' | 'approved'; expenseDate: string }): Promise<ExpenseRecord> {
   const db = ensureDb()
 
   const docRef = db.collection(COLLECTIONS.EXPENSES).doc() // auto-generate ID
@@ -948,12 +963,16 @@ export async function createExpense(input: { staffEmail: string; staffName: stri
     title: input.title.trim(),
     city: input.city.trim(),
     expenseType: input.expenseType,
+    customExpenseType: input.customExpenseType?.trim() || '',
     description: input.description.trim(),
     amount: input.amount,
     notes: input.description.trim(),
     receiptName: input.receiptName.trim(),
     receiptUrl: input.receiptUrl || '',
-    status: 'pending' as const,
+    status: input.status || 'pending',
+    submittedByRole: input.submittedByRole || 'staff',
+    expenseDate: input.expenseDate,
+    ...(input.status === 'approved' ? { approvedAt: FieldValue.serverTimestamp() } : {}),
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   }
@@ -968,6 +987,36 @@ export async function createExpense(input: { staffEmail: string; staffName: stri
     throw new Error('Failed to retrieve expense after creation.')
   }
   return mapDocToExpense(newDoc)
+}
+
+export async function deletePendingExpense(id: string, staffEmail: string) {
+  const db = ensureDb()
+  const expenseRef = db.collection(COLLECTIONS.EXPENSES).doc(id)
+  const receiptRef = db.collection(COLLECTIONS.EXPENSE_RECEIPTS).doc(id)
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(expenseRef)
+    if (!snapshot.exists) throw new Error('EXPENSE_NOT_FOUND')
+    const data = snapshot.data() || {}
+    if (String(data.staffEmail || '').trim().toLowerCase() !== staffEmail.trim().toLowerCase()) throw new Error('EXPENSE_NOT_FOUND')
+    if (data.status === 'approved' || data.status === 'rejected') throw new Error('EXPENSE_NOT_PENDING')
+    transaction.delete(expenseRef)
+    transaction.delete(receiptRef)
+  })
+}
+
+export async function deleteAdminExpense(id: string, adminEmail: string) {
+  const db = ensureDb()
+  const expenseRef = db.collection(COLLECTIONS.EXPENSES).doc(id)
+  const receiptRef = db.collection(COLLECTIONS.EXPENSE_RECEIPTS).doc(id)
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(expenseRef)
+    if (!snapshot.exists) throw new Error('EXPENSE_NOT_FOUND')
+    const data = snapshot.data() || {}
+    const belongsToAdmin = data.submittedByRole === 'admin' && String(data.staffEmail || '').trim().toLowerCase() === adminEmail.trim().toLowerCase()
+    if (!belongsToAdmin) throw new Error('EXPENSE_NOT_FOUND')
+    transaction.delete(expenseRef)
+    transaction.delete(receiptRef)
+  })
 }
 
 export async function updateExpenseStatus(id: string, status: 'approved' | 'rejected', decisionNote = ''): Promise<ExpenseRecord> {
@@ -1303,6 +1352,19 @@ export async function createLeaveRequest(input: { staffEmail: string; startDate:
   })
 
   return mapDocToLeaveRequest(await docRef.get())
+}
+
+export async function deletePendingLeaveRequest(id: string, staffEmail: string) {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc(id)
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('LEAVE_NOT_FOUND')
+    const data = snapshot.data() || {}
+    if (String(data.staffEmail || '').trim().toLowerCase() !== staffEmail.trim().toLowerCase()) throw new Error('LEAVE_NOT_FOUND')
+    if (data.status === 'approved' || data.status === 'rejected') throw new Error('LEAVE_NOT_PENDING')
+    transaction.delete(docRef)
+  })
 }
 
 export async function updateLeaveRequestStatus(id: string, status: 'approved' | 'rejected', decisionNote = '') {

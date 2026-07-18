@@ -2,6 +2,7 @@
 
 import { useRef } from 'react'
 import { CalendarDays } from 'lucide-react'
+import { formatDateOnlyDisplay } from '@/lib/date-only'
 
 type DatePickerInputProps = {
   id?: string
@@ -15,7 +16,7 @@ type DatePickerInputProps = {
 
 export function DatePickerInput({ id, value, onChange, className, required, min, max }: DatePickerInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const displayValue = value ? value.split('-').reverse().join('-') : ''
+  const displayValue = formatDateOnlyDisplay(value)
 
   function openPicker() {
     const input = inputRef.current

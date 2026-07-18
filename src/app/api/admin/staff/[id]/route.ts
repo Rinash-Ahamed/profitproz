@@ -1,17 +1,10 @@
-import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { deleteStaffAccount, getStaffById, logAdminAction, toPublicStaff, updateStaffAccount } from '@/lib/firestore'
+import { requireAdminSession as requireAdmin } from '@/lib/api-auth'
+import { isStaffDepartment, isStaffRole } from '@/lib/staff-options'
 
 type RouteContext = {
   params: Promise<{ id: string }>
-}
-
-async function requireAdmin() {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
-
-  return user?.role === 'admin' ? user : null
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -44,6 +37,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     role?: unknown
     annualCtc?: unknown
     active?: unknown
+    clientAccess?: unknown
   }
   const updates: Parameters<typeof updateStaffAccount>[1] = {}
 
@@ -73,13 +67,13 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (typeof input.department === 'string') {
     const department = input.department.trim()
-    if (!department || department.length > 100) return NextResponse.json({ message: 'Enter a valid department.' }, { status: 400 })
+    if (!department || department.length > 100 || !isStaffDepartment(department)) return NextResponse.json({ message: 'Select a valid department.' }, { status: 400 })
     updates.department = department
   }
 
   if (typeof input.role === 'string') {
     const role = input.role.trim()
-    if (!role || role.length > 100) return NextResponse.json({ message: 'Enter a valid employee role.' }, { status: 400 })
+    if (!role || role.length > 100 || !isStaffRole(role)) return NextResponse.json({ message: 'Select a valid employee role.' }, { status: 400 })
     updates.role = role
   }
 
@@ -91,6 +85,20 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   if (typeof input.active === 'boolean') {
     updates.active = input.active
+  }
+
+  if (input.clientAccess !== undefined) {
+    if (!input.clientAccess || typeof input.clientAccess !== 'object' || Array.isArray(input.clientAccess)) {
+      return NextResponse.json({ message: 'Invalid client service access selection.' }, { status: 400 })
+    }
+    const access = input.clientAccess as Record<string, unknown>
+    if (typeof access.revenueManagement !== 'boolean' || typeof access.otaOnboarding !== 'boolean') {
+      return NextResponse.json({ message: 'Select valid client service access options.' }, { status: 400 })
+    }
+    updates.clientAccess = {
+      revenueManagement: access.revenueManagement,
+      otaOnboarding: access.otaOnboarding,
+    }
   }
 
   if (Object.keys(updates).length === 0) {
