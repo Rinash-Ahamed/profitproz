@@ -711,11 +711,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   async function saveSecuritySettings() {
     setLoading(true)
+    setError('')
+    setMessage('')
     try {
-      const response = await fetch('/api/admin/security-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(securitySettings) })
-      if (!response.ok) throw new Error()
+      const data = await apiFetch<{ settings: SecuritySettings }>('/api/admin/security-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(securitySettings) })
+      setSecuritySettings(data.settings)
       setMessage('Security settings saved.')
-    } catch { setError('Unable to save security settings.') } finally { setLoading(false) }
+    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Unable to save security settings.') } finally { setLoading(false) }
   }
 
   async function changeAdminPassword(event: FormEvent<HTMLFormElement>) {

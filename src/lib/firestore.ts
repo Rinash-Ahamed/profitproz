@@ -1308,7 +1308,7 @@ export async function getSecuritySettings(): Promise<SecuritySettings> {
 export async function saveSecuritySettings(input: SecuritySettings): Promise<SecuritySettings> {
   const db = ensureDb()
   await db.collection(COLLECTIONS.SETTINGS).doc('security').set({ ...input, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
-  return getSecuritySettings()
+  return input
 }
 
 export async function listSalaries() {
