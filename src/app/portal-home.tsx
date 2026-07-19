@@ -874,6 +874,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const pendingTimesheets = timesheetList.filter((timesheet) => timesheet.status === 'pending')
   const pendingExpenses = expenseList.filter((expense) => expense.status === 'pending')
   const visibleTrackedExpenses = expenseList.filter((expense) => expenseTrackingView === 'admin' ? expense.submittedByRole === 'admin' : expense.submittedByRole !== 'admin')
+  const visibleTrackedExpenseTotal = visibleTrackedExpenses.reduce((total, expense) => total + expense.amount, 0)
   const approvedExpenseTotal = expenseList
     .filter((expense) => expense.status === 'approved')
     .reduce((total, expense) => total + expense.amount, 0)
@@ -1455,7 +1456,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         <div className="border-b border-zinc-800 p-6">
                           <div className="flex flex-wrap items-center justify-between gap-4">
                             <div><p className="text-lg font-semibold text-ink">{expenseTrackingView === 'admin' ? 'Admin Expenses' : 'Staff Expense Approvals'}</p><p className="mt-1 text-sm text-sub">{expenseTrackingView === 'admin' ? 'Review expenses recorded directly by Admin users.' : 'Review and decide employee expense claims.'}</p></div>
-                            <button type="button" onClick={handleExportExpenses} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">Total amount</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">₹{visibleTrackedExpenseTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p></div>
+                              <button type="button" onClick={handleExportExpenses} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
+                            </div>
                           </div>
                           <div className="mt-5 flex flex-wrap gap-2 rounded-lg border border-zinc-800 bg-zinc-950/30 p-1.5">
                             <button type="button" onClick={() => setExpenseTrackingView('staff')} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'staff' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Staff Expenses</button>
@@ -1470,15 +1474,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                   <th className="px-6 py-4 font-medium text-sub">Expense date</th>
                                   <th className="px-6 py-4 font-medium text-sub">Claim</th>
                               <th className="px-6 py-4 font-medium text-sub">Amount</th>
-                              <th className="px-6 py-4 font-medium text-sub">Status</th>
+                              {expenseTrackingView === 'staff' ? <th className="px-6 py-4 font-medium text-sub">Status</th> : null}
                               <th className="px-6 py-4 font-medium text-sub">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
                             {loading ? (
-                              <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
+                              <tr><td colSpan={expenseTrackingView === 'admin' ? 5 : 6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
                             ) : visibleTrackedExpenses.length === 0 ? (
-                              <tr><td colSpan={6} className="py-10 text-center text-sub">{expenseTrackingView === 'admin' ? 'No Admin expenses recorded yet.' : 'No staff expenses submitted yet.'}</td></tr>
+                              <tr><td colSpan={expenseTrackingView === 'admin' ? 5 : 6} className="py-10 text-center text-sub">{expenseTrackingView === 'admin' ? 'No Admin expenses recorded yet.' : 'No staff expenses submitted yet.'}</td></tr>
                             ) : (
                               visibleTrackedExpenses.map((expense) => (
                                 <tr key={expense.id} className="border-b border-zinc-800 last:border-none">
@@ -1494,7 +1498,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                     {expense.receiptUrl || expense.receiptDataUrl ? <a href={expense.receiptUrl || expense.receiptDataUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View receipt</a> : <p className="mt-1 text-xs text-sub">No receipt reference</p>}
                                   </td>
                                   <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
-                                  <td className="px-6 py-4"><StatusBadge status={expense.status} /></td>
+                                  {expenseTrackingView === 'staff' ? <td className="px-6 py-4"><StatusBadge status={expense.status} /></td> : null}
                                   <td className="px-6 py-4">
                                     {expense.submittedByRole === 'admin' && expense.staffEmail.toLowerCase() === user.email.toLowerCase() ? (
                                       <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawAdminExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw Admin expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button>
