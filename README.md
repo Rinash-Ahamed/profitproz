@@ -53,6 +53,14 @@ Keep existing `{{placeholder}}` names when changing template styling. Payment va
 - The dashboard uses Firestore aggregate queries rather than downloading full collections.
 - API responses use JSON with a `message` field on errors. Portal requests redirect to login when the session is rejected.
 
+## Finance workflow
+
+- Generating an OTA or Revenue Management invoice creates an immutable financial snapshot with its invoice number, service, client, dates, and amount.
+- Admins record the full received payment against its invoice; partial payments are not enabled.
+- Approved staff expenses affect cash only after an Admin marks the reimbursement as paid. Admin expenses are treated as paid when recorded.
+- The Finance screen shows received income by service, unpaid approved expenses, paid expenses, and `received income - paid expenses`.
+- `finance_invoices` stores invoice snapshots and `finance_payments` stores the payment ledger. Payment records should not be edited or deleted manually.
+
 ## Firestore and deployment
 
 Firestore browser access is denied by `firestore.rules`; the application uses the server-side Admin SDK. Deploy both rules and required aggregate-query indexes after a Firebase project is selected:

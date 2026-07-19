@@ -2,13 +2,15 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CheckCircle2, ChevronDown, Download, Edit, FileText, Loader2, Plus, Save, Search, Trash2 } from 'lucide-react'
+import { CheckCircle2, ChevronDown, CreditCard, Download, Edit, FileText, Loader2, Plus, Save, Search, Trash2 } from 'lucide-react'
 import { OTA_PLATFORMS, type OnboardingPlatformProgress, type OnboardingRecord, type OtaPlatform } from '@/lib/onboarding'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
+import type { FinanceInvoiceRecord } from '@/lib/finance'
+import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
 
 type OnboardingPanelProps = {
   onboardings: OnboardingRecord[]
@@ -22,6 +24,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<OnboardingRecord | null>(null)
   const [invoiceRecord, setInvoiceRecord] = useState<OnboardingRecord | null>(null)
+  const [paymentInvoice, setPaymentInvoice] = useState<FinanceInvoiceRecord | null>(null)
   const [deletingId, setDeletingId] = useState('')
   const [completingPaymentId, setCompletingPaymentId] = useState('')
   const [error, setError] = useState('')
@@ -56,17 +59,38 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
     }
   }
 
-  async function completePayment(record: OnboardingRecord) {
-    if (!window.confirm(`Confirm that payment has been received for ${record.propertyName}?`)) return
+  async function openPaymentRecord(record: OnboardingRecord) {
     setCompletingPaymentId(record.id)
     setError('')
     try {
-      const response = await fetch(`/api/admin/onboardings/${encodeURIComponent(record.id)}/invoice-number`, { method: 'PATCH' })
-      const data = await response.json() as { onboarding?: OnboardingRecord; message?: string }
-      if (!response.ok || !data.onboarding) throw new Error(data.message || 'Failed to complete invoice payment.')
-      onChange(onboardings.map((item) => item.id === data.onboarding!.id ? data.onboarding! : item))
+      const financeUrl = `/api/admin/finance/invoices/${encodeURIComponent(`ota_${record.id}`)}/payments`
+      const response = await fetch(financeUrl, { cache: 'no-store' })
+      let data = await response.json() as { invoice?: FinanceInvoiceRecord; message?: string }
+
+      // Completed onboarding records created before the Finance ledger do not
+      // have an invoice snapshot yet. Create that snapshot without changing
+      // the existing onboarding completion state.
+      if (response.status === 404 && record.invoiceSequence) {
+        const generatedDate = record.invoiceGeneratedAt?.slice(0, 10)
+        const invoiceDate = generatedDate && /^\d{4}-\d{2}-\d{2}$/.test(generatedDate) ? generatedDate : todayLocalDateOnly()
+        const createResponse = await fetch(`/api/admin/onboardings/${encodeURIComponent(record.id)}/invoice-number`, {
+          method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoiceDate, dueDate: invoiceDate, amount: record.ratePerPlatform * record.platforms.length }),
+        })
+        data = await createResponse.json() as { invoice?: FinanceInvoiceRecord; message?: string }
+        if (!createResponse.ok) throw new Error(data.message || 'Failed to prepare the completed onboarding invoice.')
+      } else if (!response.ok) {
+        throw new Error(data.message || 'Failed to open the invoice payment record.')
+      }
+
+      if (!data.invoice) throw new Error('The invoice payment record is unavailable.')
+      if (data.invoice.status === 'paid') {
+        onChange(onboardings.map((item) => item.id === record.id ? { ...item, paymentStatus: 'complete', financePaymentRecordedAt: new Date().toISOString() } : item))
+        return
+      }
+      setPaymentInvoice(data.invoice)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Failed to complete invoice payment.')
+      setError(caught instanceof Error ? caught.message : 'Failed to open the invoice payment record.')
     } finally {
       setCompletingPaymentId('')
     }
@@ -124,7 +148,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
                     {!readOnly && !editorOnly && paymentStatus === 'complete' ? <span className="rounded-full border border-green-500/25 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-300">Payment complete</span> : null}
                     {!readOnly ? <div className="ml-1 flex items-center gap-1">
                       {!editorOnly && liveCount === record.platforms.length && paymentStatus !== 'complete' ? <button type="button" onClick={() => setInvoiceRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159]" aria-label={`${paymentStatus === 'pending' ? 'Open' : 'Generate'} invoice for ${record.propertyName}`} title={paymentStatus === 'pending' ? 'Open invoice PDF' : 'Generate invoice'}><FileText className="h-4 w-4" /></button> : null}
-                      {!editorOnly && paymentStatus === 'pending' ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => completePayment(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50" aria-label={`Mark payment complete for ${record.propertyName}`} title="Mark payment complete">{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}</button> : null}
+                      {!editorOnly && record.invoiceSequence && !record.financePaymentRecordedAt ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => openPaymentRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50" aria-label={`Record payment for ${record.propertyName}`} title={paymentStatus === 'complete' ? 'Record completed payment in Finance' : 'Record payment'}>{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}</button> : null}
                       {!editorOnly ? <button type="button" onClick={() => setEditing(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={`Edit onboarding details for ${record.propertyName}`} title="Edit onboarding"><Edit className="h-4 w-4" /></button> : null}
                       {!editorOnly ? <button type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete onboarding for ${record.propertyName}`} title="Delete onboarding">{deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button> : null}
                     </div> : null}
@@ -151,6 +175,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
       {showCreate ? <OnboardingDetailsModal onClose={() => setShowCreate(false)} onSaved={(record) => { onChange([...onboardings, record].sort((a, b) => a.propertyName.localeCompare(b.propertyName))); setExpandedId(record.id); setShowCreate(false) }} /> : null}
       {editing ? <OnboardingDetailsModal initial={editing} onClose={() => setEditing(null)} onSaved={(record) => { onChange(onboardings.map((item) => item.id === record.id ? record : item).sort((a, b) => a.propertyName.localeCompare(b.propertyName))); setEditing(null) }} /> : null}
       {invoiceRecord ? <InvoiceModal record={invoiceRecord} onGenerated={(updated) => { onChange(onboardings.map((item) => item.id === updated.id ? updated : item)); setInvoiceRecord(updated) }} onClose={() => setInvoiceRecord(null)} /> : null}
+      {paymentInvoice ? <RecordPaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} onRecorded={(updated) => { setPaymentInvoice(null); onChange(onboardings.map((item) => item.id === updated.sourceId ? { ...item, paymentStatus: 'complete', financePaymentRecordedAt: new Date().toISOString() } : item)) }} /> : null}
     </div>
   )
 }
@@ -182,12 +207,13 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
   const [template, setTemplate] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<InvoicePaymentSettings>(emptyInvoicePaymentSettings)
   const [invoiceSequence, setInvoiceSequence] = useState(0)
+  const [issuedInvoiceNumber, setIssuedInvoiceNumber] = useState('')
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
   const dueDate = invoiceDate
   const [year, month] = invoiceDate.split('-')
-  const invoiceNumber = `PP-OTA-${month}-${year.slice(-2)}-${String(invoiceSequence).padStart(3, '0')}`
+  const invoiceNumber = issuedInvoiceNumber || `PP-OTA-${month}-${year.slice(-2)}-PREVIEW`
   const subtotal = record.ratePerPlatform * record.platforms.length
 
   useEffect(() => {
@@ -199,20 +225,13 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
     Promise.all([
       fetch('/template/ProfitPro_OTA_Onboarding_Invoice_Template.html', { signal: controller.signal }),
       fetch('/api/admin/invoice-settings', { signal: controller.signal }),
-      fetch(`/api/admin/onboardings/${encodeURIComponent(record.id)}/invoice-number`, { method: 'POST', credentials: 'same-origin', signal: controller.signal }),
     ])
-      .then(async ([templateResponse, settingsResponse, sequenceResponse]) => {
+      .then(async ([templateResponse, settingsResponse]) => {
         if (!templateResponse.ok) throw new Error('Invoice template could not be loaded.')
         if (!settingsResponse.ok) throw new Error('Invoice payment details could not be loaded.')
-        if (!sequenceResponse.ok) throw new Error('Invoice number could not be assigned.')
         const settingsData = await settingsResponse.json() as { settings?: InvoicePaymentSettings }
-        const sequenceData = await sequenceResponse.json() as { sequence?: number; onboarding?: OnboardingRecord }
-        if (!Number.isInteger(sequenceData.sequence) || (sequenceData.sequence || 0) < 1) throw new Error('Invoice number could not be assigned.')
-        if (!sequenceData.onboarding) throw new Error('Invoice payment status could not be updated.')
         setTemplate(await templateResponse.text())
         setPaymentSettings(settingsData.settings || emptyInvoicePaymentSettings)
-        setInvoiceSequence(sequenceData.sequence!)
-        onGeneratedRef.current(sequenceData.onboarding)
       })
       .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Invoice template could not be loaded.') })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
@@ -220,7 +239,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
   }, [record.id])
 
   const renderedInvoice = useMemo(() => {
-    if (!template || !invoiceSequence) return ''
+    if (!template) return ''
     const values: Record<string, string | number> = {
       invoice_number: invoiceNumber,
       invoice_date: formatDateOnlyDisplay(invoiceDate),
@@ -245,15 +264,33 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       company_address: paymentSettings.companyAddress,
     }
     return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeHtml(value)), template)
-  }, [dueDate, invoiceDate, invoiceNumber, invoiceSequence, paymentSettings, record, subtotal, template])
+  }, [dueDate, invoiceDate, invoiceNumber, paymentSettings, record, subtotal, template])
 
   async function downloadPdf() {
-    const document = iframeRef.current?.contentDocument
-    const page = document?.querySelector('.invoice-page') as HTMLElement | null
-    if (!document || !page) return
     setDownloading(true)
     setError('')
     try {
+      let issuedSequence = invoiceSequence
+      let outputInvoiceNumber = issuedInvoiceNumber
+      if (!issuedSequence) {
+        const response = await fetch(`/api/admin/onboardings/${encodeURIComponent(record.id)}/invoice-number`, {
+          method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoiceDate, dueDate, amount: subtotal }),
+        })
+        const data = await response.json() as { sequence?: number; onboarding?: OnboardingRecord; invoice?: FinanceInvoiceRecord; message?: string }
+        if (!response.ok || !data.sequence || !data.onboarding || !data.invoice) throw new Error(data.message || 'Invoice number could not be assigned.')
+        issuedSequence = data.sequence
+        outputInvoiceNumber = data.invoice.invoiceNumber
+        const frame = iframeRef.current
+        const rerendered = new Promise<void>((resolve) => frame?.addEventListener('load', () => resolve(), { once: true }))
+        setInvoiceSequence(issuedSequence)
+        setIssuedInvoiceNumber(data.invoice.invoiceNumber)
+        onGeneratedRef.current(data.onboarding)
+        await Promise.race([rerendered, new Promise<void>((resolve) => setTimeout(resolve, 2_000))])
+      }
+      const document = iframeRef.current?.contentDocument
+      const page = document?.querySelector('.invoice-page') as HTMLElement | null
+      if (!document || !page) throw new Error('Invoice preview is not ready.')
       await waitForPdfAssets(page)
 
       const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
@@ -273,7 +310,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       // fractional centering offsets, while PNG keeps small text edges lossless.
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST')
       releasePdfCanvas(canvas)
-      pdf.save(`${invoiceNumber}.pdf`)
+      pdf.save(`${outputInvoiceNumber || `PP-OTA-${month}-${year.slice(-2)}-${String(issuedSequence).padStart(3, '0')}`}.pdf`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to download invoice PDF.')
     } finally {
