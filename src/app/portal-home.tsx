@@ -3,12 +3,13 @@
 import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Building2, CheckCircle2, ClipboardList, Download, Edit, Eye, EyeOff, FileDown, FileText, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Search, Trash2, User, UserPlus, Users, XCircle } from 'lucide-react'
+import { Building2, CheckCircle2, ClipboardList, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Search, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
 import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, TimesheetRecord } from '@/lib/firestore'
 import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
 import { ClientServicesPanel } from '@/app/client-services-panel'
+import { FinancePanel } from '@/app/finance-panel'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { LeaveDateSummary } from '@/components/ui/LeaveDateSummary'
 import { addDateOnlyDays, countDateOnlyDaysInclusive, dateOnlyDay, formatDateOnlyDisplay, formatDateOnlyForLocale, todayLocalDateOnly } from '@/lib/date-only'
@@ -32,6 +33,18 @@ type PayrollRow = {
   payrollPeriod: string
   monthlySalary: number
   approvedWorkDays: number
+}
+
+const ADMIN_TAB_LABELS: Record<string, string> = {
+  dashboard: 'Dashboard',
+  staff: 'Employees',
+  properties: 'Clients',
+  timesheets: 'Timesheets',
+  expenses: 'Expenses',
+  leaves: 'Leaves',
+  payroll: 'Payroll',
+  finance: 'Finance',
+  settings: 'Settings',
 }
 
 export function PortalHome({ user, version, title, description }: PortalHomeProps) {
@@ -493,6 +506,28 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     } catch (err) {
       setExpenseList(originalExpenses)
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
+    }
+  }
+
+  async function markExpenseReimbursed(expense: ExpenseRecord) {
+    if (expense.status !== 'approved' || expense.paymentStatus === 'paid') return
+    if (!window.confirm(`Confirm that ${expense.staffName || expense.staffEmail} has been reimbursed?`)) return
+    setDeletingExpenseId(expense.id)
+    setError('')
+    try {
+      const response = await fetch(`/api/admin/expenses/${encodeURIComponent(expense.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark_paid' }),
+      })
+      const data = await response.json() as { expense?: ExpenseRecord; message?: string }
+      if (!response.ok || !data.expense) throw new Error(data.message || 'Unable to mark this reimbursement as paid.')
+      setExpenseList((current) => current.map((item) => item.id === data.expense!.id ? data.expense! : item))
+      setMessage('Expense reimbursement marked as paid.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to update the reimbursement.')
+    } finally {
+      setDeletingExpenseId('')
     }
   }
 
@@ -958,6 +993,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               </button>
               <button
                 type="button"
+                onClick={() => setActiveTab('finance')}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === 'finance' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
+                }`}
+              >
+                Finance
+              </button>
+              <button
+                type="button"
                 onClick={() => setActiveTab('settings')}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'settings' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
@@ -1025,8 +1069,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
             <span className="h-1.5 w-1.5 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-ink/80">{user.role} portal</span>
           </div>
-          <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight text-ink sm:text-6xl">
-            {title.endsWith(' Workspace') ? <>{title.slice(0, -10)}{' '}<span className="text-[#66B159]"> Workspace</span></> : title}
+          <h1 className={`${user.role === 'admin' ? 'max-w-none whitespace-nowrap text-xl sm:text-4xl lg:text-6xl' : 'max-w-3xl text-4xl sm:text-6xl'} font-bold leading-tight tracking-tight text-ink`}>
+            {user.role === 'admin' ? <>Admin Workspace <span className="text-[#66B159]">· {ADMIN_TAB_LABELS[activeTab] || 'Dashboard'}</span></> : title.endsWith(' Workspace') ? <>{title.slice(0, -10)}{' '}<span className="text-[#66B159]"> Workspace</span></> : title}
           </h1>
           {description ? <p className="mt-5 max-w-2xl text-base leading-7 text-sub">{description}</p> : null}
 
@@ -1097,6 +1141,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                 >
                   Payroll
                 </button>
+                <button type="button" onClick={() => setActiveTab('finance')} className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${activeTab === 'finance' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'}`}>Finance</button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('settings')}
@@ -1165,6 +1210,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             <button type="button" onClick={() => setActiveTab('properties')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Manage client properties <Building2 className="h-4 w-4 text-[#4d9144]" /></button>
                             <button type="button" onClick={() => setActiveTab('expenses')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Review expenses <ReceiptText className="h-4 w-4 text-[#4d9144]" /></button>
                             <button type="button" onClick={() => setActiveTab('payroll')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Open payroll <FileDown className="h-4 w-4 text-[#4d9144]" /></button>
+                            <button type="button" onClick={() => setActiveTab('finance')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Open finance <WalletCards className="h-4 w-4 text-[#4d9144]" /></button>
                           </div>
                         </div>
                       </div>
@@ -1430,6 +1476,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       </div>
                     </div>
                   ),
+                  finance: <FinancePanel />,
                   expenses: (
                     <div className="space-y-6">
                       <form className="surface rounded-lg p-6 sm:p-7" onSubmit={submitExpense}>
@@ -1498,15 +1545,20 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                     {expense.receiptUrl || expense.receiptDataUrl ? <a href={expense.receiptUrl || expense.receiptDataUrl} target="_blank" rel="noreferrer" className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View receipt</a> : <p className="mt-1 text-xs text-sub">No receipt reference</p>}
                                   </td>
                                   <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
-                                  {expenseTrackingView === 'staff' ? <td className="px-6 py-4"><StatusBadge status={expense.status} /></td> : null}
+                                  {expenseTrackingView === 'staff' ? <td className="px-6 py-4"><StatusBadge status={expense.status} />{expense.status === 'approved' ? <p className={`mt-1 text-xs font-medium ${expense.paymentStatus === 'paid' ? 'text-green-400' : 'text-amber-300'}`}>{expense.paymentStatus === 'paid' ? 'Reimbursement paid' : 'Reimbursement unpaid'}</p> : null}</td> : null}
                                   <td className="px-6 py-4">
-                                    {expense.submittedByRole === 'admin' && expense.staffEmail.toLowerCase() === user.email.toLowerCase() ? (
-                                      <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawAdminExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw Admin expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button>
+                                    {expense.submittedByRole === 'admin' ? (
+                                      <div className="flex items-center gap-2">
+                                        {expense.paymentStatus !== 'paid' ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-[#66B159]/10 px-2.5 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark expense paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />} Mark paid</button> : <span className="text-xs font-medium text-green-400">Paid</span>}
+                                        {expense.staffEmail.toLowerCase() === user.email.toLowerCase() ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawAdminExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw Admin expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : null}
+                                      </div>
                                     ) : expense.status === 'pending' ? (
                                       <div className="flex items-center gap-2">
                                         <button type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'approved')} className="flex h-8 items-center gap-1.5 rounded-md bg-green-500/10 px-2.5 text-xs text-green-400 transition-colors hover:bg-green-500/20"><CheckCircle2 className="h-3.5 w-3.5" />Approve</button>
                                         <button type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'rejected')} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs text-red-400 transition-colors hover:bg-red-500/20"><XCircle className="h-3.5 w-3.5" />Reject</button>
                                       </div>
+                                    ) : expense.status === 'approved' && expense.paymentStatus !== 'paid' ? (
+                                      <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-[#66B159]/10 px-2.5 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark reimbursement paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />} Mark paid</button>
                                     ) : <span className="text-xs text-ghost">No actions</span>}
                                   </td>
                                 </tr>
@@ -1841,7 +1893,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                     </td>
                                     <td className="whitespace-nowrap px-6 py-4 text-sub">{formatDateOnlyDisplay(expense.expenseDate) || 'Not recorded'}</td>
                                     <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
-                                    <td className="px-6 py-4"><StatusBadge status={expense.status} />{expense.decisionNote ? <p className="mt-1 max-w-48 text-xs text-sub">{expense.decisionNote}</p> : null}{expense.approvedAt || expense.rejectedAt ? <p className="mt-1 text-xs text-sub">{new Date(expense.approvedAt || expense.rejectedAt || '').toLocaleDateString('en-IN')}</p> : null}</td>
+                                    <td className="px-6 py-4"><StatusBadge status={expense.status} />{expense.status === 'approved' ? <p className={`mt-1 text-xs font-medium ${expense.paymentStatus === 'paid' ? 'text-green-400' : 'text-amber-300'}`}>{expense.paymentStatus === 'paid' ? 'Reimbursement paid' : 'Reimbursement pending'}</p> : null}{expense.decisionNote ? <p className="mt-1 max-w-48 text-xs text-sub">{expense.decisionNote}</p> : null}{expense.approvedAt || expense.rejectedAt ? <p className="mt-1 text-xs text-sub">{new Date(expense.approvedAt || expense.rejectedAt || '').toLocaleDateString('en-IN')}</p> : null}</td>
                                     <td className="px-6 py-4">{expense.status === 'pending' ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : <span className="text-xs text-ghost">Locked</span>}</td>
                                   </tr>
                                 ))

@@ -6,6 +6,7 @@ import type { OnboardingDetailsInput, OnboardingRecord, OnboardingPlatformProgre
 import type { PaginationRequest } from './pagination'
 import { countDateOnlyDaysInclusive } from './date-only'
 import { LEAVE_ALLOWANCES, type LeaveType } from './leave'
+import type { FinanceInvoiceRecord, FinanceOverview, FinancePaymentRecord, FinanceService, PaymentMethod } from './finance'
 
 export type StaffRecord = {
   id: string
@@ -136,7 +137,9 @@ const COLLECTIONS = {
   STAFF: 'staff',
   PROPERTIES: 'properties',
     OTA_ONBOARDINGS: 'ota_onboardings',
-    REVENUE_INVOICES: 'revenue_invoices',
+  REVENUE_INVOICES: 'revenue_invoices',
+  FINANCE_INVOICES: 'finance_invoices',
+  FINANCE_PAYMENTS: 'finance_payments',
   EXPENSES: 'expenses',
   EXPENSE_RECEIPTS: 'expense_receipts',
   TIMESHEETS: 'timesheets',
@@ -278,6 +281,7 @@ function mapDocToOnboarding(doc: DocumentSnapshot): OnboardingRecord {
         : 'not_invoiced',
     invoiceGeneratedAt: mapTimestamp(data.invoiceGeneratedAt),
     paymentCompletedAt: mapTimestamp(data.paymentCompletedAt),
+    financePaymentRecordedAt: mapTimestamp(data.financePaymentRecordedAt),
     platforms,
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
@@ -518,6 +522,8 @@ export type ExpenseRecord = {
   updatedAt?: string
   submittedByRole?: 'admin' | 'staff'
   expenseDate: string
+  paymentStatus: 'unpaid' | 'paid'
+  paidAt?: string
 }
 
 export type AuditLogRecord = {
@@ -584,6 +590,8 @@ function mapDocToExpense(doc: DocumentSnapshot): ExpenseRecord {
     updatedAt: mapTimestamp(data.updatedAt),
     submittedByRole: data.submittedByRole === 'admin' ? 'admin' : 'staff',
     expenseDate: typeof data.expenseDate === 'string' ? data.expenseDate : mapTimestamp(data.createdAt)?.slice(0, 10) || '',
+    paymentStatus: data.paymentStatus === 'paid' ? 'paid' : 'unpaid',
+    paidAt: mapTimestamp(data.paidAt),
   }
 }
 
@@ -628,6 +636,47 @@ export async function listStaffAccounts() {
   if (!db) return []
   const snapshot = await db.collection(COLLECTIONS.STAFF).get()
   return snapshot.docs.map(mapDocToStaff)
+}
+
+function mapDocToFinanceInvoice(doc: DocumentSnapshot): FinanceInvoiceRecord {
+  const data = doc.data() || {}
+  const amount = typeof data.amount === 'number' ? data.amount : 0
+  const paidAmount = typeof data.paidAmount === 'number' ? data.paidAmount : 0
+  return {
+    id: doc.id,
+    service: data.service === 'ota_onboarding' ? 'ota_onboarding' : 'revenue_management',
+    sourceId: typeof data.sourceId === 'string' ? data.sourceId : '',
+    invoiceNumber: typeof data.invoiceNumber === 'string' ? data.invoiceNumber : '',
+    clientName: typeof data.clientName === 'string' ? data.clientName : '',
+    propertyName: typeof data.propertyName === 'string' ? data.propertyName : '',
+    invoiceDate: typeof data.invoiceDate === 'string' ? data.invoiceDate : '',
+    dueDate: typeof data.dueDate === 'string' ? data.dueDate : '',
+    billingPeriod: typeof data.billingPeriod === 'string' ? data.billingPeriod : '',
+    amount,
+    paidAmount,
+    balanceAmount: Math.max(0, amount - paidAmount),
+    status: data.status === 'paid' || data.status === 'cancelled' ? data.status : 'pending',
+    createdAt: mapTimestamp(data.createdAt),
+    updatedAt: mapTimestamp(data.updatedAt),
+    paidAt: mapTimestamp(data.paidAt),
+  }
+}
+
+function mapDocToFinancePayment(doc: DocumentSnapshot): FinancePaymentRecord {
+  const data = doc.data() || {}
+  return {
+    id: doc.id,
+    invoiceId: typeof data.invoiceId === 'string' ? data.invoiceId : '',
+    service: data.service === 'ota_onboarding' ? 'ota_onboarding' : 'revenue_management',
+    invoiceNumber: typeof data.invoiceNumber === 'string' ? data.invoiceNumber : '',
+    amount: typeof data.amount === 'number' ? data.amount : 0,
+    paymentDate: typeof data.paymentDate === 'string' ? data.paymentDate : '',
+    method: ['upi', 'neft', 'rtgs', 'bank_transfer', 'other'].includes(data.method) ? data.method as PaymentMethod : 'other',
+    reference: typeof data.reference === 'string' ? data.reference : '',
+    notes: typeof data.notes === 'string' ? data.notes : '',
+    recordedBy: typeof data.recordedBy === 'string' ? data.recordedBy : '',
+    createdAt: mapTimestamp(data.createdAt),
+  }
 }
 
 export type PageResult<T> = { items: T[]; nextCursor: string | null }
@@ -770,14 +819,23 @@ export async function deleteOnboarding(id: string): Promise<void> {
   await docRef.delete()
 }
 
-export async function getOrCreateOnboardingInvoiceSequence(id: string): Promise<{ sequence: number; onboarding: OnboardingRecord }> {
+type InvoiceSnapshotInput = { invoiceDate: string; dueDate: string; amount: number; billingPeriod?: string }
+
+function serviceInvoiceNumber(service: FinanceService, sequence: number, invoiceDate: string) {
+  const [year, month] = invoiceDate.split('-')
+  return `PP-${service === 'ota_onboarding' ? 'OTA' : 'RMS'}-${month}-${year.slice(-2)}-${String(sequence).padStart(3, '0')}`
+}
+
+export async function getOrCreateOnboardingInvoiceSequence(id: string, input: InvoiceSnapshotInput): Promise<{ sequence: number; onboarding: OnboardingRecord; invoice: FinanceInvoiceRecord }> {
   const db = ensureDb()
   const onboardingRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
   const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('ota-invoice-sequence')
+  const financeRef = db.collection(COLLECTIONS.FINANCE_INVOICES).doc(`ota_${id}`)
 
   const sequence = await db.runTransaction(async (transaction) => {
     const onboardingSnapshot = await transaction.get(onboardingRef)
     if (!onboardingSnapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
+    const financeSnapshot = await transaction.get(financeRef)
 
     const existingSequence = onboardingSnapshot.data()?.invoiceSequence
     if (Number.isInteger(existingSequence) && existingSequence > 0) {
@@ -786,6 +844,16 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string): Promise<
           paymentStatus: 'pending',
           invoiceGeneratedAt: onboardingSnapshot.data()?.invoiceGeneratedAt || FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
+        })
+      }
+      if (!financeSnapshot.exists) {
+        transaction.set(financeRef, {
+          service: 'ota_onboarding', sourceId: id, invoiceNumber: serviceInvoiceNumber('ota_onboarding', existingSequence as number, input.invoiceDate),
+          clientName: onboardingSnapshot.data()?.clientName || '', propertyName: onboardingSnapshot.data()?.propertyName || '',
+          invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: input.amount,
+          paidAmount: 0,
+          status: 'pending',
+          createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
         })
       }
       return existingSequence as number
@@ -804,40 +872,25 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string): Promise<
       invoiceGeneratedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     })
+    transaction.set(financeRef, {
+      service: 'ota_onboarding', sourceId: id, invoiceNumber: serviceInvoiceNumber('ota_onboarding', nextSequence, input.invoiceDate),
+      clientName: onboardingSnapshot.data()?.clientName || '', propertyName: onboardingSnapshot.data()?.propertyName || '',
+      invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: input.amount,
+      paidAmount: 0, status: 'pending', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+    })
     return nextSequence
   })
 
-  return { sequence, onboarding: mapDocToOnboarding(await onboardingRef.get()) }
+  return { sequence, onboarding: mapDocToOnboarding(await onboardingRef.get()), invoice: mapDocToFinanceInvoice(await financeRef.get()) }
 }
 
-export async function completeOnboardingInvoicePayment(id: string): Promise<OnboardingRecord> {
-  const db = ensureDb()
-  const onboardingRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
-
-  await db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(onboardingRef)
-    if (!snapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
-    if (!Number.isInteger(snapshot.data()?.invoiceSequence) || snapshot.data()!.invoiceSequence < 1) {
-      throw new Error('ONBOARDING_INVOICE_NOT_GENERATED')
-    }
-    if (snapshot.data()?.paymentStatus === 'complete') return
-    transaction.update(onboardingRef, {
-      paymentStatus: 'complete',
-      paymentCompletedAt: FieldValue.serverTimestamp(),
-      updatedAt: FieldValue.serverTimestamp(),
-    })
-  })
-
-  return mapDocToOnboarding(await onboardingRef.get())
-}
-
-export async function createRevenueInvoiceSequence(propertyId: string): Promise<number> {
+export async function createRevenueInvoiceSequence(propertyId: string, input: InvoiceSnapshotInput): Promise<{ sequence: number; invoice: FinanceInvoiceRecord }> {
   const db = ensureDb()
   const propertyRef = db.collection(COLLECTIONS.PROPERTIES).doc(propertyId)
   const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('revenue-invoice-sequence')
   const invoiceRef = db.collection(COLLECTIONS.REVENUE_INVOICES).doc(createDocumentId())
 
-  return db.runTransaction(async (transaction) => {
+  const sequence = await db.runTransaction(async (transaction) => {
     const property = await transaction.get(propertyRef)
     if (!property.exists) throw new Error('PROPERTY_NOT_FOUND')
     if (property.data()?.status !== 'active') throw new Error('PROPERTY_NOT_ACTIVE')
@@ -845,9 +898,86 @@ export async function createRevenueInvoiceSequence(propertyId: string): Promise<
     const lastSequence = Number.isInteger(counter.data()?.lastSequence) ? Number(counter.data()?.lastSequence) : 0
     const sequence = lastSequence + 1
     transaction.set(counterRef, { lastSequence: sequence, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
-    transaction.set(invoiceRef, { propertyId, sequence, status: 'generated', createdAt: FieldValue.serverTimestamp() })
+    const invoiceNumber = serviceInvoiceNumber('revenue_management', sequence, input.invoiceDate)
+    transaction.set(invoiceRef, { propertyId, sequence, invoiceNumber, status: 'generated', createdAt: FieldValue.serverTimestamp() })
+    transaction.set(db.collection(COLLECTIONS.FINANCE_INVOICES).doc(invoiceRef.id), {
+      service: 'revenue_management', sourceId: propertyId, invoiceNumber,
+      clientName: property.data()?.contactName || property.data()?.name || '', propertyName: property.data()?.name || '',
+      invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: input.amount,
+      paidAmount: 0, status: 'pending', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+    })
     return sequence
   })
+  return { sequence, invoice: mapDocToFinanceInvoice(await db.collection(COLLECTIONS.FINANCE_INVOICES).doc(invoiceRef.id).get()) }
+}
+
+export async function getFinanceOverview(): Promise<FinanceOverview> {
+  const db = ensureDb()
+  const [invoiceSnapshot, paymentSnapshot, expenses] = await Promise.all([
+    db.collection(COLLECTIONS.FINANCE_INVOICES).get(),
+    db.collection(COLLECTIONS.FINANCE_PAYMENTS).get(),
+    listExpenses(),
+  ])
+  const invoices = invoiceSnapshot.docs.map(mapDocToFinanceInvoice).sort((a, b) => (b.invoiceDate || b.createdAt || '').localeCompare(a.invoiceDate || a.createdAt || ''))
+  const payments = paymentSnapshot.docs.map(mapDocToFinancePayment).sort((a, b) => (b.paymentDate || b.createdAt || '').localeCompare(a.paymentDate || a.createdAt || ''))
+  const totalInvoiced = invoices.filter((invoice) => invoice.status !== 'cancelled').reduce((total, invoice) => total + invoice.amount, 0)
+  const incomeReceived = payments.reduce((total, payment) => total + payment.amount, 0)
+  const paidExpenses = expenses.filter((expense) => expense.paymentStatus === 'paid').reduce((total, expense) => total + expense.amount, 0)
+  const unpaidExpenses = expenses.filter((expense) => expense.status === 'approved' && expense.paymentStatus !== 'paid').reduce((total, expense) => total + expense.amount, 0)
+  const revenueIncome = payments.filter((payment) => payment.service === 'revenue_management').reduce((total, payment) => total + payment.amount, 0)
+  const onboardingIncome = payments.filter((payment) => payment.service === 'ota_onboarding').reduce((total, payment) => total + payment.amount, 0)
+  return { invoices, payments, totalInvoiced, incomeReceived, paidExpenses, unpaidExpenses, netCashBalance: incomeReceived - paidExpenses, revenueIncome, onboardingIncome }
+}
+
+export async function getFinanceInvoiceById(id: string): Promise<FinanceInvoiceRecord | null> {
+  const snapshot = await ensureDb().collection(COLLECTIONS.FINANCE_INVOICES).doc(id).get()
+  return snapshot.exists ? mapDocToFinanceInvoice(snapshot) : null
+}
+
+export async function syncOnboardingFinancePaymentMarker(invoice: FinanceInvoiceRecord): Promise<void> {
+  if (invoice.service !== 'ota_onboarding' || invoice.status !== 'paid' || !invoice.sourceId) return
+  const docRef = ensureDb().collection(COLLECTIONS.OTA_ONBOARDINGS).doc(invoice.sourceId)
+  const snapshot = await docRef.get()
+  if (!snapshot.exists || snapshot.data()?.financePaymentRecordedAt) return
+  await docRef.update({
+    paymentStatus: 'complete',
+    financePaymentRecordedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+}
+
+export async function recordFinancePayment(invoiceId: string, input: { amount: number; paymentDate: string; method: PaymentMethod; reference: string; notes: string; recordedBy: string }) {
+  const db = ensureDb()
+  const invoiceRef = db.collection(COLLECTIONS.FINANCE_INVOICES).doc(invoiceId)
+  const paymentRef = db.collection(COLLECTIONS.FINANCE_PAYMENTS).doc(createDocumentId())
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(invoiceRef)
+    if (!snapshot.exists) throw new Error('FINANCE_INVOICE_NOT_FOUND')
+    const invoice = mapDocToFinanceInvoice(snapshot)
+    if (invoice.status === 'cancelled' || invoice.status === 'paid' || invoice.balanceAmount <= 0) throw new Error('FINANCE_INVOICE_CLOSED')
+    if (Math.round(input.amount * 100) !== Math.round(invoice.balanceAmount * 100)) throw new Error(`PAYMENT_MUST_MATCH_BALANCE:${invoice.balanceAmount}`)
+    const paymentAmount = invoice.balanceAmount
+    transaction.set(paymentRef, {
+      invoiceId, service: invoice.service, invoiceNumber: invoice.invoiceNumber, amount: paymentAmount,
+      paymentDate: input.paymentDate, method: input.method, reference: input.reference.trim(), notes: input.notes.trim(),
+      recordedBy: input.recordedBy, createdAt: FieldValue.serverTimestamp(),
+    })
+    transaction.update(invoiceRef, {
+      paidAmount: invoice.amount, status: 'paid', paidAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+    if (invoice.service === 'ota_onboarding') {
+      transaction.update(db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(invoice.sourceId), {
+        paymentStatus: 'complete',
+        paymentCompletedAt: FieldValue.serverTimestamp(),
+        financePaymentRecordedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      })
+    }
+  })
+
+  return { invoice: mapDocToFinanceInvoice(await invoiceRef.get()), payment: mapDocToFinancePayment(await paymentRef.get()) }
 }
 
 export async function getPropertyById(id: string): Promise<PropertyRecord | null> {
@@ -972,6 +1102,7 @@ export async function createExpense(input: { staffEmail: string; staffName: stri
     status: input.status || 'pending',
     submittedByRole: input.submittedByRole || 'staff',
     expenseDate: input.expenseDate,
+    paymentStatus: 'unpaid',
     ...(input.status === 'approved' ? { approvedAt: FieldValue.serverTimestamp() } : {}),
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
@@ -1046,6 +1177,19 @@ export async function listTimesheets(staffEmail?: string) {
 
   const snapshot = await query.get()
   return snapshot.docs.map(mapDocToTimesheet)
+}
+
+export async function markExpensePaid(id: string): Promise<ExpenseRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.EXPENSES).doc(id)
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('EXPENSE_NOT_FOUND')
+    if (snapshot.data()?.status !== 'approved') throw new Error('EXPENSE_NOT_APPROVED')
+    if (snapshot.data()?.paymentStatus === 'paid') return
+    transaction.update(docRef, { paymentStatus: 'paid', paidAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp() })
+  })
+  return mapDocToExpense(await docRef.get())
 }
 
 export function listTimesheetsPage(page: PaginationRequest, staffEmail?: string) {

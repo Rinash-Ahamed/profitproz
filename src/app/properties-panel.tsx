@@ -191,7 +191,10 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
     try {
       let issuedSequence = sequence
       if (!issuedSequence) {
-        const numbering = await apiFetch<{ sequence: number }>(`/api/admin/properties/${encodeURIComponent(property.id)}/invoice-number`, { method: 'POST' })
+        const numbering = await apiFetch<{ sequence: number }>(`/api/admin/properties/${encodeURIComponent(property.id)}/invoice-number`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invoiceDate, dueDate, billingPeriod: billingPeriod.trim(), amount: subtotal }),
+        })
         issuedSequence = numbering.sequence
         const frame = iframeRef.current
         const invoiceRendered = new Promise<void>((resolve) => frame?.addEventListener('load', () => resolve(), { once: true }))

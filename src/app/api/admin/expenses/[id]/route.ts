@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { deleteAdminExpense, logAdminAction, updateExpenseStatus } from '@/lib/firestore'
+import { deleteAdminExpense, logAdminAction, markExpensePaid, updateExpenseStatus } from '@/lib/firestore'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -29,7 +29,20 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ message: 'Invalid expense request.' }, { status: 400 })
   }
 
-  const { status, decisionNote } = body as { status?: unknown; decisionNote?: unknown }
+  const { status, decisionNote, action } = body as { status?: unknown; decisionNote?: unknown; action?: unknown }
+
+  if (action === 'mark_paid') {
+    try {
+      const expense = await markExpensePaid(id)
+      await logAdminAction({ actorEmail: user.email, action: 'EXPENSE_PAYMENT_COMPLETE', targetId: id, details: `Expense payment marked complete for ${expense.staffEmail}.` })
+      return NextResponse.json({ expense })
+    } catch (error) {
+      if (error instanceof Error && error.message === 'EXPENSE_NOT_FOUND') return NextResponse.json({ message: 'Expense was not found.' }, { status: 404 })
+      if (error instanceof Error && error.message === 'EXPENSE_NOT_APPROVED') return NextResponse.json({ message: 'Approve the expense before marking it paid.' }, { status: 409 })
+      console.error(`Failed to mark expense ${id} paid:`, error)
+      return NextResponse.json({ message: 'Failed to mark expense paid.' }, { status: 500 })
+    }
+  }
 
   if ((status !== 'approved' && status !== 'rejected') || (typeof decisionNote === 'string' && decisionNote.length > 2000)) {
     return NextResponse.json({ message: 'A valid expense status is required.' }, { status: 400 })
