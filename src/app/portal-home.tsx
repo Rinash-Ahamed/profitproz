@@ -105,6 +105,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [deletingExpenseId, setDeletingExpenseId] = useState('')
   const [adminExpenseName, setAdminExpenseName] = useState('')
   const [expenseTrackingView, setExpenseTrackingView] = useState<'staff' | 'admin'>('staff')
+  const [expensePersonSearch, setExpensePersonSearch] = useState('')
+  const [expensePaymentFilter, setExpensePaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [expenseSettings, setExpenseSettings] = useState<ExpenseFieldSettings>({ cityRequired: true, descriptionRequired: true, receiptRequired: true })
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false })
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
@@ -779,7 +781,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   function handleExportExpenses() {
-    const exportExpenses = expenseList.filter((expense) => expenseTrackingView === 'admin' ? expense.submittedByRole === 'admin' : expense.submittedByRole !== 'admin')
+    const exportExpenses = visibleTrackedExpenses
     if (exportExpenses.length === 0) {
       setError('No expense data is available to export.')
       return
@@ -910,7 +912,19 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   const pendingTimesheets = timesheetList.filter((timesheet) => timesheet.status === 'pending')
   const pendingExpenses = expenseList.filter((expense) => expense.status === 'pending')
-  const visibleTrackedExpenses = expenseList.filter((expense) => expenseTrackingView === 'admin' ? expense.submittedByRole === 'admin' : expense.submittedByRole !== 'admin')
+  const expensePersonQuery = expensePersonSearch.trim().toLowerCase()
+  const visibleTrackedExpenses = expenseList
+    .filter((expense) => expenseTrackingView === 'admin' ? expense.submittedByRole === 'admin' : expense.submittedByRole !== 'admin')
+    .filter((expense) => !expensePersonQuery || (expense.staffName || expense.staffEmail).toLowerCase().includes(expensePersonQuery))
+    .filter((expense) => expensePaymentFilter === 'all' || (expensePaymentFilter === 'paid' ? expense.paymentStatus === 'paid' : expense.status === 'approved' && expense.paymentStatus !== 'paid'))
+    .sort((a, b) => {
+      if (expensePersonQuery) {
+        const aStartsWith = (a.staffName || a.staffEmail).toLowerCase().startsWith(expensePersonQuery)
+        const bStartsWith = (b.staffName || b.staffEmail).toLowerCase().startsWith(expensePersonQuery)
+        if (aStartsWith !== bStartsWith) return aStartsWith ? -1 : 1
+      }
+      return (b.expenseDate || b.createdAt || '').localeCompare(a.expenseDate || a.createdAt || '')
+    })
   const visibleTrackedExpenseTotal = visibleTrackedExpenses.reduce((total, expense) => total + expense.amount, 0)
   const approvedExpenseTotal = expenseList
     .filter((expense) => expense.status === 'approved')
@@ -1506,13 +1520,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <div className="flex flex-wrap items-center justify-between gap-4">
                             <div><p className="text-lg font-semibold text-ink">{expenseTrackingView === 'admin' ? 'Admin Expenses' : 'Staff Expense Approvals'}</p><p className="mt-1 text-sm text-sub">{expenseTrackingView === 'admin' ? 'Review expenses recorded directly by Admin users.' : 'Review and decide employee expense claims.'}</p></div>
                             <div className="flex flex-wrap items-center gap-3">
-                              <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">Total amount</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">₹{visibleTrackedExpenseTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p></div>
+                              <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{expensePersonSearch.trim() || expensePaymentFilter !== 'all' ? 'Filtered total' : 'Total amount'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">₹{visibleTrackedExpenseTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p></div>
                               <button type="button" onClick={handleExportExpenses} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
                             </div>
                           </div>
                           <div className="mt-5 flex flex-wrap gap-2 rounded-lg border border-zinc-800 bg-zinc-950/30 p-1.5">
-                            <button type="button" onClick={() => setExpenseTrackingView('staff')} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'staff' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Staff Expenses</button>
-                            <button type="button" onClick={() => setExpenseTrackingView('admin')} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'admin' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Admin Expenses</button>
+                            <button type="button" onClick={() => { setExpenseTrackingView('staff'); setExpensePersonSearch(''); setExpensePaymentFilter('all') }} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'staff' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Staff Expenses</button>
+                            <button type="button" onClick={() => { setExpenseTrackingView('admin'); setExpensePersonSearch(''); setExpensePaymentFilter('all') }} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'admin' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Admin Expenses</button>
+                            <label className="relative ml-auto min-w-64 flex-1 sm:max-w-sm"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={expensePersonSearch} onChange={(event) => setExpensePersonSearch(event.target.value)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder={expenseTrackingView === 'admin' ? 'Search Admin name' : 'Search staff name'} aria-label={expenseTrackingView === 'admin' ? 'Search expenses by Admin name' : 'Search expenses by staff name'} /></label>
+                            <select value={expensePaymentFilter} onChange={(event) => setExpensePaymentFilter(event.target.value as typeof expensePaymentFilter)} className="h-10 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" aria-label="Filter expenses by payment status"><option value="all">All payment statuses</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select>
                           </div>
                         </div>
                       <div className="overflow-x-auto">
@@ -1531,7 +1547,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             {loading ? (
                               <tr><td colSpan={expenseTrackingView === 'admin' ? 5 : 6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
                             ) : visibleTrackedExpenses.length === 0 ? (
-                              <tr><td colSpan={expenseTrackingView === 'admin' ? 5 : 6} className="py-10 text-center text-sub">{expenseTrackingView === 'admin' ? 'No Admin expenses recorded yet.' : 'No staff expenses submitted yet.'}</td></tr>
+                              <tr><td colSpan={expenseTrackingView === 'admin' ? 5 : 6} className="py-10 text-center text-sub">{expensePersonSearch.trim() || expensePaymentFilter !== 'all' ? 'No expenses match the selected search and payment status.' : expenseTrackingView === 'admin' ? 'No Admin expenses recorded yet.' : 'No staff expenses submitted yet.'}</td></tr>
                             ) : (
                               visibleTrackedExpenses.map((expense) => (
                                 <tr key={expense.id} className="border-b border-zinc-800 last:border-none">
