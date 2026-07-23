@@ -790,6 +790,64 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     URL.revokeObjectURL(url)
   }
 
+  function handleExportWorkingDays() {
+    const query = taskEmployeeSearch.trim().toLowerCase()
+    const completedSessions = workSessionList
+      .filter((session) => session.status === 'completed')
+      .filter((session) => !taskDateFilter || session.workDate === taskDateFilter)
+      .filter((session) => {
+        if (!query) return true
+        const employeeName = staffNameByEmail.get(session.staffEmail) || ''
+        return employeeName.toLowerCase().includes(query) || session.staffEmail.toLowerCase().includes(query)
+      })
+
+    if (!completedSessions.length) {
+      setError('No completed working days match the selected employee and date filters.')
+      return
+    }
+
+    const byEmployee = new Map<string, { dates: Set<string>; minutes: number }>()
+    completedSessions.forEach((session) => {
+      const existing = byEmployee.get(session.staffEmail) || { dates: new Set<string>(), minutes: 0 }
+      existing.dates.add(session.workDate)
+      existing.minutes += Math.max(0, session.durationMinutes)
+      byEmployee.set(session.staffEmail, existing)
+    })
+
+    const csvValue = (value: unknown) => {
+      const text = String(value ?? '')
+      const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text
+      return `"${safeText.replaceAll('"', '""')}"`
+    }
+    const rows = [...byEmployee.entries()]
+      .map(([email, summary]) => ({
+        name: staffNameByEmail.get(email) || email,
+        email,
+        workingDays: summary.dates.size,
+        totalMinutes: Math.round(summary.minutes),
+        dates: [...summary.dates].sort(),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((row) => [
+        row.name,
+        row.email,
+        row.workingDays,
+        row.totalMinutes,
+        formatWorkDuration(row.totalMinutes),
+        row.dates.map(formatDateOnlyDisplay).join('; '),
+      ].map(csvValue).join(','))
+
+    const csv = ['sep=,', 'Employee,Email,Working Days,Total Minutes,Total Hours,Worked Dates', ...rows].join('\r\n')
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `working-days-${taskDateFilter || 'all-dates'}-${todayLocalDateOnly()}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
   function handleExportExpenses() {
     const exportExpenses = visibleTrackedExpenses
     if (exportExpenses.length === 0) {
@@ -1527,6 +1585,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             <label><span className="sr-only">Filter by status</span><select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as TaskStatusFilter)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="all">All statuses</option><option value="working">Working</option><option value="completed">Completed</option><option value="not-started">Not started</option></select></label>
                             <label><span className="sr-only">Sort by duration</span><select value={taskDurationSort} onChange={(event) => setTaskDurationSort(event.target.value as TaskDurationSort)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="recent">Newest first</option><option value="highest">Highest hours</option><option value="lowest">Lowest hours</option></select></label>
                             {taskEmployeeSearch || taskDateFilter || taskStatusFilter !== 'all' || taskDurationSort !== 'recent' ? <button type="button" onClick={() => { setTaskEmployeeSearch(''); setTaskDateFilter(''); setTaskStatusFilter('all'); setTaskDurationSort('recent') }} className="h-10 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub transition-colors hover:text-ink">Clear filters</button> : null}
+                            <button type="button" onClick={handleExportWorkingDays} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]" title="Export completed working days for the selected employee and date filters"><FileDown className="h-4 w-4" /> Export</button>
                           </div>
                         </div>
                         <div className="overflow-x-auto">
