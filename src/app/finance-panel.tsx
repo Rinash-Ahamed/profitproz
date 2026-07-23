@@ -6,6 +6,7 @@ import type { FinanceInvoiceRecord, FinanceOverview, FinanceService } from '@/li
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay } from '@/lib/date-only'
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
+import { DatePickerInput } from '@/components/ui/DatePickerInput'
 
 const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, unpaidExpenses: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0 }
 const money = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
@@ -15,6 +16,9 @@ export function FinancePanel() {
   const [service, setService] = useState<'all' | FinanceService>('all')
   const [status, setStatus] = useState<'all' | 'pending' | 'paid'>('all')
   const [search, setSearch] = useState('')
+  const [paymentService, setPaymentService] = useState<'all' | FinanceService>('all')
+  const [paymentDateFrom, setPaymentDateFrom] = useState('')
+  const [paymentDateTo, setPaymentDateTo] = useState('')
   const [paymentInvoice, setPaymentInvoice] = useState<FinanceInvoiceRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -48,10 +52,22 @@ export function FinancePanel() {
       })
   }, [finance.invoices, search, service, status])
 
+  const payments = useMemo(
+    () => finance.payments
+      .filter((payment) => paymentService === 'all' || payment.service === paymentService)
+      .filter((payment) => !paymentDateFrom || payment.paymentDate >= paymentDateFrom)
+      .filter((payment) => !paymentDateTo || payment.paymentDate <= paymentDateTo),
+    [finance.payments, paymentDateFrom, paymentDateTo, paymentService],
+  )
+  const filteredPaymentTotal = useMemo(
+    () => payments.reduce((total, payment) => total + payment.amount, 0),
+    [payments],
+  )
+
   function exportIncome() {
-    if (!finance.payments.length) { setError('No received payments are available to export.'); return }
+    if (!payments.length) { setError('No received payments match the selected filters.'); return }
     const cell = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
-    const rows = finance.payments.map((payment) => [payment.paymentDate, payment.invoiceNumber, payment.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management', payment.amount, payment.method, payment.reference, payment.recordedBy, payment.notes].map(cell).join(','))
+    const rows = payments.map((payment) => [payment.paymentDate, payment.invoiceNumber, payment.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management', payment.amount, payment.method, payment.reference, payment.recordedBy, payment.notes].map(cell).join(','))
     const csv = ['sep=,', 'Payment Date,Invoice Number,Service,Amount,Method,Reference,Recorded By,Notes', ...rows].join('\r\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }))
     const link = document.createElement('a'); link.href = url; link.download = 'income-payments.csv'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url)
@@ -75,7 +91,24 @@ export function FinancePanel() {
       <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Client</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Dates</th><th className="px-5 py-4 font-medium text-sub">Amount</th><th className="px-5 py-4 font-medium text-sub">Paid / Balance</th><th className="px-5 py-4 font-medium text-sub">Status</th><th className="px-5 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{loading ? <tr><td colSpan={8} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : invoices.length === 0 ? <tr><td colSpan={8} className="py-12 text-center text-sub">No tracked invoices yet. New invoices appear here when generated.</td></tr> : invoices.map((invoice) => <tr key={invoice.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 font-medium text-ink">{invoice.invoiceNumber}</td><td className="px-5 py-4"><p className="text-ink">{invoice.propertyName}</p><p className="text-xs text-sub">{invoice.clientName}</p></td><td className="px-5 py-4 text-sub">{invoice.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management'}</td><td className="px-5 py-4 text-xs text-sub"><p>{formatDateOnlyDisplay(invoice.invoiceDate)}</p><p>Due {formatDateOnlyDisplay(invoice.dueDate)}</p>{invoice.billingPeriod ? <p>{invoice.billingPeriod}</p> : null}</td><td className="px-5 py-4 font-semibold text-ink">{money(invoice.amount)}</td><td className="px-5 py-4 text-sub"><p>{money(invoice.paidAmount)} paid</p><p>{money(invoice.balanceAmount)} due</p></td><td className="px-5 py-4"><FinanceStatus status={invoice.status} /></td><td className="px-5 py-4">{invoice.status === 'pending' ? <button type="button" onClick={() => setPaymentInvoice(invoice)} className="flex h-9 items-center gap-2 rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Record payment</button> : <span className="text-xs text-ghost">Complete</span>}</td></tr>)}</tbody></table></div>
     </section>
 
-    <section className="surface rounded-lg"><div className="flex items-center justify-between gap-4 border-b border-zinc-800 p-6"><div><p className="text-lg font-semibold text-ink">Received payments</p><p className="mt-1 text-sm text-sub">Every income transaction recorded against an invoice.</p></div><button type="button" onClick={exportIncome} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white"><FileDown className="h-4 w-4" /> Export income</button></div><div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Date</th><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Method</th><th className="px-5 py-4 font-medium text-sub">Reference</th><th className="px-5 py-4 font-medium text-sub">Amount</th></tr></thead><tbody>{finance.payments.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">No payments recorded yet.</td></tr> : finance.payments.map((payment) => <tr key={payment.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 text-sub">{formatDateOnlyDisplay(payment.paymentDate)}</td><td className="px-5 py-4 font-medium text-ink">{payment.invoiceNumber}</td><td className="px-5 py-4 text-sub">{payment.service === 'ota_onboarding' ? 'OTA' : 'Revenue'}</td><td className="px-5 py-4 uppercase text-sub">{payment.method.replace('_', ' ')}</td><td className="px-5 py-4 text-sub">{payment.reference || '—'}</td><td className="px-5 py-4 font-semibold text-[#66B159]">{money(payment.amount)}</td></tr>)}</tbody></table></div></section>
+    <section className="surface rounded-lg">
+      <div className="border-b border-zinc-800 p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div><p className="text-lg font-semibold text-ink">Received payments</p><p className="mt-1 text-sm text-sub">Every income transaction recorded against an invoice.</p></div>
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'Filtered total' : 'Total received'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">{money(filteredPaymentTotal)}</p></div>
+            <button type="button" onClick={exportIncome} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white"><FileDown className="h-4 w-4" /> Export income</button>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Service</span><select value={paymentService} onChange={(event) => setPaymentService(event.target.value as typeof paymentService)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="all">All services</option><option value="revenue_management">Revenue Management</option><option value="ota_onboarding">OTA Onboarding</option></select></label>
+          <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">From date</span><DatePickerInput value={paymentDateFrom} onChange={setPaymentDateFrom} max={paymentDateTo || undefined} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
+          <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">To date</span><DatePickerInput value={paymentDateTo} onChange={setPaymentDateTo} min={paymentDateFrom || undefined} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
+          <div className="flex items-end"><button type="button" disabled={paymentService === 'all' && !paymentDateFrom && !paymentDateTo} onClick={() => { setPaymentService('all'); setPaymentDateFrom(''); setPaymentDateTo('') }} className="h-10 w-full rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub transition-colors hover:border-zinc-600 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40">Clear filters</button></div>
+        </div>
+      </div>
+      <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Date</th><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Method</th><th className="px-5 py-4 font-medium text-sub">Reference</th><th className="px-5 py-4 font-medium text-sub">Amount</th></tr></thead><tbody>{payments.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'No received payments match the selected filters.' : 'No payments recorded yet.'}</td></tr> : payments.map((payment) => <tr key={payment.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 text-sub">{formatDateOnlyDisplay(payment.paymentDate)}</td><td className="px-5 py-4 font-medium text-ink">{payment.invoiceNumber}</td><td className="px-5 py-4 text-sub">{payment.service === 'ota_onboarding' ? 'OTA' : 'Revenue'}</td><td className="px-5 py-4 uppercase text-sub">{payment.method.replace('_', ' ')}</td><td className="px-5 py-4 text-sub">{payment.reference || '—'}</td><td className="px-5 py-4 font-semibold text-[#66B159]">{money(payment.amount)}</td></tr>)}</tbody></table></div>
+    </section>
 
     {paymentInvoice ? <RecordPaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} onRecorded={() => { setPaymentInvoice(null); setMessage('Payment recorded successfully.'); void load() }} /> : null}
   </div>
