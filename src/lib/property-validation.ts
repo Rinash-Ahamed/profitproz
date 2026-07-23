@@ -7,23 +7,6 @@ const datePattern = /^\d{4}-\d{2}-\d{2}$/
 
 type PropertyPayload = Record<string, unknown>
 
-export const propertyFields = [
-  'name',
-  'propertyType',
-  'contactName',
-  'contactEmail',
-  'contactPhone',
-  'gstNumber',
-  'city',
-  'address',
-  'roomCount',
-  'commissionPercent',
-  'contractStartDate',
-  'signedContractUrl',
-  'status',
-  'notes',
-] as const satisfies readonly (keyof PropertyInput)[]
-
 export function parsePropertyPayload(body: unknown, partial = false): { value?: Partial<PropertyInput>; error?: string } {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return { error: 'Invalid property request.' }
   const input = body as PropertyPayload

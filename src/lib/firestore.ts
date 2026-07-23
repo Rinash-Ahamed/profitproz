@@ -142,7 +142,8 @@ const COLLECTIONS = {
   FINANCE_PAYMENTS: 'finance_payments',
   EXPENSES: 'expenses',
   EXPENSE_RECEIPTS: 'expense_receipts',
-  TIMESHEETS: 'timesheets',
+  WORK_SESSIONS: 'work_sessions',
+  LEGACY_TIMESHEETS: 'timesheets',
   LEAVE_REQUESTS: 'leave_requests',
   SALARIES: 'salaries',
   AUDIT_LOG: 'audit_log',
@@ -381,13 +382,44 @@ export async function createStaffAccount(input: { name: string; email?: string; 
   return mapDocToStaff(finalDoc)
 }
 
-export async function deleteStaffAccount(id: string) {
+export async function deleteStaffAccount(id: string, staffEmail: string) {
   const db = ensureDb()
-  const batch = db.batch()
-  batch.delete(db.collection(COLLECTIONS.STAFF).doc(id))
-  // Salary documents use the employee document ID, so remove both atomically.
-  batch.delete(db.collection(COLLECTIONS.SALARIES).doc(id))
-  await batch.commit()
+  const normalizedEmail = staffEmail.trim().toLowerCase()
+  const linkedCollections = [
+    COLLECTIONS.WORK_SESSIONS,
+    COLLECTIONS.LEGACY_TIMESHEETS,
+    COLLECTIONS.LEAVE_REQUESTS,
+    COLLECTIONS.SALARIES,
+  ] as const
+
+  const linkedSnapshots = await Promise.all(
+    linkedCollections.map((collection) =>
+      db.collection(collection).where('staffEmail', '==', normalizedEmail).get(),
+    ),
+  )
+
+  // Use paths as keys so a receipt found by both its email and expense ID is
+  // deleted only once.
+  const linkedDocuments = new Map<string, FirebaseFirestore.DocumentReference>()
+  linkedSnapshots.forEach((snapshot) => {
+    snapshot.docs.forEach((document) => linkedDocuments.set(document.ref.path, document.ref))
+  })
+
+  const salaryRef = db.collection(COLLECTIONS.SALARIES).doc(id)
+  linkedDocuments.set(salaryRef.path, salaryRef)
+
+  // Firestore permits up to 500 writes per batch. Delete dependent records
+  // first and the employee account last so a large cleanup never leaves an
+  // orphaned account that can no longer be selected for retry.
+  const references = [...linkedDocuments.values()]
+  const maxBatchSize = 450
+  for (let index = 0; index < references.length; index += maxBatchSize) {
+    const batch = db.batch()
+    references.slice(index, index + maxBatchSize).forEach((reference) => batch.delete(reference))
+    await batch.commit()
+  }
+
+  await db.collection(COLLECTIONS.STAFF).doc(id).delete()
 }
 
 export async function updateStaffAccount(id: string, updates: Partial<Omit<StaffRecord, 'id' | 'passwordHash'>>): Promise<StaffRecord> {
@@ -536,20 +568,15 @@ export type AuditLogRecord = {
   changes?: Record<string, { from: any; to: any }>
 }
 
-export type TimesheetRecord = {
+export type WorkSessionRecord = {
   id: string
   staffEmail: string
   workDate: string
-  weekStart: string
-  weekEnd: string
-  workedDates: string[]
-  workLocation: 'remote' | 'office'
-  hours: number
+  startedAt: string
+  endedAt?: string
+  durationMinutes: number
   notes: string
-  status: 'pending' | 'approved' | 'rejected'
-  decisionNote?: string
-  approvedAt?: string
-  rejectedAt?: string
+  status: 'active' | 'completed'
   createdAt?: string
   updatedAt?: string
 }
@@ -595,26 +622,17 @@ function mapDocToExpense(doc: DocumentSnapshot): ExpenseRecord {
   }
 }
 
-function mapDocToTimesheet(doc: DocumentSnapshot): TimesheetRecord {
+function mapDocToWorkSession(doc: DocumentSnapshot): WorkSessionRecord {
   const data = doc.data() || {}
-  const readStatus = (status?: string): 'pending' | 'approved' | 'rejected' => {
-    return status === 'approved' || status === 'rejected' ? status : 'pending'
-  }
-
   return {
     id: doc.id,
     staffEmail: data.staffEmail || '',
     workDate: data.workDate || '',
-    weekStart: data.weekStart || data.workDate || '',
-    weekEnd: data.weekEnd || data.weekStart || data.workDate || '',
-    workedDates: Array.isArray(data.workedDates) ? data.workedDates.filter((date): date is string => typeof date === 'string') : (data.workDate ? [data.workDate] : []),
-    workLocation: data.workLocation === 'office' ? 'office' : 'remote',
-    hours: data.hours || 0,
+    startedAt: mapTimestamp(data.startedAt) || '',
+    endedAt: mapTimestamp(data.endedAt),
+    durationMinutes: typeof data.durationMinutes === 'number' ? data.durationMinutes : 0,
     notes: data.notes || '',
-    status: readStatus(data.status),
-    decisionNote: data.decisionNote || '',
-    approvedAt: mapTimestamp(data.approvedAt),
-    rejectedAt: mapTimestamp(data.rejectedAt),
+    status: data.status === 'completed' ? 'completed' : 'active',
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
@@ -696,7 +714,7 @@ export function listStaffAccountsPage(page: PaginationRequest) {
 
 export type DashboardSummary = {
   staffCount: number
-  pendingTimesheets: number
+  activeWorkSessions: number
   pendingExpenses: number
   approvedExpenseTotal: number
 }
@@ -727,23 +745,22 @@ async function getApprovedExpenseTotal(query: Query) {
 export async function getDashboardSummary(staffEmail?: string): Promise<DashboardSummary> {
   const db = ensureDb()
   const email = staffEmail?.trim().toLowerCase()
-  let timesheetQuery: Query = db.collection(COLLECTIONS.TIMESHEETS).where('status', '==', 'pending')
+  const activeWorkQuery: Query = db.collection(COLLECTIONS.WORK_SESSIONS).where('status', '==', 'active')
   let expensePendingQuery: Query = db.collection(COLLECTIONS.EXPENSES).where('status', '==', 'pending')
   let expenseApprovedQuery: Query = db.collection(COLLECTIONS.EXPENSES).where('status', '==', 'approved')
   if (email) {
-    timesheetQuery = timesheetQuery.where('staffEmail', '==', email)
     expensePendingQuery = expensePendingQuery.where('staffEmail', '==', email)
     expenseApprovedQuery = expenseApprovedQuery.where('staffEmail', '==', email)
   }
-  const [staffCount, timesheetCount, expenseCount, approvedTotal] = await Promise.all([
+  const [staffCount, activeWorkSnapshot, expenseCount, approvedTotal] = await Promise.all([
     email ? Promise.resolve({ data: () => ({ count: 0 }) }) : db.collection(COLLECTIONS.STAFF).count().get(),
-    timesheetQuery.count().get(),
+    activeWorkQuery.get(),
     expensePendingQuery.count().get(),
     getApprovedExpenseTotal(expenseApprovedQuery),
   ])
   return {
     staffCount: staffCount.data().count,
-    pendingTimesheets: timesheetCount.data().count,
+    activeWorkSessions: email ? activeWorkSnapshot.docs.filter((document) => document.data().staffEmail === email).length : activeWorkSnapshot.size,
     pendingExpenses: expenseCount.data().count,
     approvedExpenseTotal: approvedTotal,
   }
@@ -1167,18 +1184,6 @@ export async function updateExpenseStatus(id: string, status: 'approved' | 'reje
   return mapDocToExpense(updatedDoc)
 }
 
-export async function listTimesheets(staffEmail?: string) {
-  if (!db) return []
-
-  let query: Query = db.collection(COLLECTIONS.TIMESHEETS)
-  if (staffEmail) {
-    query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
-  }
-
-  const snapshot = await query.get()
-  return snapshot.docs.map(mapDocToTimesheet)
-}
-
 export async function markExpensePaid(id: string): Promise<ExpenseRecord> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.EXPENSES).doc(id)
@@ -1192,54 +1197,121 @@ export async function markExpensePaid(id: string): Promise<ExpenseRecord> {
   return mapDocToExpense(await docRef.get())
 }
 
-export function listTimesheetsPage(page: PaginationRequest, staffEmail?: string) {
-  let query: Query = ensureDb().collection(COLLECTIONS.TIMESHEETS)
+export async function listWorkSessions(staffEmail?: string): Promise<WorkSessionRecord[]> {
+  if (!db) return []
+  let query: Query = db.collection(COLLECTIONS.WORK_SESSIONS)
   if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
-  return paginateQuery(query, mapDocToTimesheet, page)
+  const snapshot = await query.get()
+  return snapshot.docs
+    .map(mapDocToWorkSession)
+    .sort((a, b) => (b.startedAt || b.createdAt || '').localeCompare(a.startedAt || a.createdAt || ''))
 }
 
-export async function createTimesheet(input: { staffEmail: string; weekStart: string; weekEnd: string; workedDates: string[]; workLocation: 'remote' | 'office'; notes?: string }): Promise<TimesheetRecord> {
-  const db = ensureDb()
-
-  const docRef = db.collection(COLLECTIONS.TIMESHEETS).doc() // auto-generate ID
-
-  const newTimesheetData = {
-    staffEmail: input.staffEmail.trim().toLowerCase(),
-    workDate: input.weekStart,
-    weekStart: input.weekStart,
-    weekEnd: input.weekEnd,
-    workedDates: input.workedDates,
-    workLocation: input.workLocation,
-    hours: 0,
-    notes: input.notes?.trim() || '',
-    status: 'pending' as const,
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-  }
-
-  await docRef.set(newTimesheetData)
-  const newDoc = await docRef.get()
-  if (!newDoc.exists) {
-    throw new Error('Failed to retrieve timesheet after creation.')
-  }
-  return mapDocToTimesheet(newDoc)
+export function listWorkSessionsPage(page: PaginationRequest, staffEmail?: string) {
+  let query: Query = ensureDb().collection(COLLECTIONS.WORK_SESSIONS)
+  if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
+  return paginateQuery(query, mapDocToWorkSession, page)
 }
 
-export async function updateTimesheetStatus(id: string, status: 'approved' | 'rejected', decisionNote = ''): Promise<TimesheetRecord> {
+function workSessionDocumentId(staffEmail: string, workDate: string) {
+  return `work_${crypto.createHash('sha256').update(`${staffEmail.trim().toLowerCase()}:${workDate}`).digest('hex').slice(0, 32)}`
+}
+
+export async function startWorkSession(staffEmail: string, workDate: string): Promise<WorkSessionRecord> {
   const db = ensureDb()
-  const docRef = db.collection(COLLECTIONS.TIMESHEETS).doc(id)
-  await docRef.update({
-    status: status,
-    decisionNote: decisionNote.trim(),
-    approvedAt: status === 'approved' ? FieldValue.serverTimestamp() : null,
-    rejectedAt: status === 'rejected' ? FieldValue.serverTimestamp() : null,
-    updatedAt: FieldValue.serverTimestamp(),
+  const normalizedEmail = staffEmail.trim().toLowerCase()
+  const docRef = db.collection(COLLECTIONS.WORK_SESSIONS).doc(workSessionDocumentId(normalizedEmail, workDate))
+  const now = Timestamp.now()
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (snapshot.exists) {
+      if (snapshot.data()?.status === 'active') throw new Error('WORK_SESSION_ALREADY_ACTIVE')
+      throw new Error('WORK_SESSION_ALREADY_COMPLETED')
+    }
+    transaction.set(docRef, {
+      staffEmail: normalizedEmail,
+      workDate,
+      startedAt: now,
+      durationMinutes: 0,
+      notes: '',
+      status: 'active',
+      createdAt: now,
+      updatedAt: now,
+    })
   })
-  const updatedDoc = await docRef.get()
-  if (!updatedDoc.exists) {
-    throw new Error('Document not found after update.')
-  }
-  return mapDocToTimesheet(updatedDoc)
+  return mapDocToWorkSession(await docRef.get())
+}
+
+export async function endWorkSession(id: string, staffEmail: string, notes: string): Promise<WorkSessionRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.WORK_SESSIONS).doc(id)
+  const normalizedEmail = staffEmail.trim().toLowerCase()
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists || snapshot.data()?.staffEmail !== normalizedEmail) throw new Error('WORK_SESSION_NOT_FOUND')
+    if (snapshot.data()?.status !== 'active') throw new Error('WORK_SESSION_ALREADY_COMPLETED')
+    const startedAt = snapshot.data()?.startedAt
+    if (!(startedAt instanceof Timestamp)) throw new Error('WORK_SESSION_INVALID_START')
+    const endedAt = Timestamp.now()
+    const durationMinutes = Math.max(1, Math.round((endedAt.toMillis() - startedAt.toMillis()) / 60_000))
+    transaction.update(docRef, {
+      endedAt,
+      durationMinutes,
+      notes: notes.trim(),
+      status: 'completed',
+      updatedAt: endedAt,
+    })
+  })
+  return mapDocToWorkSession(await docRef.get())
+}
+
+export async function correctWorkSessionTimes(
+  id: string,
+  input: { startedAt: Date; endedAt?: Date; actorEmail: string },
+): Promise<{ previous: WorkSessionRecord; session: WorkSessionRecord }> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.WORK_SESSIONS).doc(id)
+  const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
+  let previous: WorkSessionRecord | null = null
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('WORK_SESSION_NOT_FOUND')
+
+    previous = mapDocToWorkSession(snapshot)
+    const correctedStartedAt = input.startedAt.toISOString()
+    const correctedEndedAt = input.endedAt?.toISOString()
+    const changes: AuditLogRecord['changes'] = {}
+    if (previous.startedAt !== correctedStartedAt) changes.startedAt = { from: previous.startedAt, to: correctedStartedAt }
+    if ((previous.endedAt || null) !== (correctedEndedAt || null)) changes.endedAt = { from: previous.endedAt || null, to: correctedEndedAt || null }
+    if (!Object.keys(changes).length) throw new Error('WORK_SESSION_NO_CHANGES')
+
+    const startedAt = Timestamp.fromDate(input.startedAt)
+    const endedAt = input.endedAt ? Timestamp.fromDate(input.endedAt) : null
+    const durationMinutes = endedAt
+      ? Math.max(1, Math.round((endedAt.toMillis() - startedAt.toMillis()) / 60_000))
+      : 0
+
+    transaction.update(docRef, {
+      startedAt,
+      endedAt,
+      durationMinutes,
+      status: endedAt ? 'completed' : 'active',
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+    transaction.set(auditRef, {
+      timestamp: FieldValue.serverTimestamp(),
+      actorEmail: input.actorEmail.trim().toLowerCase(),
+      action: 'WORK_SESSION_TIME_CORRECTION',
+      targetId: id,
+      details: `Admin corrected work-session times for ${previous.staffEmail} on ${previous.workDate}.`,
+      changes,
+    })
+  })
+
+  if (!previous) throw new Error('WORK_SESSION_NOT_FOUND')
+  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  return { previous, session: mapDocToWorkSession(await docRef.get()) }
 }
 
 export type LeaveRequestRecord = {
@@ -1516,6 +1588,5 @@ export async function updateLeaveRequestStatus(id: string, status: 'approved' | 
   const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc(id)
   await docRef.update({ status, decisionNote: decisionNote.trim(), updatedAt: FieldValue.serverTimestamp() })
   const doc = await docRef.get()
-  const data = doc.data() || {}
   return mapDocToLeaveRequest(doc)
 }

@@ -1,18 +1,18 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { FormEvent, Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Building2, CheckCircle2, ClipboardList, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, Filter, KeyRound, Loader2, LogOut, ReceiptText, RefreshCw, Search, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
+import { Building2, CheckCircle2, ChevronDown, ChevronRight, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, Loader2, LogOut, Play, ReceiptText, RefreshCw, Search, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
-import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, TimesheetRecord } from '@/lib/firestore'
+import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, WorkSessionRecord } from '@/lib/firestore'
 import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
 import { ClientServicesPanel } from '@/app/client-services-panel'
 import { FinancePanel } from '@/app/finance-panel'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { LeaveDateSummary } from '@/components/ui/LeaveDateSummary'
-import { addDateOnlyDays, countDateOnlyDaysInclusive, dateOnlyDay, formatDateOnlyDisplay, formatDateOnlyForLocale, todayLocalDateOnly } from '@/lib/date-only'
+import { countDateOnlyDaysInclusive, formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
 import { LEAVE_ALLOWANCES, leaveTypeLabel, type LeaveType } from '@/lib/leave'
 import { escapeHtml } from '@/lib/html'
@@ -32,14 +32,25 @@ type PayrollRow = {
   department: string
   payrollPeriod: string
   monthlySalary: number
-  approvedWorkDays: number
+  completedWorkDays: number
+}
+
+type TaskStatusFilter = 'all' | 'working' | 'completed' | 'not-started'
+type TaskDurationSort = 'recent' | 'highest' | 'lowest'
+type DailyWorkSummary = {
+  key: string
+  staffEmail: string
+  workDate: string
+  sessions: WorkSessionRecord[]
+  status: 'active' | 'completed' | 'not-started'
+  durationMinutes: number
 }
 
 const ADMIN_TAB_LABELS: Record<string, string> = {
   dashboard: 'Dashboard',
   staff: 'Employees',
   properties: 'Clients',
-  timesheets: 'Timesheets',
+  tasks: 'Tasks',
   expenses: 'Expenses',
   leaves: 'Leaves',
   payroll: 'Payroll',
@@ -70,15 +81,17 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [offerStaff, setOfferStaff] = useState<PublicStaffRecord | null>(null)
   const [propertyList, setPropertyList] = useState<PropertyRecord[]>([])
   const [onboardingList, setOnboardingList] = useState<OnboardingRecord[]>([])
-  // Timesheet state
-  const [timesheetList, setTimesheetList] = useState<TimesheetRecord[]>([])
-  const [showTimesheetFilters, setShowTimesheetFilters] = useState(false)
-  const [timesheetFilterEmployee, setTimesheetFilterEmployee] = useState('all')
-  const [timesheetWorkDate, setTimesheetWorkDate] = useState('')
-  const [timesheetWeekEnd, setTimesheetWeekEnd] = useState('')
-  const [timesheetWorkedDates, setTimesheetWorkedDates] = useState<string[]>([])
-  const [timesheetLocation, setTimesheetLocation] = useState<'remote' | 'office'>('remote')
-  const [timesheetNotes, setTimesheetNotes] = useState('')
+  // Daily task and work-session state
+  const [workSessionList, setWorkSessionList] = useState<WorkSessionRecord[]>([])
+  const [taskEmployeeSearch, setTaskEmployeeSearch] = useState('')
+  const [taskDateFilter, setTaskDateFilter] = useState('')
+  const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>('all')
+  const [taskDurationSort, setTaskDurationSort] = useState<TaskDurationSort>('recent')
+  const [expandedTaskSummary, setExpandedTaskSummary] = useState('')
+  const [correctingWorkSession, setCorrectingWorkSession] = useState<WorkSessionRecord | null>(null)
+  const [workNotes, setWorkNotes] = useState('')
+  const [workActionLoading, setWorkActionLoading] = useState(false)
+  const [workClock, setWorkClock] = useState(() => Date.now())
   // Expense state
   const [expenseList, setExpenseList] = useState<ExpenseRecord[]>([])
   const [leaveList, setLeaveList] = useState<LeaveRequestRecord[]>([])
@@ -199,23 +212,16 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         .finally(() => setLoading(false))
     }
 
-    if (activeTab === 'timesheets') {
+    if (activeTab === 'tasks') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/timesheets'), fetch('/api/admin/staff'), fetch('/api/admin/leaves')])
-        .then(async (responses) => {
-          const [timesheetRes, staffRes, leaveRes] = responses
-          const timesheetData = await timesheetRes.json()
-          if (timesheetData.timesheets) {
-            setTimesheetList(timesheetData.timesheets)
-          }
+      Promise.all([fetch('/api/admin/tasks'), fetch('/api/admin/staff')])
+        .then(async ([taskRes, staffRes]) => {
+          const taskData = await taskRes.json()
+          if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
           const staffData = await staffRes.json()
-          if (staffData.staff) {
-            setStaffList(staffData.staff)
-          }
-          const leaveData = await leaveRes.json()
-          if (leaveData.leaves) setLeaveList(leaveData.leaves)
+          if (staffData.staff) setStaffList(staffData.staff)
         })
-        .catch(() => setError('Could not load data for this view.'))
+        .catch(() => setError('Could not load employee task logs.'))
         .finally(() => setLoading(false))
     }
 
@@ -235,12 +241,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
     if (activeTab === 'payroll') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/salaries'), fetch('/api/admin/timesheets')])
-        .then(async ([salaryRes, timesheetRes]) => {
-          const [salaryData, timesheetData] = await Promise.all([salaryRes.json(), timesheetRes.json()])
+      Promise.all([fetch('/api/admin/salaries'), fetch('/api/admin/tasks')])
+        .then(async ([salaryRes, taskRes]) => {
+          const [salaryData, taskData] = await Promise.all([salaryRes.json(), taskRes.json()])
           if (salaryData.staff) setStaffList(salaryData.staff)
           if (salaryData.salaries) setSalaryList(salaryData.salaries)
-          if (timesheetData.timesheets) setTimesheetList(timesheetData.timesheets)
+          if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
         })
         .catch(() => setError('Could not load payroll data.'))
         .finally(() => setLoading(false))
@@ -283,15 +289,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         .finally(() => setLoading(false))
     }
 
-    if (activeTab === 'timesheets') {
+    if (activeTab === 'tasks') {
       setLoading(true)
-      Promise.all([fetch('/api/staff/timesheets'), fetch('/api/staff/leaves')])
-        .then(async ([timesheetRes, leaveRes]) => {
-          const [timesheetData, leaveData] = await Promise.all([timesheetRes.json(), leaveRes.json()])
-          if (timesheetData.timesheets) setTimesheetList(timesheetData.timesheets)
-          if (leaveData.leaves) setLeaveList(leaveData.leaves)
+      fetch('/api/staff/tasks')
+        .then(async (response) => {
+          const data = await response.json()
+          if (!response.ok) throw new Error(data.message || 'Could not load your work log.')
+          if (data.workSessions) setWorkSessionList(data.workSessions)
         })
-        .catch(() => setError('Could not load your timesheets.'))
+        .catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not load your work log.'))
         .finally(() => setLoading(false))
     }
 
@@ -315,9 +321,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }, [activeTab, user.mustChangePassword, user.role])
 
   useEffect(() => {
-    if (user.role !== 'staff') return
-    setTimesheetWorkedDates((current) => current.filter((date) => !isApprovedLeaveDate(leaveList, user.email, date)))
-  }, [leaveList, user.email, user.role])
+    if (user.role !== 'staff' || !user.mustChangePassword) return
+
+    apiFetch<{ settings: SecuritySettings }>('/api/staff/change-password')
+      .then((data) => setSecuritySettings(data.settings))
+      .catch(() => setError('Could not load the password policy. The server will still enforce the current security settings.'))
+  }, [user.mustChangePassword, user.role])
 
   async function logout() {
     await fetch('/api/logout', { method: 'POST' })
@@ -367,8 +376,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }
   }
 
-  async function handleDeleteStaff(staffId: string, staffName: string) {
-    if (!window.confirm(`Are you sure you want to delete ${staffName}? This action cannot be undone.`)) {
+  async function handleDeleteStaff(staffId: string, staffName: string, staffEmail: string) {
+    if (!window.confirm(`Delete ${staffName} and all of their tasks, leave requests, and salary records? Expense and receipt history will be preserved. This action cannot be undone.`)) {
       return
     }
 
@@ -394,7 +403,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       }
 
       setStaffList((prev) => prev.filter((s) => s.id !== staffId))
-      setMessage('Employee deleted.')
+      setSalaryList((prev) => prev.filter((salary) => salary.id !== staffId && salary.staffEmail !== staffEmail))
+      setWorkSessionList((prev) => prev.filter((session) => session.staffEmail !== staffEmail))
+      setLeaveList((prev) => prev.filter((leave) => leave.staffEmail !== staffEmail))
+      setMessage('Employee records deleted. Expense and receipt history was preserved.')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.')
     } finally {
@@ -452,38 +464,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       setError(caught instanceof Error ? caught.message : 'Failed to activate employee.')
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleTimesheetStatusUpdate(timesheetId: string, status: 'approved' | 'rejected') {
-    const decisionNote = status === 'rejected' ? window.prompt('Rejection reason (shown to the employee):') : ''
-    if (status === 'rejected' && decisionNote === null) return
-    const originalTimesheets = [...timesheetList]
-    // Optimistic UI update
-    setTimesheetList((prev) => prev.map((ts) => (ts.id === timesheetId ? { ...ts, status } : ts)))
-
-    try {
-      const response = await fetch(`/api/admin/timesheets/${timesheetId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, decisionNote }),
-      })
-
-      if (!response.ok) {
-        // Revert on failure
-        setTimesheetList(originalTimesheets)
-        let errorMessage = 'Failed to update timesheet status.'
-        try {
-          const data = await response.json()
-          errorMessage = data.message || errorMessage
-        } catch (e) {
-          errorMessage = response.statusText || errorMessage
-        }
-        setError(errorMessage)
-      }
-    } catch (err) {
-      setTimesheetList(originalTimesheets)
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred.')
     }
   }
 
@@ -602,35 +582,50 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }
   }
 
-  async function submitTimesheet(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setLoading(true)
+  async function startWork() {
+    setWorkActionLoading(true)
     setMessage('')
     setError('')
-
     try {
-      const response = await fetch('/api/staff/timesheets', {
+      const response = await fetch('/api/staff/tasks', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ weekStart: timesheetWorkDate, weekEnd: timesheetWeekEnd, workedDates: timesheetWorkedDates, workLocation: timesheetLocation, notes: timesheetNotes }),
       })
-      const data = (await response.json()) as { message?: string; timesheet?: TimesheetRecord }
-
-      if (!response.ok || !data.timesheet) {
-        setError(data.message || 'Unable to submit timesheet.')
-        return
-      }
-
-      setTimesheetWorkDate('')
-      setTimesheetWeekEnd('')
-      setTimesheetWorkedDates([])
-      setTimesheetNotes('')
-      setTimesheetList((prev) => [data.timesheet!, ...prev])
-      setMessage('Timesheet submitted for admin approval.')
-    } catch {
-      setError('Unable to submit timesheet right now.')
+      const data = await response.json() as { workSession?: WorkSessionRecord; message?: string }
+      if (!response.ok || !data.workSession) throw new Error(data.message || 'Unable to start work.')
+      setWorkSessionList((current) => [data.workSession!, ...current])
+      setWorkClock(Date.now())
+      setMessage('Work timer started.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to start work right now.')
     } finally {
-      setLoading(false)
+      setWorkActionLoading(false)
+    }
+  }
+
+  async function endWork(session: WorkSessionRecord) {
+    const notes = workNotes.trim()
+    if (notes.length < 3) {
+      setError('Add a short summary of the work completed today.')
+      return
+    }
+    setWorkActionLoading(true)
+    setMessage('')
+    setError('')
+    try {
+      const response = await fetch(`/api/staff/tasks/${encodeURIComponent(session.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes }),
+      })
+      const data = await response.json() as { workSession?: WorkSessionRecord; message?: string }
+      if (!response.ok || !data.workSession) throw new Error(data.message || 'Unable to end work.')
+      setWorkSessionList((current) => current.map((item) => item.id === data.workSession!.id ? data.workSession! : item))
+      setWorkNotes('')
+      setMessage('Work completed and today’s summary saved.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to end work right now.')
+    } finally {
+      setWorkActionLoading(false)
     }
   }
 
@@ -757,8 +752,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       return
     }
 
-    const headers: (keyof PayrollRow)[] = ['employeeName', 'employeeId', 'department', 'payrollPeriod', 'monthlySalary', 'approvedWorkDays']
-    const headerRow = 'Employee Name,Employee ID,Department,Payroll Period,Monthly Salary,Approved Work Days'
+    const headers: (keyof PayrollRow)[] = ['employeeName', 'employeeId', 'department', 'payrollPeriod', 'monthlySalary', 'completedWorkDays']
+    const headerRow = 'Employee Name,Employee ID,Department,Payroll Period,Monthly Salary,Completed Work Days'
 
     const csvRows = payrollRows.map(row =>
       headers.map(header => {
@@ -873,20 +868,99 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const inputClass =
     'h-12 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 text-sm text-ink placeholder:text-ghost transition-colors focus:border-[#66B159] focus:outline-none focus:ring-1 focus:ring-[#66B159]/40'
 
-  const filteredTimesheets = useMemo(() => {
-    if (timesheetFilterEmployee === 'all') {
-      return timesheetList
-    }
-    return timesheetList.filter(ts => ts.staffEmail === timesheetFilterEmployee)
-  }, [timesheetList, timesheetFilterEmployee])
+  const staffNameByEmail = useMemo(
+    () => new Map(staffList.map((staff) => [staff.email, staff.name])),
+    [staffList],
+  )
 
-  const weekDays = useMemo(() => {
-    if (!timesheetWorkDate) return []
-    return Array.from({ length: 7 }, (_, index) => {
-      const value = addDateOnlyDays(timesheetWorkDate, index)
-      return { value, label: formatDateOnlyForLocale(value, { weekday: 'short' }), day: formatDateOnlyForLocale(value, { day: 'numeric', month: 'short' }) }
+  const dailyWorkSummaries = useMemo(() => {
+    const query = taskEmployeeSearch.trim().toLowerCase()
+    const matchingSessions = workSessionList
+      .filter((session) => {
+        if (!query) return true
+        const employeeName = staffNameByEmail.get(session.staffEmail) || ''
+        return employeeName.toLowerCase().includes(query) || session.staffEmail.toLowerCase().includes(query)
+      })
+      .filter((session) => !taskDateFilter || session.workDate === taskDateFilter)
+
+    const grouped = new Map<string, DailyWorkSummary>()
+    matchingSessions.forEach((session) => {
+      const key = `${session.staffEmail}:${session.workDate}`
+      const existing = grouped.get(key)
+      if (existing) {
+        existing.sessions.push(session)
+        existing.durationMinutes += workSessionDurationMinutes(session, workClock)
+        if (session.status === 'active') existing.status = 'active'
+      } else {
+        grouped.set(key, {
+          key,
+          staffEmail: session.staffEmail,
+          workDate: session.workDate,
+          sessions: [session],
+          status: session.status,
+          durationMinutes: workSessionDurationMinutes(session, workClock),
+        })
+      }
     })
-  }, [timesheetWorkDate])
+
+    let summaries = [...grouped.values()]
+    if (taskStatusFilter === 'working') summaries = summaries.filter((summary) => summary.status === 'active')
+    if (taskStatusFilter === 'completed') summaries = summaries.filter((summary) => summary.status === 'completed')
+    if (taskStatusFilter === 'not-started') {
+      const targetDate = taskDateFilter || todayLocalDateOnly()
+      const employeesWithSessions = new Set(
+        workSessionList.filter((session) => session.workDate === targetDate).map((session) => session.staffEmail),
+      )
+      summaries = staffList
+        .filter((staff) => staff.active && !employeesWithSessions.has(staff.email))
+        .filter((staff) => !query || staff.name.toLowerCase().includes(query) || staff.email.toLowerCase().includes(query))
+        .map((staff) => ({
+          key: `${staff.email}:${targetDate}`,
+          staffEmail: staff.email,
+          workDate: targetDate,
+          sessions: [],
+          status: 'not-started' as const,
+          durationMinutes: 0,
+        }))
+    }
+
+    return summaries.sort((a, b) => {
+      if (taskDurationSort === 'highest' && b.durationMinutes !== a.durationMinutes) return b.durationMinutes - a.durationMinutes
+      if (taskDurationSort === 'lowest' && a.durationMinutes !== b.durationMinutes) return a.durationMinutes - b.durationMinutes
+      if (query) {
+        const aName = staffNameByEmail.get(a.staffEmail)?.toLowerCase() || a.staffEmail.toLowerCase()
+        const bName = staffNameByEmail.get(b.staffEmail)?.toLowerCase() || b.staffEmail.toLowerCase()
+        const rankDifference = Number(!aName.startsWith(query)) - Number(!bName.startsWith(query))
+        if (rankDifference) return rankDifference
+      }
+      const dateDifference = b.workDate.localeCompare(a.workDate)
+      return dateDifference || a.staffEmail.localeCompare(b.staffEmail)
+    })
+  }, [staffList, staffNameByEmail, taskDateFilter, taskDurationSort, taskEmployeeSearch, taskStatusFilter, workClock, workSessionList])
+
+  const taskTodaySummary = useMemo(() => {
+    const today = todayLocalDateOnly()
+    const todaySessions = workSessionList.filter((session) => session.workDate === today)
+    const employeesWithSessions = new Set(todaySessions.map((session) => session.staffEmail))
+    return {
+      working: todaySessions.filter((session) => session.status === 'active').length,
+      completed: todaySessions.filter((session) => session.status === 'completed').length,
+      notStarted: staffList.filter((staff) => staff.active && !employeesWithSessions.has(staff.email)).length,
+      totalMinutes: todaySessions.reduce((total, session) => total + workSessionDurationMinutes(session, workClock), 0),
+    }
+  }, [staffList, workClock, workSessionList])
+
+  const activeWorkSession = user.role === 'staff' ? workSessionList.find((session) => session.status === 'active') : undefined
+  const todayCompletedSession = user.role === 'staff'
+    ? workSessionList.find((session) => session.status === 'completed' && session.workDate === todayLocalDateOnly())
+    : undefined
+
+  useEffect(() => {
+    if (!workSessionList.some((session) => session.status === 'active')) return
+    setWorkClock(Date.now())
+    const timer = window.setInterval(() => setWorkClock(Date.now()), 30_000)
+    return () => window.clearInterval(timer)
+  }, [workSessionList])
 
   const payrollRows = useMemo<PayrollRow[]>(() => {
     const now = new Date()
@@ -897,20 +971,19 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     return staffList.map((staff) => {
       const monthlySalary = salaryList.find((salary) => salary.staffEmail === staff.email)?.baseSalary || 0
       const workedDates = new Set(
-        timesheetList
-          .filter((timesheet) => timesheet.staffEmail === staff.email && timesheet.status === 'approved')
-          .flatMap((timesheet) => timesheet.workedDates.length ? timesheet.workedDates : [timesheet.workDate])
+        workSessionList
+          .filter((session) => session.staffEmail === staff.email && session.status === 'completed')
+          .map((session) => session.workDate)
           .filter((date) => {
             const parsed = new Date(`${date}T00:00:00`)
             return parsed.getFullYear() === currentYear && parsed.getMonth() === currentMonth
           })
       )
 
-      return { employeeName: staff.name, employeeId: staff.employeeId || 'N/A', department: staff.department || 'N/A', payrollPeriod: period, monthlySalary, approvedWorkDays: workedDates.size }
+      return { employeeName: staff.name, employeeId: staff.employeeId || 'N/A', department: staff.department || 'N/A', payrollPeriod: period, monthlySalary, completedWorkDays: workedDates.size }
     })
-  }, [salaryList, staffList, timesheetList])
+  }, [salaryList, staffList, workSessionList])
 
-  const pendingTimesheets = timesheetList.filter((timesheet) => timesheet.status === 'pending')
   const pendingExpenses = expenseList.filter((expense) => expense.status === 'pending')
   const expensePersonQuery = expensePersonSearch.trim().toLowerCase()
   const visibleTrackedExpenses = expenseList
@@ -929,10 +1002,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const approvedExpenseTotal = expenseList
     .filter((expense) => expense.status === 'approved')
     .reduce((total, expense) => total + expense.amount, 0)
-  const dashboardPendingTimesheets = dashboardSummary?.pendingTimesheets ?? pendingTimesheets.length
+  const dashboardActiveWorkSessions = dashboardSummary?.activeWorkSessions ?? workSessionList.filter((session) => session.status === 'active').length
   const dashboardPendingExpenses = dashboardSummary?.pendingExpenses ?? pendingExpenses.length
   const dashboardApprovedExpenseTotal = dashboardSummary?.approvedExpenseTotal ?? approvedExpenseTotal
-  const recentActivity = [...timesheetList.map((timesheet) => ({ type: 'Timesheet', title: timesheet.workDate, status: timesheet.status, createdAt: timesheet.createdAt })), ...expenseList.map((expense) => ({ type: 'Expense', title: expense.title, status: expense.status, createdAt: expense.createdAt }))]
+  const recentActivity = [...workSessionList.map((session) => ({ type: 'Task', title: session.workDate, status: session.status, createdAt: session.createdAt })), ...expenseList.map((expense) => ({ type: 'Expense', title: expense.title, status: expense.status, createdAt: expense.createdAt }))]
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 5)
 
@@ -981,12 +1054,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               </button>
               <button
                 type="button"
-                onClick={() => setActiveTab('timesheets')}
+                onClick={() => setActiveTab('tasks')}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'timesheets' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
+                  activeTab === 'tasks' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
-                Timesheets
+                Tasks
               </button>
               <button
                 type="button"
@@ -1032,7 +1105,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         {user.role === 'staff' && !user.mustChangePassword && (
           <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm md:flex">
             <div className="flex items-center gap-1">
-              {['dashboard', 'properties', 'expenses', 'timesheets', 'leaves'].map((tab) => (
+              {['dashboard', 'properties', 'expenses', 'tasks', 'leaves'].map((tab) => (
                 <button
                   key={tab}
                   type="button"
@@ -1127,14 +1200,14 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                 </button>
                 <button
                   type="button"
-                  onClick={() => setActiveTab('timesheets')}
+                  onClick={() => setActiveTab('tasks')}
                   className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                    activeTab === 'timesheets'
+                    activeTab === 'tasks'
                       ? 'border-[#66B159] text-ink'
                       : 'border-transparent text-sub hover:border-zinc-700'
                   }`}
                 >
-                  Timesheets
+                  Tasks
                 </button>
                 <button
                   type="button"
@@ -1174,7 +1247,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           {user.role === 'staff' && !user.mustChangePassword && (
             <div className="mt-10 overflow-x-auto border-b border-zinc-800 md:hidden">
               <div className="-mb-px flex items-center gap-4">
-                {['dashboard', 'properties', 'expenses', 'timesheets', 'leaves'].map((tab) => (
+                {['dashboard', 'properties', 'expenses', 'tasks', 'leaves'].map((tab) => (
                   <button
                     key={tab}
                     type="button"
@@ -1192,7 +1265,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
             </div>
           )}
 
-          <div className={`mt-10 w-full ${(user.role === 'admin' || activeTab === 'dashboard' || activeTab === 'properties' || activeTab === 'expenses' || activeTab === 'timesheets') ? 'max-w-7xl' : 'max-w-3xl'}`}>
+          <div className={`mt-10 w-full ${(user.role === 'admin' || activeTab === 'dashboard' || activeTab === 'properties' || activeTab === 'expenses' || activeTab === 'tasks') ? 'max-w-7xl' : 'max-w-3xl'}`}>
             {user.role === 'admin'
               ? {
                    dashboard: (
@@ -1200,7 +1273,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                         <DashboardMetric icon={<Users className="h-5 w-5" />} label="Active employees" value={dashboardSummary?.staffCount ?? staffList.length} detail="People in your workspace" />
                         <DashboardMetric icon={<Building2 className="h-5 w-5" />} label="Active client properties" value={propertyList.filter((property) => property.status === 'active').length} detail="Hospitality properties served" />
-                        <DashboardMetric icon={<ClipboardList className="h-5 w-5" />} label="Timesheets to review" value={dashboardPendingTimesheets} detail="Awaiting a decision" />
+                        <DashboardMetric icon={<Clock3 className="h-5 w-5" />} label="Working now" value={dashboardActiveWorkSessions} detail="Active employee work sessions" />
                         <DashboardMetric icon={<ReceiptText className="h-5 w-5" />} label="Expenses to review" value={dashboardPendingExpenses} detail="Awaiting a decision" />
                         <DashboardMetric icon={<CheckCircle2 className="h-5 w-5" />} label="Approved expenses" value={`Rs. ${dashboardApprovedExpenseTotal.toLocaleString('en-IN')}`} detail="Total approved to date" />
                       </div>
@@ -1209,13 +1282,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         <div className="surface rounded-lg p-6 sm:p-7">
                           <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
-                              <p className="text-lg font-semibold text-ink">Approval queue</p>
-                              <p className="mt-1 text-sm text-sub">Keep employee submissions moving.</p>
+                              <p className="text-lg font-semibold text-ink">Operational overview</p>
+                              <p className="mt-1 text-sm text-sub">Monitor active work and pending expense decisions.</p>
                             </div>
-                            <button type="button" onClick={() => setActiveTab('timesheets')} className="text-sm font-semibold text-[#4d9144] hover:text-[#36722f]">Review timesheets</button>
+                            <button type="button" onClick={() => setActiveTab('tasks')} className="text-sm font-semibold text-[#4d9144] hover:text-[#36722f]">Open Tasks</button>
                           </div>
                           <div className="mt-6 divide-y divide-zinc-200">
-                            <DashboardQueueRow label="Timesheets" count={dashboardPendingTimesheets} action="Open queue" onClick={() => setActiveTab('timesheets')} />
+                            <DashboardQueueRow label="Employees working now" count={dashboardActiveWorkSessions} action="View tasks" detail={dashboardActiveWorkSessions === 0 ? 'No active work sessions' : `${dashboardActiveWorkSessions} currently working`} onClick={() => setActiveTab('tasks')} />
                             <DashboardQueueRow label="Expense claims" count={dashboardPendingExpenses} action="Open queue" onClick={() => setActiveTab('expenses')} />
                           </div>
                         </div>
@@ -1407,7 +1480,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                           {!staff.active ? <button type="button" onClick={() => activateAcknowledgedStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-green-500/20 hover:text-green-400 transition-colors" aria-label={`Acknowledge offer and activate ${staff.name}`} title="Acknowledge & activate"><CheckCircle2 className="h-4 w-4" /></button> : null}
                                           <button type="button" onClick={() => setEditingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors" aria-label={`Edit ${staff.name}`} title="Edit employee"><Edit className="h-4 w-4" /></button>
                                           <button type="button" onClick={() => handleResetPassword(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-amber-500/20 hover:text-amber-400 transition-colors" aria-label={`Reset password for ${staff.name}`} title="Reset password"><RefreshCw className="h-4 w-4" /></button>
-                                          <button type="button" onClick={() => handleDeleteStaff(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Delete ${staff.name}`} title="Delete employee"><Trash2 className="h-4 w-4" /></button>
+                                          <button type="button" onClick={() => handleDeleteStaff(staff.id, staff.name, staff.email)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Delete ${staff.name}`} title="Delete employee and records"><Trash2 className="h-4 w-4" /></button>
                                         </div>
                                       </td>
                                     </tr>
@@ -1421,74 +1494,89 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     </div>
                   ),
                   properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} />,
-                  timesheets: (
-                    <div className="surface rounded-lg">
-                      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
-                        <div>
-                          <p className="text-lg font-semibold text-ink">Timesheet Management</p>
-                          <p className="mt-1 text-sm text-sub">Review and approve submitted timesheets.</p>
-                        </div>
-                        <div className="relative flex items-center gap-2">
-                          <button type="button" onClick={() => setShowTimesheetFilters(v => !v)} className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub transition-colors hover:border-zinc-600 hover:text-ink">
-                            <Filter className="h-4 w-4" />
-                            Filter
-                          </button>
-                          {showTimesheetFilters && (
-                            <div className="absolute right-0 top-full z-10 mt-2 w-64 rounded-lg border border-zinc-700 bg-zinc-900 p-4 shadow-2xl">
-                              <label htmlFor="timesheet-employee-filter" className="label-upper mb-2 block text-ghost">
-                                Employee
-                              </label>
-                              <select
-                                id="timesheet-employee-filter"
-                                value={timesheetFilterEmployee}
-                                onChange={(e) => setTimesheetFilterEmployee(e.target.value)}
-                                className="h-10 w-full rounded-lg border border-zinc-600 bg-zinc-800 px-3 text-sm text-ink"
-                              >
-                                <option value="all">All Employees</option>
-                                {staffList.map(staff => (
-                                  <option key={staff.id} value={staff.email}>{staff.name}</option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                        </div>
+                  tasks: (
+                    <div className="space-y-5">
+                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <TaskMetric label="Working now" value={taskTodaySummary.working} detail="Active today" tone="green" />
+                        <TaskMetric label="Completed today" value={taskTodaySummary.completed} detail="Work summaries submitted" tone="green" />
+                        <TaskMetric label="Not started" value={taskTodaySummary.notStarted} detail="Active employees today" tone="amber" />
+                        <TaskMetric label="Total hours today" value={formatWorkDuration(taskTodaySummary.totalMinutes)} detail="Completed and active time" tone="neutral" />
                       </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead className="border-b border-zinc-700 text-left">
-                            <tr>
-                              <th className="px-6 py-4 font-medium text-sub">Employee</th>
-                              <th className="px-6 py-4 font-medium text-sub">Week</th>
-                              <th className="px-6 py-4 font-medium text-sub">Worked days</th>
-                              <th className="px-6 py-4 font-medium text-sub">Location</th>
-                              <th className="px-6 py-4 font-medium text-sub">Status</th>
-                              <th className="px-6 py-4 font-medium text-sub">Actions</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {loading ? (
+                      <div className="surface rounded-lg">
+                        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
+                          <div>
+                            <p className="text-lg font-semibold text-ink">Daily Employee Summary</p>
+                            <p className="mt-1 text-sm text-sub">Compact daily totals with expandable work details.</p>
+                          </div>
+                          <div className="flex flex-wrap items-end gap-2">
+                            <label className="relative block"><span className="sr-only">Search employee</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={taskEmployeeSearch} onChange={(event) => setTaskEmployeeSearch(event.target.value)} className="h-10 w-56 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employee" aria-label="Search Tasks by employee name or email" /></label>
+                            <label className="block w-44"><span className="sr-only">Filter by work date</span><DatePickerInput value={taskDateFilter} onChange={setTaskDateFilter} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
+                            <label><span className="sr-only">Filter by status</span><select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as TaskStatusFilter)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="all">All statuses</option><option value="working">Working</option><option value="completed">Completed</option><option value="not-started">Not started</option></select></label>
+                            <label><span className="sr-only">Sort by duration</span><select value={taskDurationSort} onChange={(event) => setTaskDurationSort(event.target.value as TaskDurationSort)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="recent">Newest first</option><option value="highest">Highest hours</option><option value="lowest">Lowest hours</option></select></label>
+                            {taskEmployeeSearch || taskDateFilter || taskStatusFilter !== 'all' || taskDurationSort !== 'recent' ? <button type="button" onClick={() => { setTaskEmployeeSearch(''); setTaskDateFilter(''); setTaskStatusFilter('all'); setTaskDurationSort('recent') }} className="h-10 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub transition-colors hover:text-ink">Clear filters</button> : null}
+                          </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full min-w-[860px] text-sm">
+                            <thead className="border-b border-zinc-700 text-left">
+                              <tr>
+                                <th className="w-12 px-4 py-4"><span className="sr-only">Expand</span></th>
+                                <th className="px-4 py-4 font-medium text-sub">Employee</th>
+                                <th className="px-4 py-4 font-medium text-sub">Date</th>
+                                <th className="px-4 py-4 font-medium text-sub">Status</th>
+                                <th className="px-4 py-4 font-medium text-sub">Duration</th>
+                                <th className="px-4 py-4 font-medium text-sub">Summary</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {loading ? (
                                 <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
-                            ) : (
-                              filteredTimesheets.map((ts) => (
-                                <tr key={ts.id} className="border-b border-zinc-800 last:border-none">
-                                  <td className="px-6 py-4 text-ink">{ts.staffEmail}</td>
-                                  <td className="px-6 py-4 text-sub">{ts.weekStart || ts.workDate} to {ts.weekEnd || ts.workDate}</td>
-                                  <td className="px-6 py-4 text-sub"><TimesheetDaysSummary timesheet={ts} leaves={leaveList} /></td>
-                                  <td className="px-6 py-4 text-sub">{ts.workLocation}</td>
-                                  <td className="px-6 py-4"><StatusBadge status={ts.status} /></td>
-                                  <td className="px-6 py-4">
-                                    {ts.status === 'pending' ? (
-                                      <div className="flex items-center gap-2">
-                                        <button onClick={() => handleTimesheetStatusUpdate(ts.id, 'approved')} className="flex h-8 items-center gap-1.5 rounded-md bg-green-500/10 px-2.5 text-xs text-green-400 transition-colors hover:bg-green-500/20"><CheckCircle2 className="h-3.5 w-3.5" />Approve</button>
-                                        <button onClick={() => handleTimesheetStatusUpdate(ts.id, 'rejected')} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs text-red-400 transition-colors hover:bg-red-500/20"><XCircle className="h-3.5 w-3.5" />Reject</button>
-                                      </div>
-                                    ) : <span className="text-xs text-ghost">No actions</span>}
-                                  </td>
-                                </tr>
-                              ))
-                            )}
-                          </tbody>
-                        </table>
+                              ) : dailyWorkSummaries.length === 0 ? (
+                                <tr><td colSpan={6} className="py-10 text-center text-sub">{taskEmployeeSearch.trim() || taskDateFilter || taskStatusFilter !== 'all' ? 'No employee summaries match the selected filters.' : 'No work sessions recorded yet.'}</td></tr>
+                              ) : (
+                                dailyWorkSummaries.map((summary) => {
+                                  const expanded = expandedTaskSummary === summary.key
+                                  const firstNote = summary.sessions.find((session) => session.notes)?.notes
+                                  return (
+                                    <Fragment key={summary.key}>
+                                      <tr className="border-b border-zinc-800">
+                                        <td className="px-4 py-4">
+                                          {summary.sessions.length ? <button type="button" onClick={() => setExpandedTaskSummary(expanded ? '' : summary.key)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={`${expanded ? 'Collapse' : 'Expand'} ${staffNameByEmail.get(summary.staffEmail) || summary.staffEmail} work details`}>{expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button> : null}
+                                        </td>
+                                        <td className="px-4 py-4"><p className="font-medium text-ink">{staffNameByEmail.get(summary.staffEmail) || summary.staffEmail}</p><p className="text-xs text-sub">{summary.staffEmail}</p></td>
+                                        <td className="whitespace-nowrap px-4 py-4 text-sub">{formatDateOnlyDisplay(summary.workDate)}</td>
+                                        <td className="px-4 py-4"><TaskSummaryStatus status={summary.status} /></td>
+                                        <td className="whitespace-nowrap px-4 py-4 font-medium text-ink">{formatWorkDuration(summary.durationMinutes)}</td>
+                                        <td className="max-w-sm px-4 py-4 text-sub"><p className="truncate">{firstNote || (summary.status === 'active' ? 'Work currently in progress.' : summary.status === 'not-started' ? 'Work has not been started.' : 'No summary recorded.')}</p></td>
+                                      </tr>
+                                      {expanded ? (
+                                        <tr className="border-b border-zinc-800 bg-zinc-950/35">
+                                          <td colSpan={6} className="px-6 py-5">
+                                            <div className="space-y-3">
+                                              {summary.sessions.map((session) => (
+                                                <div key={session.id} className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
+                                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">
+                                                      <span>Start: <strong className="font-medium text-ink">{formatWorkTime(session.startedAt)}</strong></span>
+                                                      <span>End: <strong className="font-medium text-ink">{session.endedAt ? formatWorkTime(session.endedAt) : 'In progress'}</strong></span>
+                                                      <span>Duration: <strong className="font-medium text-ink">{formatWorkDuration(workSessionDurationMinutes(session, workClock))}</strong></span>
+                                                    </div>
+                                                    <button type="button" onClick={() => setCorrectingWorkSession(session)} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub transition-colors hover:border-[#66B159]/50 hover:text-ink" title="Correct start or end time"><Edit className="h-3.5 w-3.5" /> Correct time</button>
+                                                  </div>
+                                                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-sub">{session.notes || (session.status === 'active' ? 'Work currently in progress.' : 'No work summary recorded.')}</p>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ) : null}
+                                    </Fragment>
+                                  )
+                                })
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     </div>
                   ),
@@ -1599,7 +1687,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
                         <div>
                           <p className="text-lg font-semibold text-ink">Payroll Processing</p>
-                          <p className="mt-1 text-sm text-sub">Monthly salary is paid in full. Approved timesheets are shown for reference only.</p>
+                          <p className="mt-1 text-sm text-sub">Monthly salary is paid in full. Completed work sessions are shown for reference only.</p>
                         </div>
                         <div className="flex items-center gap-2">
                           <button type="button" className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 text-sm text-sub transition-colors hover:bg-zinc-800">
@@ -1618,7 +1706,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                               <th className="px-6 py-4 font-medium text-sub">Employee</th>
                               <th className="px-6 py-4 font-medium text-sub">Department</th>
                               <th className="px-6 py-4 font-medium text-sub">Salary</th>
-                              <th className="px-6 py-4 font-medium text-sub">Approved work days</th>
+                              <th className="px-6 py-4 font-medium text-sub">Completed work days</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1632,7 +1720,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                 </td>
                                 <td className="px-6 py-4 text-sub">{p.department}</td>
                                 <td className="px-6 py-4 text-sub">₹{p.monthlySalary.toLocaleString('en-IN')}</td>
-                                <td className="px-6 py-4 text-sub">{p.approvedWorkDays}</td>
+                                <td className="px-6 py-4 text-sub">{p.completedWorkDays}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1742,14 +1830,19 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           value={newPassword}
                           onChange={(event) => setNewPassword(event.target.value)}
                           className={`${inputClass} pr-12`}
-                          placeholder="At least 8 characters"
-                          minLength={8}
+                          placeholder={`At least ${securitySettings.minPasswordLength} characters`}
+                          minLength={securitySettings.minPasswordLength}
                           required
                         />
                         <button type="button" onClick={() => setShowNewPassword((visible) => !visible)} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ghost transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}>
                           {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
+                      <p className="mt-2 text-xs text-sub">
+                        Use at least {securitySettings.minPasswordLength} characters
+                        {securitySettings.requireUppercase ? ', including an uppercase letter' : ''}
+                        {securitySettings.requireNumber ? ', including a number' : ''}.
+                      </p>
                     </div>
                   </div>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -1793,7 +1886,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   dashboard: (
                     <div className="staff-dashboard space-y-6">
                       <div className="grid gap-4 sm:grid-cols-3">
-                        <DashboardMetric icon={<ClipboardList className="h-5 w-5" />} label="Pending timesheets" value={dashboardPendingTimesheets} detail="Waiting for admin review" />
+                        <DashboardMetric icon={<Clock3 className="h-5 w-5" />} label="Work timer" value={dashboardActiveWorkSessions ? 'Running' : 'Not started'} detail="Today’s task session" />
                         <DashboardMetric icon={<ReceiptText className="h-5 w-5" />} label="Pending expenses" value={dashboardPendingExpenses} detail="Waiting for admin review" />
                         <DashboardMetric icon={<CheckCircle2 className="h-5 w-5" />} label="Approved expenses" value={`Rs. ${dashboardApprovedExpenseTotal.toLocaleString('en-IN')}`} detail="Reimbursable total approved" />
                       </div>
@@ -1803,14 +1896,14 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             <div><p className="text-lg font-semibold text-ink">Recent activity</p><p className="mt-1 text-sm text-sub">Your latest submissions and decisions.</p></div>
                           </div>
                           <div className="mt-5 divide-y divide-zinc-200">
-                            {loading ? <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-[#4d9144]" /></div> : recentActivity.length === 0 ? <p className="py-8 text-sm text-sub">No submissions yet. Start with an expense or timesheet.</p> : recentActivity.map((item, index) => <div key={`${item.type}-${index}`} className="flex items-center justify-between gap-4 py-4"><div><p className="text-sm font-medium text-ink">{item.type}: {item.title}</p><p className="mt-1 text-xs text-sub">{item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recently submitted'}</p></div><StatusBadge status={item.status} /></div>)}
+                            {loading ? <div className="py-8 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-[#4d9144]" /></div> : recentActivity.length === 0 ? <p className="py-8 text-sm text-sub">No activity yet. Start work or submit an expense.</p> : recentActivity.map((item, index) => <div key={`${item.type}-${index}`} className="flex items-center justify-between gap-4 py-4"><div><p className="text-sm font-medium text-ink">{item.type}: {item.title}</p><p className="mt-1 text-xs text-sub">{item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recently submitted'}</p></div><StatusBadge status={item.status} /></div>)}
                           </div>
                         </div>
                         <div className="surface rounded-lg p-6 sm:p-7">
                           <p className="text-lg font-semibold text-ink">Submit work</p>
                           <p className="mt-1 text-sm leading-6 text-sub">Send your records for admin approval.</p>
                           <div className="mt-5 grid gap-3">
-                            <button type="button" onClick={() => setActiveTab('timesheets')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Submit timesheet <ClipboardList className="h-4 w-4 text-[#4d9144]" /></button>
+                            <button type="button" onClick={() => setActiveTab('tasks')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Open today’s tasks <Clock3 className="h-4 w-4 text-[#4d9144]" /></button>
                             <button type="button" onClick={() => setActiveTab('expenses')} className="flex items-center justify-between rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm font-medium text-ink transition-colors hover:border-[#66B159]">Submit expense <ReceiptText className="h-4 w-4 text-[#4d9144]" /></button>
                           </div>
                         </div>
@@ -1922,105 +2015,60 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       </div>
                     </div>
                   ),
-                  timesheets: (
+                  tasks: (
                     <div className="staff-workspace space-y-6 text-left">
-                      <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitTimesheet}>
-                        <div className="mb-6">
-                          <p className="text-lg font-semibold text-ink">Submit Timesheet</p>
-                          <p className="mt-1 text-sm text-sub">Select your work week, then choose the days you worked.</p>
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                          <div>
-                            <label htmlFor="timesheetWorkDate" className="label-upper mb-2 block text-ghost">
-                              Week starts (Sunday)
-                            </label>
-                            <DatePickerInput id="timesheetWorkDate" value={timesheetWorkDate} onChange={(value) => {
-                              setTimesheetWorkDate(value)
-                              setTimesheetWorkedDates([])
-                              if (value && dateOnlyDay(value) === 0) {
-                                setTimesheetWeekEnd(addDateOnlyDays(value, 6))
-                              } else {
-                                setTimesheetWeekEnd('')
-                              }
-                            }} className={inputClass} required />
-                          </div>
-                          <div>
-                            <label htmlFor="timesheetWeekEnd" className="label-upper mb-2 block text-ghost">Week ends (Saturday)</label>
-                            <DatePickerInput id="timesheetWeekEnd" value={timesheetWeekEnd} onChange={setTimesheetWeekEnd} className={inputClass} min={timesheetWorkDate || undefined} required />
-                          </div>
-                          <div>
-                            <label htmlFor="timesheetLocation" className="label-upper mb-2 block text-ghost">Work location</label>
-                            <select id="timesheetLocation" value={timesheetLocation} onChange={(event) => setTimesheetLocation(event.target.value as 'remote' | 'office')} className={inputClass}><option value="remote">Remote</option><option value="office">Office</option></select>
-                          </div>
-                        </div>
-                        {timesheetWorkDate ? <fieldset className="mt-5">
-                          <legend className="label-upper mb-3 block text-ghost">Days worked</legend>
-                          {dateOnlyDay(timesheetWorkDate) !== 0 ? <p className="text-sm text-red-600">Please choose a Sunday as the week start.</p> : <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
-                            {weekDays.map((day) => {
-                              const selected = timesheetWorkedDates.includes(day.value)
-                              const leaveApproved = isApprovedLeaveDate(leaveList, user.email, day.value)
-                              return <label key={day.value} className={`rounded-lg border px-3 py-3 text-center transition-colors ${leaveApproved ? 'cursor-not-allowed border-amber-300 bg-amber-50 text-amber-800' : selected ? 'cursor-pointer border-[#66B159] bg-[#66B159]/15 text-[#36722f]' : 'cursor-pointer border-zinc-200 bg-white text-ink hover:border-[#66B159]/60'}`}>
-                                <input type="checkbox" checked={selected} disabled={leaveApproved} onChange={() => setTimesheetWorkedDates((current) => selected ? current.filter((date) => date !== day.value) : [...current, day.value])} className="sr-only" />
-                                <span className="block text-xs font-semibold">{day.label}</span><span className="mt-1 block text-xs opacity-70">{day.day}</span>{leaveApproved ? <span className="mt-1 block text-[10px] font-semibold">Leave approved</span> : null}
-                              </label>
-                            })}
-                          </div>}
-                        </fieldset> : null}
-                        <div className="mt-4">
-                          <label htmlFor="timesheetNotes" className="label-upper mb-2 block text-ghost">
-                            Notes (optional)
-                          </label>
-                          <textarea
-                            id="timesheetNotes"
-                            rows={3}
-                            value={timesheetNotes}
-                            onChange={(event) => setTimesheetNotes(event.target.value)}
-                            className={`${inputClass} h-auto resize-none py-3`}
-                          />
+                      <section className="staff-work-card rounded-lg p-6 sm:p-7">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div><p className="text-lg font-semibold text-ink">Today’s Task & Work Time</p><p className="mt-1 text-sm text-sub">{formatDateOnlyDisplay(todayLocalDateOnly())}</p></div>
+                          {activeWorkSession ? <div className="rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-xs font-semibold uppercase tracking-wider text-sub">Work time</p><p className="mt-1 text-xl font-bold text-[#66B159]">{formatLiveWorkDuration(activeWorkSession.startedAt, workClock)}</p></div> : null}
                         </div>
 
-                        {message && <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p>}
-                        {error && <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
-
-                        <button
-                          type="submit"
-                          disabled={loading}
-                          className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-6"
-                        >
-                          {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-                          Submit timesheet
-                        </button>
-                      </form>
+                        {loading ? <div className="flex min-h-36 items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-sub" /></div> : activeWorkSession ? (
+                          <div className="mt-6">
+                            <div className="flex items-center gap-3 rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-3"><span className="relative flex h-3 w-3"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#66B159] opacity-50" /><span className="relative inline-flex h-3 w-3 rounded-full bg-[#66B159]" /></span><div><p className="font-semibold text-ink">Work in progress</p><p className="text-xs text-sub">Started at {formatWorkTime(activeWorkSession.startedAt)}</p></div></div>
+                            <label className="mt-5 block"><span className="label-upper mb-2 block text-ghost">Today’s work summary</span><textarea rows={5} value={workNotes} onChange={(event) => setWorkNotes(event.target.value)} maxLength={2000} className={`${inputClass} h-auto resize-y py-3`} placeholder="Example: Completed 45 calls. 8 clients were interested, 3 follow-ups were scheduled, and 1 client was converted. Add any onboarding or other tasks completed today." required /></label>
+                            <p className="mt-2 text-xs text-sub">Add the work completed, calls made, interested leads, conversions, follow-ups, or onboarding progress.</p>
+                            <button type="button" onClick={() => void endWork(activeWorkSession)} disabled={workActionLoading || workNotes.trim().length < 3} className="mt-5 flex h-12 items-center gap-2 rounded-lg bg-red-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50">{workActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4 fill-current" />} End work & save summary</button>
+                          </div>
+                        ) : todayCompletedSession ? (
+                          <div className="mt-6 rounded-lg border border-green-500/25 bg-green-500/10 p-5"><div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-green-400" /><div><p className="font-semibold text-ink">Today’s work is completed</p><p className="mt-1 text-sm text-sub">{formatWorkTime(todayCompletedSession.startedAt)} – {todayCompletedSession.endedAt ? formatWorkTime(todayCompletedSession.endedAt) : ''} · {formatWorkDuration(todayCompletedSession.durationMinutes)}</p></div></div><p className="mt-4 text-sm leading-6 text-sub">{todayCompletedSession.notes}</p></div>
+                        ) : (
+                          <div className="mt-6"><p className="max-w-2xl text-sm leading-6 text-sub">Start the timer when you begin today’s work. After starting, the End Work option will appear and a work summary will be required before finishing.</p><button type="button" onClick={() => void startWork()} disabled={workActionLoading} className="mt-5 flex h-12 items-center gap-2 rounded-lg bg-[#66B159] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66] disabled:opacity-50">{workActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />} Start work</button></div>
+                        )}
+                        {message ? <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p> : null}
+                        {error ? <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+                      </section>
 
                       <div className="staff-work-card rounded-lg">
                         <div className="border-b border-zinc-800 p-6">
-                          <p className="text-lg font-semibold text-ink">My Timesheets</p>
+                          <p className="text-lg font-semibold text-ink">My Work Log</p>
                         </div>
                         <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
+                          <table className="w-full min-w-[760px] text-sm">
                             <thead className="border-b border-zinc-700 text-left">
                               <tr>
-                                <th className="px-6 py-4 font-medium text-sub">Week</th>
-                                <th className="px-6 py-4 font-medium text-sub">Worked days</th>
-                                <th className="px-6 py-4 font-medium text-sub">Location</th>
+                                <th className="px-6 py-4 font-medium text-sub">Date</th>
+                                <th className="px-6 py-4 font-medium text-sub">Start</th>
+                                <th className="px-6 py-4 font-medium text-sub">End</th>
+                                <th className="px-6 py-4 font-medium text-sub">Duration</th>
                                 <th className="px-6 py-4 font-medium text-sub">Status</th>
+                                <th className="px-6 py-4 font-medium text-sub">Work summary</th>
                               </tr>
                             </thead>
                             <tbody>
                               {loading ? (
-                                <tr><td colSpan={4} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
-                              ) : timesheetList.length === 0 ? (
-                                <tr><td colSpan={4} className="py-10 text-center text-sub">No timesheets submitted yet.</td></tr>
+                                <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
+                              ) : workSessionList.length === 0 ? (
+                                <tr><td colSpan={6} className="py-10 text-center text-sub">No work sessions recorded yet.</td></tr>
                               ) : (
-                                timesheetList.map((timesheet) => (
-                                  <tr key={timesheet.id} className="border-b border-zinc-800 last:border-none">
-                                    <td className="px-6 py-4">
-                                      <p className="font-medium text-ink">{timesheet.weekStart || timesheet.workDate} to {timesheet.weekEnd || timesheet.workDate}</p>
-                                      {timesheet.notes ? <p className="text-xs text-sub">{timesheet.notes}</p> : null}
-                                    </td>
-                                    <td className="px-6 py-4 text-sub"><TimesheetDaysSummary timesheet={timesheet} leaves={leaveList} /></td>
-                                    <td className="px-6 py-4 text-sub">{timesheet.workLocation}</td>
-                                    <td className="px-6 py-4"><StatusBadge status={timesheet.status} />{timesheet.decisionNote ? <p className="mt-1 max-w-48 text-xs text-sub">{timesheet.decisionNote}</p> : null}{timesheet.approvedAt || timesheet.rejectedAt ? <p className="mt-1 text-xs text-sub">{new Date(timesheet.approvedAt || timesheet.rejectedAt || '').toLocaleDateString('en-IN')}</p> : null}</td>
+                                workSessionList.map((session) => (
+                                  <tr key={session.id} className="border-b border-zinc-800 last:border-none">
+                                    <td className="whitespace-nowrap px-6 py-4 font-medium text-ink">{formatDateOnlyDisplay(session.workDate)}</td>
+                                    <td className="whitespace-nowrap px-6 py-4 text-sub">{formatWorkTime(session.startedAt)}</td>
+                                    <td className="whitespace-nowrap px-6 py-4 text-sub">{session.endedAt ? formatWorkTime(session.endedAt) : 'In progress'}</td>
+                                    <td className="whitespace-nowrap px-6 py-4 text-sub">{session.status === 'active' ? formatLiveWorkDuration(session.startedAt, workClock) : formatWorkDuration(session.durationMinutes)}</td>
+                                    <td className="px-6 py-4"><WorkSessionStatus status={session.status} /></td>
+                                    <td className="max-w-md px-6 py-4 text-sub">{session.notes || 'Work currently in progress.'}</td>
                                   </tr>
                                 ))
                               )}
@@ -2056,6 +2104,18 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         />
       )}
       {offerStaff ? <OfferLetterModal staff={offerStaff} onClose={() => setOfferStaff(null)} /> : null}
+      {correctingWorkSession ? (
+        <WorkSessionCorrectionModal
+          session={correctingWorkSession}
+          employeeName={staffNameByEmail.get(correctingWorkSession.staffEmail) || correctingWorkSession.staffEmail}
+          onClose={() => setCorrectingWorkSession(null)}
+          onSaved={(updatedSession) => {
+            setWorkSessionList((current) => current.map((session) => session.id === updatedSession.id ? updatedSession : session))
+            setCorrectingWorkSession(null)
+            setMessage('Work-session time corrected and added to the audit log.')
+          }}
+        />
+      ) : null}
     </main>
   )
 }
@@ -2321,26 +2381,122 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
   )
 }
 
-function isApprovedLeaveDate(leaves: LeaveRequestRecord[], staffEmail: string, date: string) {
-  const normalizedEmail = staffEmail.trim().toLowerCase()
-  return leaves.some((leave) => leave.status === 'approved' && leave.staffEmail.trim().toLowerCase() === normalizedEmail && date >= leave.startDate && date <= leave.endDate)
+function formatWorkTime(value?: string) {
+  if (!value) return '—'
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
 }
 
-function TimesheetDaysSummary({ timesheet, leaves }: { timesheet: TimesheetRecord; leaves: LeaveRequestRecord[] }) {
-  const weekStart = timesheet.weekStart || timesheet.workDate
-  const workedDates = new Set(timesheet.workedDates.length ? timesheet.workedDates : timesheet.workDate ? [timesheet.workDate] : [])
-  const days = Array.from({ length: 7 }, (_, index) => addDateOnlyDays(weekStart, index))
-    .filter(Boolean)
-    .map((date) => ({ date, worked: workedDates.has(date), leaveApproved: isApprovedLeaveDate(leaves, timesheet.staffEmail, date) }))
-    .filter((day) => day.worked || day.leaveApproved)
+function formatWorkDuration(minutes: number) {
+  const safeMinutes = Math.max(0, Math.round(minutes))
+  const hours = Math.floor(safeMinutes / 60)
+  const remainder = safeMinutes % 60
+  return hours ? `${hours}h ${remainder}m` : `${remainder}m`
+}
 
-  if (days.length === 0) return <>Not recorded</>
+function workSessionDurationMinutes(session: WorkSessionRecord, now: number) {
+  if (session.status !== 'active') return Math.max(0, session.durationMinutes)
+  const started = new Date(session.startedAt).getTime()
+  return Number.isFinite(started) ? Math.max(0, Math.floor((now - started) / 60_000)) : 0
+}
 
-  return <div className="flex max-w-md flex-wrap gap-1.5">
-    {days.map((day) => <span key={day.date} className={`rounded border px-2 py-1 text-xs ${day.leaveApproved ? 'border-amber-300 bg-amber-50 font-semibold text-amber-800' : 'border-zinc-700 bg-zinc-900 text-sub'}`}>
-      {formatDateOnlyForLocale(day.date, { weekday: 'short', day: '2-digit', month: 'short' })}{day.leaveApproved ? ' · Leave approved' : ' · Worked'}
-    </span>)}
-  </div>
+function formatLiveWorkDuration(startedAt: string, now: number) {
+  const started = new Date(startedAt).getTime()
+  if (!Number.isFinite(started)) return '0m'
+  return formatWorkDuration(Math.max(0, Math.floor((now - started) / 60_000)))
+}
+
+function WorkSessionStatus({ status }: { status: WorkSessionRecord['status'] }) {
+  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${status === 'completed' ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-[#66B159]/25 bg-[#66B159]/10 text-[#66B159]'}`}>{status === 'completed' ? 'Completed' : 'In progress'}</span>
+}
+
+function TaskSummaryStatus({ status }: { status: DailyWorkSummary['status'] }) {
+  const style = status === 'completed'
+    ? 'border-green-500/20 bg-green-500/10 text-green-400'
+    : status === 'not-started'
+      ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
+      : 'border-[#66B159]/25 bg-[#66B159]/10 text-[#66B159]'
+  const label = status === 'completed' ? 'Completed' : status === 'not-started' ? 'Not started' : 'Working'
+  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${style}`}>{label}</span>
+}
+
+function TaskMetric({ label, value, detail, tone }: { label: string; value: string | number; detail: string; tone: 'green' | 'amber' | 'neutral' }) {
+  const valueStyle = tone === 'amber' ? 'text-amber-400' : tone === 'green' ? 'text-[#66B159]' : 'text-ink'
+  return (
+    <div className="surface rounded-lg p-5">
+      <p className={`text-2xl font-semibold ${valueStyle}`}>{value}</p>
+      <p className="mt-2 text-sm font-medium text-ink">{label}</p>
+      <p className="mt-1 text-xs text-sub">{detail}</p>
+    </div>
+  )
+}
+
+function toDateTimeLocal(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.valueOf())) return ''
+  const offset = date.getTimezoneOffset() * 60_000
+  return new Date(date.valueOf() - offset).toISOString().slice(0, 16)
+}
+
+function WorkSessionCorrectionModal({ session, employeeName, onClose, onSaved }: {
+  session: WorkSessionRecord
+  employeeName: string
+  onClose: () => void
+  onSaved: (session: WorkSessionRecord) => void
+}) {
+  const [startedAt, setStartedAt] = useState(toDateTimeLocal(session.startedAt))
+  const [endedAt, setEndedAt] = useState(toDateTimeLocal(session.endedAt))
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      const response = await fetch(`/api/admin/tasks/${encodeURIComponent(session.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startedAt: new Date(startedAt).toISOString(),
+          endedAt: endedAt ? new Date(endedAt).toISOString() : null,
+        }),
+      })
+      const data = await response.json() as { workSession?: WorkSessionRecord; message?: string }
+      if (!response.ok || !data.workSession) throw new Error(data.message || 'Unable to correct work-session times.')
+      onSaved(data.workSession)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to correct work-session times.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const modalInputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <form onSubmit={submit} className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-950 p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-lg font-semibold text-ink">Correct work time</p>
+            <p className="mt-1 text-sm text-sub">{employeeName} · {formatDateOnlyDisplay(session.workDate)}</p>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label="Close correction form"><XCircle className="h-4 w-4" /></button>
+        </div>
+        <p className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-200">Every correction records the previous and updated times in the Admin audit log.</p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          <div><label htmlFor="correctWorkStart" className="label-upper mb-2 block text-ghost">Start time</label><input id="correctWorkStart" type="datetime-local" value={startedAt} onChange={(event) => setStartedAt(event.target.value)} className={modalInputClass} required /></div>
+          <div><label htmlFor="correctWorkEnd" className="label-upper mb-2 block text-ghost">End time</label><input id="correctWorkEnd" type="datetime-local" value={endedAt} onChange={(event) => setEndedAt(event.target.value)} className={modalInputClass} required={session.status === 'completed'} /></div>
+        </div>
+        {error ? <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
+          <button type="submit" disabled={loading || !startedAt || (session.status === 'completed' && !endedAt)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Save correction</button>
+        </div>
+      </form>
+    </div>
+  )
 }
 
 function DashboardMetric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string | number; detail: string }) {
@@ -2356,23 +2512,25 @@ function DashboardMetric({ icon, label, value, detail }: { icon: ReactNode; labe
   )
 }
 
-function DashboardQueueRow({ label, count, action, onClick }: { label: string; count: number; action: string; onClick: () => void }) {
+function DashboardQueueRow({ label, count, action, detail, onClick }: { label: string; count: number; action: string; detail?: string; onClick: () => void }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 py-4">
       <div>
         <p className="text-sm font-medium text-ink">{label}</p>
-        <p className="mt-1 text-xs text-sub">{count === 0 ? 'Nothing waiting right now' : `${count} awaiting approval`}</p>
+        <p className="mt-1 text-xs text-sub">{detail || (count === 0 ? 'Nothing waiting right now' : `${count} awaiting approval`)}</p>
       </div>
       <button type="button" onClick={onClick} className="text-sm font-semibold text-[#4d9144] hover:text-[#36722f]">{action}</button>
     </div>
   )
 }
 
-const StatusBadge = ({ status }: { status: 'pending' | 'approved' | 'rejected' }) => {
+const StatusBadge = ({ status }: { status: 'pending' | 'approved' | 'rejected' | 'active' | 'completed' }) => {
   const statusStyles = {
     pending: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
     approved: 'bg-green-500/10 text-green-400 border-green-500/20',
     rejected: 'bg-red-500/10 text-red-400 border-red-500/20',
+    active: 'bg-[#66B159]/10 text-[#66B159] border-[#66B159]/20',
+    completed: 'bg-green-500/10 text-green-400 border-green-500/20',
   }
   return (
     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium border ${statusStyles[status]}`}>
