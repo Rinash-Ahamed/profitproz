@@ -4,18 +4,21 @@ import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { createExpense, listExpenses, listExpensesPage, logAdminAction } from '@/lib/firestore'
 import { readPagination } from '@/lib/pagination'
 import { parseDateOnly } from '@/lib/date-only'
+import { timedApiResponse } from '@/lib/api-timing'
 
 export async function GET(request: Request) {
-  const cookieStore = await cookies()
-  const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
+  return timedApiResponse('GET /api/admin/expenses', async () => {
+    const cookieStore = await cookies()
+    const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
 
-  if (!user || user.role !== 'admin') {
-    return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
-  }
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
+    }
 
-  const pagination = readPagination(request)
-  if (pagination) { const page = await listExpensesPage(pagination); return NextResponse.json({ expenses: page.items, nextCursor: page.nextCursor }) }
-  return NextResponse.json({ expenses: await listExpenses() })
+    const pagination = readPagination(request)
+    if (pagination) { const page = await listExpensesPage(pagination); return NextResponse.json({ expenses: page.items, nextCursor: page.nextCursor }) }
+    return NextResponse.json({ expenses: await listExpenses() })
+  })
 }
 
 export async function POST(request: Request) {

@@ -1,15 +1,14 @@
 'use client'
 
-import { FormEvent, Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Building2, CheckCircle2, ChevronDown, ChevronRight, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, Loader2, LogOut, Play, ReceiptText, RefreshCw, Search, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { Building2, CheckCircle2, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, Loader2, LogOut, Play, ReceiptText, RefreshCw, Search, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
 import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, WorkSessionRecord } from '@/lib/firestore'
 import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
-import { ClientServicesPanel } from '@/app/client-services-panel'
-import { FinancePanel } from '@/app/finance-panel'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { LeaveDateSummary } from '@/components/ui/LeaveDateSummary'
 import { countDateOnlyDaysInclusive, formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
@@ -19,6 +18,11 @@ import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
 import { ADMIN_NAMES } from '@/lib/admin-options'
+import { formatLiveWorkDuration, formatWorkDuration, formatWorkTime } from '@/lib/work-session-format'
+
+const ClientServicesPanel = dynamic(() => import('@/app/client-services-panel').then((module) => module.ClientServicesPanel))
+const FinancePanel = dynamic(() => import('@/app/finance-panel').then((module) => module.FinancePanel))
+const AdminTasksPanel = dynamic(() => import('@/app/admin-tasks-panel').then((module) => module.AdminTasksPanel))
 
 type PortalHomeProps = {
   user: SessionUser
@@ -34,17 +38,6 @@ type PayrollRow = {
   payrollPeriod: string
   monthlySalary: number
   completedWorkDays: number
-}
-
-type TaskStatusFilter = 'all' | 'working' | 'completed' | 'not-started'
-type TaskDurationSort = 'recent' | 'highest' | 'lowest'
-type DailyWorkSummary = {
-  key: string
-  staffEmail: string
-  workDate: string
-  sessions: WorkSessionRecord[]
-  status: 'active' | 'completed' | 'not-started'
-  durationMinutes: number
 }
 
 const ADMIN_TAB_LABELS: Record<string, string> = {
@@ -76,6 +69,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffOnboardingAccess, setStaffOnboardingAccess] = useState(false)
   // Staff list state
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
+  const staffListLoadedRef = useRef(false)
   const [staffSearch, setStaffSearch] = useState('')
   const [salaryList, setSalaryList] = useState<SalaryRecord[]>([])
   const [editingStaff, setEditingStaff] = useState<PublicStaffRecord | null>(null)
@@ -84,11 +78,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [onboardingList, setOnboardingList] = useState<OnboardingRecord[]>([])
   // Daily task and work-session state
   const [workSessionList, setWorkSessionList] = useState<WorkSessionRecord[]>([])
-  const [taskEmployeeSearch, setTaskEmployeeSearch] = useState('')
-  const [taskDateFilter, setTaskDateFilter] = useState('')
-  const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>('all')
-  const [taskDurationSort, setTaskDurationSort] = useState<TaskDurationSort>('recent')
-  const [expandedTaskSummary, setExpandedTaskSummary] = useState('')
   const [correctingWorkSession, setCorrectingWorkSession] = useState<WorkSessionRecord | null>(null)
   const [workNotes, setWorkNotes] = useState('')
   const [workActionLoading, setWorkActionLoading] = useState(false)
@@ -157,169 +146,270 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   useEffect(() => {
     if (!user.expiresAt) return
 
+    const controller = new AbortController()
     let redirecting = false
+    let idleTimer = 0
+    let idleTimeoutMs = Math.max(60_000, user.expiresAt - Date.now())
+    let idleDeadline = Date.now() + idleTimeoutMs
+    let lastActivityHandledAt = 0
+    let lastRefreshAt = 0
+    let refreshing = false
+
     const expireSession = () => {
       if (redirecting) return
       redirecting = true
       fetch('/api/logout', { method: 'POST', credentials: 'same-origin', keepalive: true })
         .finally(() => window.location.replace('/login?reason=session-expired'))
     }
-    const checkSessionLimit = () => {
-      if (Date.now() >= user.expiresAt!) expireSession()
-    }
-    const timer = window.setTimeout(expireSession, Math.max(0, user.expiresAt - Date.now()))
 
-    document.addEventListener('visibilitychange', checkSessionLimit)
-    window.addEventListener('focus', checkSessionLimit)
+    const scheduleIdleCheck = () => {
+      window.clearTimeout(idleTimer)
+      idleTimer = window.setTimeout(() => {
+        if (Date.now() >= idleDeadline) expireSession()
+        else scheduleIdleCheck()
+      }, Math.max(1_000, idleDeadline - Date.now()))
+    }
+
+    const refreshSession = async () => {
+      if (refreshing || redirecting || controller.signal.aborted) return
+      refreshing = true
+      try {
+        const response = await fetch('/api/session/refresh', { method: 'POST', signal: controller.signal })
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) expireSession()
+          return
+        }
+        const data = await response.json() as { expiresAt?: number; idleTimeoutMs?: number }
+        if (typeof data.idleTimeoutMs === 'number' && data.idleTimeoutMs >= 60_000) {
+          idleTimeoutMs = data.idleTimeoutMs
+        }
+        lastRefreshAt = Date.now()
+        idleDeadline = lastRefreshAt + idleTimeoutMs
+        scheduleIdleCheck()
+      } catch (caught) {
+        if (!(caught instanceof Error && caught.name === 'AbortError')) {
+          // A temporary network failure is retried on the next user activity.
+          lastRefreshAt = 0
+        }
+      } finally {
+        refreshing = false
+      }
+    }
+
+    const recordActivity = () => {
+      const now = Date.now()
+      if (now >= idleDeadline) {
+        expireSession()
+        return
+      }
+      if (now - lastActivityHandledAt < 5_000) return
+      lastActivityHandledAt = now
+      idleDeadline = now + idleTimeoutMs
+      scheduleIdleCheck()
+      const refreshInterval = Math.max(60_000, Math.min(300_000, idleTimeoutMs / 4))
+      if (now - lastRefreshAt >= refreshInterval) void refreshSession()
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') recordActivity()
+    }
+    const activityEvents: (keyof WindowEventMap)[] = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'focus']
+    activityEvents.forEach((event) => window.addEventListener(event, recordActivity, { passive: true }))
+    document.addEventListener('visibilitychange', handleVisibility)
+    scheduleIdleCheck()
+    void refreshSession()
+
     return () => {
-      window.clearTimeout(timer)
-      document.removeEventListener('visibilitychange', checkSessionLimit)
-      window.removeEventListener('focus', checkSessionLimit)
+      controller.abort()
+      window.clearTimeout(idleTimer)
+      activityEvents.forEach((event) => window.removeEventListener(event, recordActivity))
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [user.expiresAt])
 
   useEffect(() => {
     if (user.role !== 'admin') return
+    const controller = new AbortController()
+    const tabFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, signal: controller.signal })
+    const reportError = (fallback: string) => (caught: unknown) => {
+      if (controller.signal.aborted || (caught instanceof Error && caught.name === 'AbortError')) return
+      setError(fallback)
+    }
+    const finishLoading = () => {
+      if (!controller.signal.aborted) setLoading(false)
+    }
 
     if (activeTab === 'dashboard') {
       setLoading(true)
-      apiFetch<{ summary: DashboardSummary }>('/api/dashboard')
-        .then((data) => setDashboardSummary(data.summary))
-        .catch(() => setError('Could not load dashboard data.'))
-        .finally(() => setLoading(false))
+      apiFetch<{ summary: DashboardSummary }>('/api/dashboard', { signal: controller.signal })
+        .then((data) => { if (!controller.signal.aborted) setDashboardSummary(data.summary) })
+        .catch(reportError('Could not load dashboard data.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'staff') {
       setLoading(true)
-      fetch('/api/admin/staff')
+      tabFetch('/api/admin/staff')
         .then((res) => res.json())
         .then((data) => {
+          if (controller.signal.aborted) return
           if (data.staff) {
             setStaffList(data.staff)
+            staffListLoadedRef.current = true
           }
         })
-        .catch(() => setError('Could not load employee list.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load employee list.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'properties') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/properties'), fetch('/api/admin/onboardings', { credentials: 'same-origin', cache: 'no-store' })])
+      Promise.all([tabFetch('/api/admin/properties'), tabFetch('/api/admin/onboardings', { credentials: 'same-origin', cache: 'no-store' })])
         .then(async ([propertyRes, onboardingRes]) => {
           const [propertyData, onboardingData] = await Promise.all([propertyRes.json(), onboardingRes.json()])
+          if (controller.signal.aborted) return
           if (propertyData.properties) setPropertyList(propertyData.properties)
           if (onboardingData.onboardings) setOnboardingList(onboardingData.onboardings)
         })
-        .catch(() => setError('Could not load client properties.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load client properties.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'tasks') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/tasks'), fetch('/api/admin/staff')])
+      Promise.all([
+        tabFetch('/api/admin/tasks'),
+        staffListLoadedRef.current ? Promise.resolve(null) : tabFetch('/api/admin/staff'),
+      ])
         .then(async ([taskRes, staffRes]) => {
           const taskData = await taskRes.json()
+          if (controller.signal.aborted) return
           if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
-          const staffData = await staffRes.json()
-          if (staffData.staff) setStaffList(staffData.staff)
+          if (staffRes) {
+            const staffData = await staffRes.json()
+            if (staffData.staff) {
+              setStaffList(staffData.staff)
+              staffListLoadedRef.current = true
+            }
+          }
         })
-        .catch(() => setError('Could not load employee task logs.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load employee task logs.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'expenses') {
       setLoading(true)
-      fetch('/api/admin/expenses')
+      tabFetch('/api/admin/expenses')
         .then((res) => res.json())
         .then((data) => {
+          if (controller.signal.aborted) return
           if (data.expenses) {
             setExpenseList(data.expenses)
           }
           if (data.settings) setExpenseSettings(data.settings)
         })
-        .catch(() => setError('Could not load expenses.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load expenses.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'payroll') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/salaries'), fetch('/api/admin/tasks')])
+      Promise.all([tabFetch('/api/admin/salaries'), tabFetch('/api/admin/tasks')])
         .then(async ([salaryRes, taskRes]) => {
           const [salaryData, taskData] = await Promise.all([salaryRes.json(), taskRes.json()])
-          if (salaryData.staff) setStaffList(salaryData.staff)
+          if (controller.signal.aborted) return
+          if (salaryData.staff) {
+            setStaffList(salaryData.staff)
+            staffListLoadedRef.current = true
+          }
           if (salaryData.salaries) setSalaryList(salaryData.salaries)
           if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
         })
-        .catch(() => setError('Could not load payroll data.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load payroll data.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'leaves') {
       setLoading(true)
-      fetch('/api/admin/leaves').then((res) => res.json()).then((data) => { if (data.leaves) setLeaveList(data.leaves) }).catch(() => setError('Could not load leave requests.')).finally(() => setLoading(false))
+      tabFetch('/api/admin/leaves').then((res) => res.json()).then((data) => { if (!controller.signal.aborted && data.leaves) setLeaveList(data.leaves) }).catch(reportError('Could not load leave requests.')).finally(finishLoading)
     }
 
     if (activeTab === 'settings') {
-      Promise.all([fetch('/api/admin/expense-settings'), fetch('/api/admin/security-settings')])
+      Promise.all([tabFetch('/api/admin/expense-settings'), tabFetch('/api/admin/security-settings')])
         .then(async ([expenseRes, securityRes]) => {
           const [expenseData, securityData] = await Promise.all([expenseRes.json(), securityRes.json()])
+          if (controller.signal.aborted) return
           if (expenseData.settings) setExpenseSettings(expenseData.settings)
           if (securityData.settings) setSecuritySettings(securityData.settings)
         })
-        .catch(() => setError('Could not load expense settings.'))
+        .catch(reportError('Could not load expense settings.'))
     }
+    return () => controller.abort()
   }, [activeTab, user.role])
 
   useEffect(() => {
     if (user.role !== 'staff' || user.mustChangePassword) return
+    const controller = new AbortController()
+    const tabFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, signal: controller.signal })
+    const reportError = (fallback: string) => (caught: unknown) => {
+      if (controller.signal.aborted || (caught instanceof Error && caught.name === 'AbortError')) return
+      setError(caught instanceof Error && caught.message ? caught.message : fallback)
+    }
+    const finishLoading = () => {
+      if (!controller.signal.aborted) setLoading(false)
+    }
 
     if (activeTab === 'dashboard') {
       setLoading(true)
-      apiFetch<{ summary: DashboardSummary }>('/api/dashboard').then((data) => setDashboardSummary(data.summary)).catch(() => setError('Could not load dashboard data.')).finally(() => setLoading(false))
+      apiFetch<{ summary: DashboardSummary }>('/api/dashboard', { signal: controller.signal }).then((data) => { if (!controller.signal.aborted) setDashboardSummary(data.summary) }).catch(reportError('Could not load dashboard data.')).finally(finishLoading)
     }
 
     if (activeTab === 'expenses') {
       setLoading(true)
-      fetch('/api/staff/expenses')
+      tabFetch('/api/staff/expenses')
         .then((res) => res.json())
         .then((data) => {
+          if (controller.signal.aborted) return
           if (data.expenses) {
             setExpenseList(data.expenses)
           }
         })
-        .catch(() => setError('Could not load your expenses.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load your expenses.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'tasks') {
       setLoading(true)
-      fetch('/api/staff/tasks')
+      tabFetch('/api/staff/tasks')
         .then(async (response) => {
           const data = await response.json()
+          if (controller.signal.aborted) return
           if (!response.ok) throw new Error(data.message || 'Could not load your work log.')
           if (data.workSessions) setWorkSessionList(data.workSessions)
         })
-        .catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not load your work log.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load your work log.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'leaves') {
       setLoading(true)
-      fetch('/api/staff/leaves').then((res) => res.json()).then((data) => { if (data.leaves) setLeaveList(data.leaves) }).catch(() => setError('Could not load your leave requests.')).finally(() => setLoading(false))
+      tabFetch('/api/staff/leaves').then((res) => res.json()).then((data) => { if (!controller.signal.aborted && data.leaves) setLeaveList(data.leaves) }).catch(reportError('Could not load your leave requests.')).finally(finishLoading)
     }
 
     if (activeTab === 'properties') {
       setLoading(true)
-      Promise.all([fetch('/api/properties'), fetch('/api/onboardings')])
+      Promise.all([tabFetch('/api/properties'), tabFetch('/api/onboardings')])
         .then(async ([propertyRes, onboardingRes]) => {
           const [propertyData, onboardingData] = await Promise.all([propertyRes.json(), onboardingRes.json()])
+          if (controller.signal.aborted) return
           if (propertyData.properties) setPropertyList(propertyData.properties)
           if (onboardingData.onboardings) setOnboardingList(onboardingData.onboardings)
         })
-        .catch(() => setError('Could not load client properties.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load client properties.'))
+        .finally(finishLoading)
     }
 
+    return () => controller.abort()
   }, [activeTab, user.mustChangePassword, user.role])
 
   useEffect(() => {
@@ -870,87 +960,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const inputClass =
     'h-12 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 text-sm text-ink placeholder:text-ghost transition-colors focus:border-[#66B159] focus:outline-none focus:ring-1 focus:ring-[#66B159]/40'
 
-  const staffNameByEmail = useMemo(
-    () => new Map(staffList.map((staff) => [staff.email, staff.name])),
-    [staffList],
-  )
-
-  const dailyWorkSummaries = useMemo(() => {
-    const query = taskEmployeeSearch.trim().toLowerCase()
-    const matchingSessions = workSessionList
-      .filter((session) => {
-        if (!query) return true
-        const employeeName = staffNameByEmail.get(session.staffEmail) || ''
-        return employeeName.toLowerCase().includes(query) || session.staffEmail.toLowerCase().includes(query)
-      })
-      .filter((session) => !taskDateFilter || session.workDate === taskDateFilter)
-
-    const grouped = new Map<string, DailyWorkSummary>()
-    matchingSessions.forEach((session) => {
-      const key = `${session.staffEmail}:${session.workDate}`
-      const existing = grouped.get(key)
-      if (existing) {
-        existing.sessions.push(session)
-        existing.durationMinutes += workSessionDurationMinutes(session, workClock)
-        if (session.status === 'active') existing.status = 'active'
-      } else {
-        grouped.set(key, {
-          key,
-          staffEmail: session.staffEmail,
-          workDate: session.workDate,
-          sessions: [session],
-          status: session.status,
-          durationMinutes: workSessionDurationMinutes(session, workClock),
-        })
-      }
-    })
-
-    let summaries = [...grouped.values()]
-    if (taskStatusFilter === 'working') summaries = summaries.filter((summary) => summary.status === 'active')
-    if (taskStatusFilter === 'completed') summaries = summaries.filter((summary) => summary.status === 'completed')
-    if (taskStatusFilter === 'not-started') {
-      const targetDate = taskDateFilter || todayLocalDateOnly()
-      const employeesWithSessions = new Set(
-        workSessionList.filter((session) => session.workDate === targetDate).map((session) => session.staffEmail),
-      )
-      summaries = staffList
-        .filter((staff) => staff.active && !employeesWithSessions.has(staff.email))
-        .filter((staff) => !query || staff.name.toLowerCase().includes(query) || staff.email.toLowerCase().includes(query))
-        .map((staff) => ({
-          key: `${staff.email}:${targetDate}`,
-          staffEmail: staff.email,
-          workDate: targetDate,
-          sessions: [],
-          status: 'not-started' as const,
-          durationMinutes: 0,
-        }))
-    }
-
-    return summaries.sort((a, b) => {
-      if (taskDurationSort === 'highest' && b.durationMinutes !== a.durationMinutes) return b.durationMinutes - a.durationMinutes
-      if (taskDurationSort === 'lowest' && a.durationMinutes !== b.durationMinutes) return a.durationMinutes - b.durationMinutes
-      if (query) {
-        const aName = staffNameByEmail.get(a.staffEmail)?.toLowerCase() || a.staffEmail.toLowerCase()
-        const bName = staffNameByEmail.get(b.staffEmail)?.toLowerCase() || b.staffEmail.toLowerCase()
-        const rankDifference = Number(!aName.startsWith(query)) - Number(!bName.startsWith(query))
-        if (rankDifference) return rankDifference
-      }
-      const dateDifference = b.workDate.localeCompare(a.workDate)
-      return dateDifference || a.staffEmail.localeCompare(b.staffEmail)
-    })
-  }, [staffList, staffNameByEmail, taskDateFilter, taskDurationSort, taskEmployeeSearch, taskStatusFilter, workClock, workSessionList])
-
-  const taskTodaySummary = useMemo(() => {
-    const today = todayLocalDateOnly()
-    const todaySessions = workSessionList.filter((session) => session.workDate === today)
-    const employeesWithSessions = new Set(todaySessions.map((session) => session.staffEmail))
-    return {
-      working: todaySessions.filter((session) => session.status === 'active').length,
-      completed: todaySessions.filter((session) => session.status === 'completed').length,
-      notStarted: staffList.filter((staff) => staff.active && !employeesWithSessions.has(staff.email)).length,
-    }
-  }, [staffList, workSessionList])
-
   const activeWorkSession = user.role === 'staff' ? workSessionList.find((session) => session.status === 'active') : undefined
   const todayCompletedSession = user.role === 'staff'
     ? workSessionList.find((session) => session.status === 'completed' && session.workDate === todayLocalDateOnly())
@@ -1495,91 +1504,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     </div>
                   ),
                   properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} />,
-                  tasks: (
-                    <div className="space-y-5">
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <TaskMetric label="Working now" value={taskTodaySummary.working} detail="Active today" tone="green" />
-                        <TaskMetric label="Completed today" value={taskTodaySummary.completed} detail="Work summaries submitted" tone="green" />
-                        <TaskMetric label="Not started" value={taskTodaySummary.notStarted} detail="Active employees today" tone="amber" />
-                      </div>
-                      <div className="surface rounded-lg">
-                        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
-                          <div>
-                            <p className="text-lg font-semibold text-ink">Daily Employee Summary</p>
-                            <p className="mt-1 text-sm text-sub">Compact daily totals with expandable work details.</p>
-                          </div>
-                          <div className="flex flex-wrap items-end gap-2">
-                            <label className="relative block"><span className="sr-only">Search employee</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={taskEmployeeSearch} onChange={(event) => setTaskEmployeeSearch(event.target.value)} className="h-10 w-56 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employee" aria-label="Search Tasks by employee name or email" /></label>
-                            <label className="block w-44"><span className="sr-only">Filter by work date</span><DatePickerInput value={taskDateFilter} onChange={setTaskDateFilter} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
-                            <label><span className="sr-only">Filter by status</span><select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as TaskStatusFilter)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="all">All statuses</option><option value="working">Working</option><option value="completed">Completed</option><option value="not-started">Not started</option></select></label>
-                            <label><span className="sr-only">Sort by duration</span><select value={taskDurationSort} onChange={(event) => setTaskDurationSort(event.target.value as TaskDurationSort)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="recent">Newest first</option><option value="highest">Highest hours</option><option value="lowest">Lowest hours</option></select></label>
-                            {taskEmployeeSearch || taskDateFilter || taskStatusFilter !== 'all' || taskDurationSort !== 'recent' ? <button type="button" onClick={() => { setTaskEmployeeSearch(''); setTaskDateFilter(''); setTaskStatusFilter('all'); setTaskDurationSort('recent') }} className="h-10 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub transition-colors hover:text-ink">Clear filters</button> : null}
-                          </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="w-full min-w-[860px] text-sm">
-                            <thead className="border-b border-zinc-700 text-left">
-                              <tr>
-                                <th className="w-12 px-4 py-4"><span className="sr-only">Expand</span></th>
-                                <th className="px-4 py-4 font-medium text-sub">Employee</th>
-                                <th className="px-4 py-4 font-medium text-sub">Date</th>
-                                <th className="px-4 py-4 font-medium text-sub">Status</th>
-                                <th className="px-4 py-4 font-medium text-sub">Duration</th>
-                                <th className="px-4 py-4 font-medium text-sub">Summary</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {loading ? (
-                                <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
-                              ) : dailyWorkSummaries.length === 0 ? (
-                                <tr><td colSpan={6} className="py-10 text-center text-sub">{taskEmployeeSearch.trim() || taskDateFilter || taskStatusFilter !== 'all' ? 'No employee summaries match the selected filters.' : 'No work sessions recorded yet.'}</td></tr>
-                              ) : (
-                                dailyWorkSummaries.map((summary) => {
-                                  const expanded = expandedTaskSummary === summary.key
-                                  const firstNote = summary.sessions.find((session) => session.notes)?.notes
-                                  return (
-                                    <Fragment key={summary.key}>
-                                      <tr className="border-b border-zinc-800">
-                                        <td className="px-4 py-4">
-                                          {summary.sessions.length ? <button type="button" onClick={() => setExpandedTaskSummary(expanded ? '' : summary.key)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={`${expanded ? 'Collapse' : 'Expand'} ${staffNameByEmail.get(summary.staffEmail) || summary.staffEmail} work details`}>{expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button> : null}
-                                        </td>
-                                        <td className="px-4 py-4"><p className="font-medium text-ink">{staffNameByEmail.get(summary.staffEmail) || summary.staffEmail}</p><p className="text-xs text-sub">{summary.staffEmail}</p></td>
-                                        <td className="whitespace-nowrap px-4 py-4 text-sub">{formatDateOnlyDisplay(summary.workDate)}</td>
-                                        <td className="px-4 py-4"><TaskSummaryStatus status={summary.status} /></td>
-                                        <td className="whitespace-nowrap px-4 py-4 font-medium text-ink">{formatWorkDuration(summary.durationMinutes)}</td>
-                                        <td className="max-w-sm px-4 py-4 text-sub"><p className="truncate">{firstNote || (summary.status === 'active' ? 'Work currently in progress.' : summary.status === 'not-started' ? 'Work has not been started.' : 'No summary recorded.')}</p></td>
-                                      </tr>
-                                      {expanded ? (
-                                        <tr className="border-b border-zinc-800 bg-zinc-950/35">
-                                          <td colSpan={6} className="px-6 py-5">
-                                            <div className="space-y-3">
-                                              {summary.sessions.map((session) => (
-                                                <div key={session.id} className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
-                                                  <div className="flex flex-wrap items-center justify-between gap-3">
-                                                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">
-                                                      <span>Start: <strong className="font-medium text-ink">{formatWorkTime(session.startedAt)}</strong></span>
-                                                      <span>End: <strong className="font-medium text-ink">{session.endedAt ? formatWorkTime(session.endedAt) : 'In progress'}</strong></span>
-                                                      <span>Duration: <strong className="font-medium text-ink">{formatWorkDuration(workSessionDurationMinutes(session, workClock))}</strong></span>
-                                                    </div>
-                                                    <button type="button" onClick={() => setCorrectingWorkSession(session)} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub transition-colors hover:border-[#66B159]/50 hover:text-ink" title="Correct start or end time"><Edit className="h-3.5 w-3.5" /> Correct time</button>
-                                                  </div>
-                                                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-sub">{session.notes || (session.status === 'active' ? 'Work currently in progress.' : 'No work summary recorded.')}</p>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      ) : null}
-                                    </Fragment>
-                                  )
-                                })
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  ),
+                  tasks: <AdminTasksPanel staff={staffList} sessions={workSessionList} loading={loading} now={workClock} onCorrect={setCorrectingWorkSession} onError={setError} />,
                   finance: <FinancePanel />,
                   expenses: (
                     <div className="space-y-6">
@@ -1654,7 +1579,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                   {expenseTrackingView === 'staff' ? <td className="px-6 py-4"><StatusBadge status={expense.status} />{expense.status === 'approved' ? <p className={`mt-1 text-xs font-medium ${expense.paymentStatus === 'paid' ? 'text-green-400' : 'text-amber-300'}`}>{expense.paymentStatus === 'paid' ? 'Reimbursement paid' : 'Reimbursement unpaid'}</p> : null}</td> : null}
                                   <td className="px-6 py-4">
                                     <div className="flex flex-wrap items-center gap-2">
-                                      <button type="button" onClick={() => setCorrectingExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub transition-colors hover:border-[#66B159]/50 hover:text-ink" title="Correct expense details"><Edit className="h-3.5 w-3.5" /> Correct</button>
+                                      {expense.paymentStatus !== 'paid' ? <button type="button" onClick={() => setCorrectingExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub transition-colors hover:border-[#66B159]/50 hover:text-ink" title="Correct expense details"><Edit className="h-3.5 w-3.5" /> Correct</button> : null}
                                       {expense.submittedByRole === 'admin' ? (
                                         <>
                                         {expense.paymentStatus !== 'paid' ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-[#66B159]/10 px-2.5 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark expense paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />} Mark paid</button> : <span className="text-xs font-medium text-green-400">Paid</span>}
@@ -1766,7 +1691,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <div className="surface rounded-lg p-6 sm:p-7">
                         <p className="text-base font-semibold text-ink">Security Policy</p>
                         <div className="mt-5 space-y-4">
-                          <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Session duration</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select></div>
+                          <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Idle session timeout</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select><p className="mt-2 text-xs text-sub">Active sessions renew automatically. Users are logged out after this period without activity.</p></div>
                           <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="8" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 8 }))} className={inputClass} /></div>
                           {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
                         </div>
@@ -2110,7 +2035,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       {correctingWorkSession ? (
         <WorkSessionCorrectionModal
           session={correctingWorkSession}
-          employeeName={staffNameByEmail.get(correctingWorkSession.staffEmail) || correctingWorkSession.staffEmail}
+          employeeName={staffList.find((staff) => staff.email === correctingWorkSession.staffEmail)?.name || correctingWorkSession.staffEmail}
           onClose={() => setCorrectingWorkSession(null)}
           onSaved={(updatedSession) => {
             setWorkSessionList((current) => current.map((session) => session.id === updatedSession.id ? updatedSession : session))
@@ -2395,54 +2320,8 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
   )
 }
 
-function formatWorkTime(value?: string) {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatWorkDuration(minutes: number) {
-  const safeMinutes = Math.max(0, Math.round(minutes))
-  const hours = Math.floor(safeMinutes / 60)
-  const remainder = safeMinutes % 60
-  return hours ? `${hours}h ${remainder}m` : `${remainder}m`
-}
-
-function workSessionDurationMinutes(session: WorkSessionRecord, now: number) {
-  if (session.status !== 'active') return Math.max(0, session.durationMinutes)
-  const started = new Date(session.startedAt).getTime()
-  return Number.isFinite(started) ? Math.max(0, Math.floor((now - started) / 60_000)) : 0
-}
-
-function formatLiveWorkDuration(startedAt: string, now: number) {
-  const started = new Date(startedAt).getTime()
-  if (!Number.isFinite(started)) return '0m'
-  return formatWorkDuration(Math.max(0, Math.floor((now - started) / 60_000)))
-}
-
 function WorkSessionStatus({ status }: { status: WorkSessionRecord['status'] }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${status === 'completed' ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-[#66B159]/25 bg-[#66B159]/10 text-[#66B159]'}`}>{status === 'completed' ? 'Completed' : 'In progress'}</span>
-}
-
-function TaskSummaryStatus({ status }: { status: DailyWorkSummary['status'] }) {
-  const style = status === 'completed'
-    ? 'border-green-500/20 bg-green-500/10 text-green-400'
-    : status === 'not-started'
-      ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
-      : 'border-[#66B159]/25 bg-[#66B159]/10 text-[#66B159]'
-  const label = status === 'completed' ? 'Completed' : status === 'not-started' ? 'Not started' : 'Working'
-  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${style}`}>{label}</span>
-}
-
-function TaskMetric({ label, value, detail, tone }: { label: string; value: string | number; detail: string; tone: 'green' | 'amber' }) {
-  const valueStyle = tone === 'amber' ? 'text-amber-400' : 'text-[#66B159]'
-  return (
-    <div className="surface rounded-lg p-5">
-      <p className={`text-2xl font-semibold ${valueStyle}`}>{value}</p>
-      <p className="mt-2 text-sm font-medium text-ink">{label}</p>
-      <p className="mt-1 text-xs text-sub">{detail}</p>
-    </div>
-  )
 }
 
 function toDateTimeLocal(value?: string) {

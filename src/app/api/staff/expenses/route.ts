@@ -5,6 +5,7 @@ import { getExpenseNotificationHtml, queueMail } from '@/lib/mail'
 import { readPagination } from '@/lib/pagination'
 import { requireStaffSession } from '@/lib/api-auth'
 import { parseDateOnly } from '@/lib/date-only'
+import { timedApiResponse } from '@/lib/api-timing'
 
 // Helper to centralize authentication and role checking for staff routes
 async function getAuthenticatedStaffUser(): Promise<SessionUser | NextResponse> {
@@ -21,21 +22,23 @@ function hideReceiptLink(expense: ExpenseRecord): ExpenseRecord {
 }
 
 export async function GET(request: Request) {
-  const userOrResponse = await getAuthenticatedStaffUser()
-  if (userOrResponse instanceof NextResponse) {
-    return userOrResponse
-  }
+  return timedApiResponse('GET /api/staff/expenses', async () => {
+    const userOrResponse = await getAuthenticatedStaffUser()
+    if (userOrResponse instanceof NextResponse) {
+      return userOrResponse
+    }
 
-  try {
-    const pagination = readPagination(request)
-    const [expenseResult, settings] = await Promise.all([pagination ? listExpensesPage(pagination, userOrResponse.email) : listExpenses(userOrResponse.email), getExpenseFieldSettings()])
-    return Array.isArray(expenseResult)
-      ? NextResponse.json({ expenses: expenseResult.map(hideReceiptLink), settings })
-      : NextResponse.json({ expenses: expenseResult.items.map(hideReceiptLink), settings, nextCursor: expenseResult.nextCursor })
-  } catch (error) {
-    console.error('Error fetching expenses:', error)
-    return NextResponse.json({ message: 'An internal server error occurred.' }, { status: 500 })
-  }
+    try {
+      const pagination = readPagination(request)
+      const [expenseResult, settings] = await Promise.all([pagination ? listExpensesPage(pagination, userOrResponse.email) : listExpenses(userOrResponse.email), getExpenseFieldSettings()])
+      return Array.isArray(expenseResult)
+        ? NextResponse.json({ expenses: expenseResult.map(hideReceiptLink), settings })
+        : NextResponse.json({ expenses: expenseResult.items.map(hideReceiptLink), settings, nextCursor: expenseResult.nextCursor })
+    } catch (error) {
+      console.error('Error fetching expenses:', error)
+      return NextResponse.json({ message: 'An internal server error occurred.' }, { status: 500 })
+    }
+  })
 }
 
 export async function POST(request: NextRequest) {

@@ -3,21 +3,24 @@ import { listWorkSessions, listWorkSessionsPage, startWorkSession } from '@/lib/
 import { readPagination } from '@/lib/pagination'
 import { requireStaffSession } from '@/lib/api-auth'
 import { todayInTimeZone } from '@/lib/date-only'
+import { timedApiResponse } from '@/lib/api-timing'
 
 export async function GET(request: Request) {
-  const user = await requireStaffSession()
-  if (!user) return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
-  try {
-    const pagination = readPagination(request)
-    if (pagination) {
-      const page = await listWorkSessionsPage(pagination, user.email)
-      return NextResponse.json({ workSessions: page.items, nextCursor: page.nextCursor })
+  return timedApiResponse('GET /api/staff/tasks', async () => {
+    const user = await requireStaffSession()
+    if (!user) return NextResponse.json({ message: 'Employee access is required.' }, { status: 403 })
+    try {
+      const pagination = readPagination(request)
+      if (pagination) {
+        const page = await listWorkSessionsPage(pagination, user.email)
+        return NextResponse.json({ workSessions: page.items, nextCursor: page.nextCursor })
+      }
+      return NextResponse.json({ workSessions: await listWorkSessions(user.email) })
+    } catch (error) {
+      console.error(`Failed to load work sessions for ${user.email}:`, error)
+      return NextResponse.json({ message: 'Unable to load your work log.' }, { status: 500 })
     }
-    return NextResponse.json({ workSessions: await listWorkSessions(user.email) })
-  } catch (error) {
-    console.error(`Failed to load work sessions for ${user.email}:`, error)
-    return NextResponse.json({ message: 'Unable to load your work log.' }, { status: 500 })
-  }
+  })
 }
 
 export async function POST() {

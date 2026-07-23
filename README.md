@@ -30,7 +30,7 @@ npm run build
 
 Production authentication requires Firestore and `AUTH_SECRET`. Admin and staff accounts are stored in the `admins` and `staff` collections. The development-only fallback credentials use `ADMIN_EMAIL` / `ADMIN_PASSWORD` and optionally `STAFF_LOGIN_EMAIL` / `STAFF_LOGIN_PASSWORD` when Firestore is not configured.
 
-`AUTH_SECRET` must contain at least 32 bytes in production. Session duration and password rules are managed in the Admin security settings.
+`AUTH_SECRET` must contain at least 32 bytes in production. The idle session timeout and password rules are managed in the Admin security settings. Active portal sessions renew securely; users are logged out after the configured period without activity.
 
 The repository does not automatically create the first production admin. Provision the initial `admins` document through an approved deployment/bootstrap process with a PBKDF2 password hash compatible with `src/lib/auth.ts`; never store a plaintext production password in Firestore.
 
