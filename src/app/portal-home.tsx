@@ -181,49 +181,61 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   useEffect(() => {
     if (user.role !== 'admin') return
+    const controller = new AbortController()
+    const tabFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, signal: controller.signal })
+    const reportError = (fallback: string) => (caught: unknown) => {
+      if (controller.signal.aborted || (caught instanceof Error && caught.name === 'AbortError')) return
+      setError(fallback)
+    }
+    const finishLoading = () => {
+      if (!controller.signal.aborted) setLoading(false)
+    }
 
     if (activeTab === 'dashboard') {
       setLoading(true)
-      apiFetch<{ summary: DashboardSummary }>('/api/dashboard')
-        .then((data) => setDashboardSummary(data.summary))
-        .catch(() => setError('Could not load dashboard data.'))
-        .finally(() => setLoading(false))
+      apiFetch<{ summary: DashboardSummary }>('/api/dashboard', { signal: controller.signal })
+        .then((data) => { if (!controller.signal.aborted) setDashboardSummary(data.summary) })
+        .catch(reportError('Could not load dashboard data.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'staff') {
       setLoading(true)
-      fetch('/api/admin/staff')
+      tabFetch('/api/admin/staff')
         .then((res) => res.json())
         .then((data) => {
+          if (controller.signal.aborted) return
           if (data.staff) {
             setStaffList(data.staff)
             staffListLoadedRef.current = true
           }
         })
-        .catch(() => setError('Could not load employee list.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load employee list.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'properties') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/properties'), fetch('/api/admin/onboardings', { credentials: 'same-origin', cache: 'no-store' })])
+      Promise.all([tabFetch('/api/admin/properties'), tabFetch('/api/admin/onboardings', { credentials: 'same-origin', cache: 'no-store' })])
         .then(async ([propertyRes, onboardingRes]) => {
           const [propertyData, onboardingData] = await Promise.all([propertyRes.json(), onboardingRes.json()])
+          if (controller.signal.aborted) return
           if (propertyData.properties) setPropertyList(propertyData.properties)
           if (onboardingData.onboardings) setOnboardingList(onboardingData.onboardings)
         })
-        .catch(() => setError('Could not load client properties.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load client properties.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'tasks') {
       setLoading(true)
       Promise.all([
-        fetch('/api/admin/tasks'),
-        staffListLoadedRef.current ? Promise.resolve(null) : fetch('/api/admin/staff'),
+        tabFetch('/api/admin/tasks'),
+        staffListLoadedRef.current ? Promise.resolve(null) : tabFetch('/api/admin/staff'),
       ])
         .then(async ([taskRes, staffRes]) => {
           const taskData = await taskRes.json()
+          if (controller.signal.aborted) return
           if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
           if (staffRes) {
             const staffData = await staffRes.json()
@@ -233,29 +245,31 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
             }
           }
         })
-        .catch(() => setError('Could not load employee task logs.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load employee task logs.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'expenses') {
       setLoading(true)
-      fetch('/api/admin/expenses')
+      tabFetch('/api/admin/expenses')
         .then((res) => res.json())
         .then((data) => {
+          if (controller.signal.aborted) return
           if (data.expenses) {
             setExpenseList(data.expenses)
           }
           if (data.settings) setExpenseSettings(data.settings)
         })
-        .catch(() => setError('Could not load expenses.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load expenses.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'payroll') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/salaries'), fetch('/api/admin/tasks')])
+      Promise.all([tabFetch('/api/admin/salaries'), tabFetch('/api/admin/tasks')])
         .then(async ([salaryRes, taskRes]) => {
           const [salaryData, taskData] = await Promise.all([salaryRes.json(), taskRes.json()])
+          if (controller.signal.aborted) return
           if (salaryData.staff) {
             setStaffList(salaryData.staff)
             staffListLoadedRef.current = true
@@ -263,76 +277,91 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           if (salaryData.salaries) setSalaryList(salaryData.salaries)
           if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
         })
-        .catch(() => setError('Could not load payroll data.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load payroll data.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'leaves') {
       setLoading(true)
-      fetch('/api/admin/leaves').then((res) => res.json()).then((data) => { if (data.leaves) setLeaveList(data.leaves) }).catch(() => setError('Could not load leave requests.')).finally(() => setLoading(false))
+      tabFetch('/api/admin/leaves').then((res) => res.json()).then((data) => { if (!controller.signal.aborted && data.leaves) setLeaveList(data.leaves) }).catch(reportError('Could not load leave requests.')).finally(finishLoading)
     }
 
     if (activeTab === 'settings') {
-      Promise.all([fetch('/api/admin/expense-settings'), fetch('/api/admin/security-settings')])
+      Promise.all([tabFetch('/api/admin/expense-settings'), tabFetch('/api/admin/security-settings')])
         .then(async ([expenseRes, securityRes]) => {
           const [expenseData, securityData] = await Promise.all([expenseRes.json(), securityRes.json()])
+          if (controller.signal.aborted) return
           if (expenseData.settings) setExpenseSettings(expenseData.settings)
           if (securityData.settings) setSecuritySettings(securityData.settings)
         })
-        .catch(() => setError('Could not load expense settings.'))
+        .catch(reportError('Could not load expense settings.'))
     }
+    return () => controller.abort()
   }, [activeTab, user.role])
 
   useEffect(() => {
     if (user.role !== 'staff' || user.mustChangePassword) return
+    const controller = new AbortController()
+    const tabFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, signal: controller.signal })
+    const reportError = (fallback: string) => (caught: unknown) => {
+      if (controller.signal.aborted || (caught instanceof Error && caught.name === 'AbortError')) return
+      setError(caught instanceof Error && caught.message ? caught.message : fallback)
+    }
+    const finishLoading = () => {
+      if (!controller.signal.aborted) setLoading(false)
+    }
 
     if (activeTab === 'dashboard') {
       setLoading(true)
-      apiFetch<{ summary: DashboardSummary }>('/api/dashboard').then((data) => setDashboardSummary(data.summary)).catch(() => setError('Could not load dashboard data.')).finally(() => setLoading(false))
+      apiFetch<{ summary: DashboardSummary }>('/api/dashboard', { signal: controller.signal }).then((data) => { if (!controller.signal.aborted) setDashboardSummary(data.summary) }).catch(reportError('Could not load dashboard data.')).finally(finishLoading)
     }
 
     if (activeTab === 'expenses') {
       setLoading(true)
-      fetch('/api/staff/expenses')
+      tabFetch('/api/staff/expenses')
         .then((res) => res.json())
         .then((data) => {
+          if (controller.signal.aborted) return
           if (data.expenses) {
             setExpenseList(data.expenses)
           }
         })
-        .catch(() => setError('Could not load your expenses.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load your expenses.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'tasks') {
       setLoading(true)
-      fetch('/api/staff/tasks')
+      tabFetch('/api/staff/tasks')
         .then(async (response) => {
           const data = await response.json()
+          if (controller.signal.aborted) return
           if (!response.ok) throw new Error(data.message || 'Could not load your work log.')
           if (data.workSessions) setWorkSessionList(data.workSessions)
         })
-        .catch((caught) => setError(caught instanceof Error ? caught.message : 'Could not load your work log.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load your work log.'))
+        .finally(finishLoading)
     }
 
     if (activeTab === 'leaves') {
       setLoading(true)
-      fetch('/api/staff/leaves').then((res) => res.json()).then((data) => { if (data.leaves) setLeaveList(data.leaves) }).catch(() => setError('Could not load your leave requests.')).finally(() => setLoading(false))
+      tabFetch('/api/staff/leaves').then((res) => res.json()).then((data) => { if (!controller.signal.aborted && data.leaves) setLeaveList(data.leaves) }).catch(reportError('Could not load your leave requests.')).finally(finishLoading)
     }
 
     if (activeTab === 'properties') {
       setLoading(true)
-      Promise.all([fetch('/api/properties'), fetch('/api/onboardings')])
+      Promise.all([tabFetch('/api/properties'), tabFetch('/api/onboardings')])
         .then(async ([propertyRes, onboardingRes]) => {
           const [propertyData, onboardingData] = await Promise.all([propertyRes.json(), onboardingRes.json()])
+          if (controller.signal.aborted) return
           if (propertyData.properties) setPropertyList(propertyData.properties)
           if (onboardingData.onboardings) setOnboardingList(onboardingData.onboardings)
         })
-        .catch(() => setError('Could not load client properties.'))
-        .finally(() => setLoading(false))
+        .catch(reportError('Could not load client properties.'))
+        .finally(finishLoading)
     }
 
+    return () => controller.abort()
   }, [activeTab, user.mustChangePassword, user.role])
 
   useEffect(() => {
