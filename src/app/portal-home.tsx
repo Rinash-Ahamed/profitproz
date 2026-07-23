@@ -146,24 +146,84 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   useEffect(() => {
     if (!user.expiresAt) return
 
+    const controller = new AbortController()
     let redirecting = false
+    let idleTimer = 0
+    let idleTimeoutMs = Math.max(60_000, user.expiresAt - Date.now())
+    let idleDeadline = Date.now() + idleTimeoutMs
+    let lastActivityHandledAt = 0
+    let lastRefreshAt = 0
+    let refreshing = false
+
     const expireSession = () => {
       if (redirecting) return
       redirecting = true
       fetch('/api/logout', { method: 'POST', credentials: 'same-origin', keepalive: true })
         .finally(() => window.location.replace('/login?reason=session-expired'))
     }
-    const checkSessionLimit = () => {
-      if (Date.now() >= user.expiresAt!) expireSession()
-    }
-    const timer = window.setTimeout(expireSession, Math.max(0, user.expiresAt - Date.now()))
 
-    document.addEventListener('visibilitychange', checkSessionLimit)
-    window.addEventListener('focus', checkSessionLimit)
+    const scheduleIdleCheck = () => {
+      window.clearTimeout(idleTimer)
+      idleTimer = window.setTimeout(() => {
+        if (Date.now() >= idleDeadline) expireSession()
+        else scheduleIdleCheck()
+      }, Math.max(1_000, idleDeadline - Date.now()))
+    }
+
+    const refreshSession = async () => {
+      if (refreshing || redirecting || controller.signal.aborted) return
+      refreshing = true
+      try {
+        const response = await fetch('/api/session/refresh', { method: 'POST', signal: controller.signal })
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 403) expireSession()
+          return
+        }
+        const data = await response.json() as { expiresAt?: number; idleTimeoutMs?: number }
+        if (typeof data.idleTimeoutMs === 'number' && data.idleTimeoutMs >= 60_000) {
+          idleTimeoutMs = data.idleTimeoutMs
+        }
+        lastRefreshAt = Date.now()
+        idleDeadline = lastRefreshAt + idleTimeoutMs
+        scheduleIdleCheck()
+      } catch (caught) {
+        if (!(caught instanceof Error && caught.name === 'AbortError')) {
+          // A temporary network failure is retried on the next user activity.
+          lastRefreshAt = 0
+        }
+      } finally {
+        refreshing = false
+      }
+    }
+
+    const recordActivity = () => {
+      const now = Date.now()
+      if (now >= idleDeadline) {
+        expireSession()
+        return
+      }
+      if (now - lastActivityHandledAt < 5_000) return
+      lastActivityHandledAt = now
+      idleDeadline = now + idleTimeoutMs
+      scheduleIdleCheck()
+      const refreshInterval = Math.max(60_000, Math.min(300_000, idleTimeoutMs / 4))
+      if (now - lastRefreshAt >= refreshInterval) void refreshSession()
+    }
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') recordActivity()
+    }
+    const activityEvents: (keyof WindowEventMap)[] = ['pointerdown', 'pointermove', 'keydown', 'scroll', 'touchstart', 'focus']
+    activityEvents.forEach((event) => window.addEventListener(event, recordActivity, { passive: true }))
+    document.addEventListener('visibilitychange', handleVisibility)
+    scheduleIdleCheck()
+    void refreshSession()
+
     return () => {
-      window.clearTimeout(timer)
-      document.removeEventListener('visibilitychange', checkSessionLimit)
-      window.removeEventListener('focus', checkSessionLimit)
+      controller.abort()
+      window.clearTimeout(idleTimer)
+      activityEvents.forEach((event) => window.removeEventListener(event, recordActivity))
+      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [user.expiresAt])
 
@@ -1631,7 +1691,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <div className="surface rounded-lg p-6 sm:p-7">
                         <p className="text-base font-semibold text-ink">Security Policy</p>
                         <div className="mt-5 space-y-4">
-                          <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Session duration</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select></div>
+                          <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Idle session timeout</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select><p className="mt-2 text-xs text-sub">Active sessions renew automatically. Users are logged out after this period without activity.</p></div>
                           <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="8" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 8 }))} className={inputClass} /></div>
                           {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
                         </div>
