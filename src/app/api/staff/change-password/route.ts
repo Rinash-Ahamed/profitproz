@@ -3,6 +3,16 @@ import { authConfig, createSessionToken, getPasswordValidationMessage, hashPassw
 import { completeStaffOnboarding, getSecuritySettings, getStaffByEmail, updateStaffPassword } from '@/lib/firestore'
 import { requireStaffSession } from '@/lib/api-auth'
 
+export async function GET() {
+  const user = await requireStaffSession({ allowMustChangePassword: true })
+
+  if (!user || user.role !== 'staff') {
+    return NextResponse.json({ message: 'Staff access is required.' }, { status: 403 })
+  }
+
+  return NextResponse.json({ settings: await getSecuritySettings() })
+}
+
 export async function POST(request: Request) {
   const user = await requireStaffSession({ allowMustChangePassword: true })
 
@@ -25,7 +35,7 @@ export async function POST(request: Request) {
   }
 
   const security = await getSecuritySettings()
-  const passwordError = getPasswordValidationMessage(newPassword, { ...security, minPasswordLength: 8 })
+  const passwordError = getPasswordValidationMessage(newPassword, security)
   if (passwordError) return NextResponse.json({ message: passwordError }, { status: 400 })
 
   const profile = {

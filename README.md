@@ -1,6 +1,6 @@
 # ProfitPro
 
-ProfitPro is a Next.js portal and public website for hotel revenue management, OTA onboarding, employee operations, contracts, invoices, expenses, timesheets, leave, and payroll reporting.
+ProfitPro is a Next.js portal and public website for hotel revenue management, OTA onboarding, employee operations, contracts, invoices, expenses, daily task tracking, leave, and payroll reporting.
 
 ## Technology
 
@@ -60,6 +60,15 @@ Keep existing `{{placeholder}}` names when changing template styling. Payment va
 - Approved staff expenses affect cash only after an Admin marks the reimbursement as paid. Admin expenses are treated as paid when recorded.
 - The Finance screen shows received income by service, unpaid approved expenses, paid expenses, and `received income - paid expenses`.
 - `finance_invoices` stores invoice snapshots and `finance_payments` stores the payment ledger. Payment records should not be edited or deleted manually.
+
+## Tasks and work-time workflow
+
+- Staff start one work session when beginning work for the day.
+- After work starts, the timer and End Work action are shown.
+- Ending work requires a summary of completed tasks, calls, interested leads, conversions, follow-ups, or onboarding progress.
+- Admins can view employee start time, end time, duration, status, and work summary. There is no approval or rejection step.
+- Leave requests remain a separate workflow and are not shown in Tasks.
+- New records are stored in `work_sessions`; legacy `timesheets` records are retained in Firestore but are not displayed.
 
 ## Firestore and deployment
 

@@ -11,27 +11,23 @@ export function parseDateOnly(value: string) {
   return date
 }
 
-export function formatDateOnly(date: Date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
-}
-
 export function todayLocalDateOnly(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+export function todayInTimeZone(timeZone: string, date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value || ''
+  return `${value('year')}-${value('month')}-${value('day')}`
+}
+
 export function formatDateOnlyDisplay(value: string) {
   return parseDateOnly(value) ? value.split('-').reverse().join('-') : ''
-}
-
-export function addDateOnlyDays(value: string, days: number) {
-  const date = parseDateOnly(value)
-  if (!date) return ''
-  date.setUTCDate(date.getUTCDate() + days)
-  return formatDateOnly(date)
-}
-
-export function dateOnlyDay(value: string) {
-  return parseDateOnly(value)?.getUTCDay() ?? -1
 }
 
 export function countDateOnlyDaysInclusive(startValue: string, endValue: string) {
@@ -39,9 +35,4 @@ export function countDateOnlyDaysInclusive(startValue: string, endValue: string)
   const end = parseDateOnly(endValue)
   if (!start || !end || end < start) return 0
   return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1
-}
-
-export function formatDateOnlyForLocale(value: string, options: Intl.DateTimeFormatOptions) {
-  const date = parseDateOnly(value)
-  return date ? date.toLocaleDateString('en-IN', { ...options, timeZone: 'UTC' }) : ''
 }

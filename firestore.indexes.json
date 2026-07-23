@@ -1,14 +1,6 @@
 {
   "indexes": [
     {
-      "collectionGroup": "timesheets",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "staffEmail", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "expenses",
       "queryScope": "COLLECTION",
       "fields": [

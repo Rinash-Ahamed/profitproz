@@ -151,7 +151,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
       return NextResponse.json({ message: 'Employee was not found.' }, { status: 404 })
     }
 
-    await deleteStaffAccount(id)
+    await deleteStaffAccount(id, staff.email)
     await logAdminAction({
       actorEmail: user.email,
       action: 'STAFF_DELETE',
