@@ -1,15 +1,14 @@
 'use client'
 
-import { FormEvent, Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Building2, CheckCircle2, ChevronDown, ChevronRight, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, Loader2, LogOut, Play, ReceiptText, RefreshCw, Search, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
+import dynamic from 'next/dynamic'
+import { Building2, CheckCircle2, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, Loader2, LogOut, Play, ReceiptText, RefreshCw, Search, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
 import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, WorkSessionRecord } from '@/lib/firestore'
 import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
-import { ClientServicesPanel } from '@/app/client-services-panel'
-import { FinancePanel } from '@/app/finance-panel'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { LeaveDateSummary } from '@/components/ui/LeaveDateSummary'
 import { countDateOnlyDaysInclusive, formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
@@ -19,6 +18,11 @@ import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
 import { ADMIN_NAMES } from '@/lib/admin-options'
+import { formatLiveWorkDuration, formatWorkDuration, formatWorkTime } from '@/lib/work-session-format'
+
+const ClientServicesPanel = dynamic(() => import('@/app/client-services-panel').then((module) => module.ClientServicesPanel))
+const FinancePanel = dynamic(() => import('@/app/finance-panel').then((module) => module.FinancePanel))
+const AdminTasksPanel = dynamic(() => import('@/app/admin-tasks-panel').then((module) => module.AdminTasksPanel))
 
 type PortalHomeProps = {
   user: SessionUser
@@ -34,17 +38,6 @@ type PayrollRow = {
   payrollPeriod: string
   monthlySalary: number
   completedWorkDays: number
-}
-
-type TaskStatusFilter = 'all' | 'working' | 'completed' | 'not-started'
-type TaskDurationSort = 'recent' | 'highest' | 'lowest'
-type DailyWorkSummary = {
-  key: string
-  staffEmail: string
-  workDate: string
-  sessions: WorkSessionRecord[]
-  status: 'active' | 'completed' | 'not-started'
-  durationMinutes: number
 }
 
 const ADMIN_TAB_LABELS: Record<string, string> = {
@@ -85,11 +78,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [onboardingList, setOnboardingList] = useState<OnboardingRecord[]>([])
   // Daily task and work-session state
   const [workSessionList, setWorkSessionList] = useState<WorkSessionRecord[]>([])
-  const [taskEmployeeSearch, setTaskEmployeeSearch] = useState('')
-  const [taskDateFilter, setTaskDateFilter] = useState('')
-  const [taskStatusFilter, setTaskStatusFilter] = useState<TaskStatusFilter>('all')
-  const [taskDurationSort, setTaskDurationSort] = useState<TaskDurationSort>('recent')
-  const [expandedTaskSummary, setExpandedTaskSummary] = useState('')
   const [correctingWorkSession, setCorrectingWorkSession] = useState<WorkSessionRecord | null>(null)
   const [workNotes, setWorkNotes] = useState('')
   const [workActionLoading, setWorkActionLoading] = useState(false)
@@ -819,64 +807,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     URL.revokeObjectURL(url)
   }
 
-  function handleExportWorkingDays() {
-    const query = taskEmployeeSearch.trim().toLowerCase()
-    const completedSessions = workSessionList
-      .filter((session) => session.status === 'completed')
-      .filter((session) => !taskDateFilter || session.workDate === taskDateFilter)
-      .filter((session) => {
-        if (!query) return true
-        const employeeName = staffNameByEmail.get(session.staffEmail) || ''
-        return employeeName.toLowerCase().includes(query) || session.staffEmail.toLowerCase().includes(query)
-      })
-
-    if (!completedSessions.length) {
-      setError('No completed working days match the selected employee and date filters.')
-      return
-    }
-
-    const byEmployee = new Map<string, { dates: Set<string>; minutes: number }>()
-    completedSessions.forEach((session) => {
-      const existing = byEmployee.get(session.staffEmail) || { dates: new Set<string>(), minutes: 0 }
-      existing.dates.add(session.workDate)
-      existing.minutes += Math.max(0, session.durationMinutes)
-      byEmployee.set(session.staffEmail, existing)
-    })
-
-    const csvValue = (value: unknown) => {
-      const text = String(value ?? '')
-      const safeText = /^[=+\-@]/.test(text) ? `'${text}` : text
-      return `"${safeText.replaceAll('"', '""')}"`
-    }
-    const rows = [...byEmployee.entries()]
-      .map(([email, summary]) => ({
-        name: staffNameByEmail.get(email) || email,
-        email,
-        workingDays: summary.dates.size,
-        totalMinutes: Math.round(summary.minutes),
-        dates: [...summary.dates].sort(),
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-      .map((row) => [
-        row.name,
-        row.email,
-        row.workingDays,
-        row.totalMinutes,
-        formatWorkDuration(row.totalMinutes),
-        row.dates.map(formatDateOnlyDisplay).join('; '),
-      ].map(csvValue).join(','))
-
-    const csv = ['sep=,', 'Employee,Email,Working Days,Total Minutes,Total Hours,Worked Dates', ...rows].join('\r\n')
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `working-days-${taskDateFilter || 'all-dates'}-${todayLocalDateOnly()}.csv`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-  }
-
   function handleExportExpenses() {
     const exportExpenses = visibleTrackedExpenses
     if (exportExpenses.length === 0) {
@@ -969,87 +899,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   const inputClass =
     'h-12 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-4 text-sm text-ink placeholder:text-ghost transition-colors focus:border-[#66B159] focus:outline-none focus:ring-1 focus:ring-[#66B159]/40'
-
-  const staffNameByEmail = useMemo(
-    () => new Map(staffList.map((staff) => [staff.email, staff.name])),
-    [staffList],
-  )
-
-  const dailyWorkSummaries = useMemo(() => {
-    const query = taskEmployeeSearch.trim().toLowerCase()
-    const matchingSessions = workSessionList
-      .filter((session) => {
-        if (!query) return true
-        const employeeName = staffNameByEmail.get(session.staffEmail) || ''
-        return employeeName.toLowerCase().includes(query) || session.staffEmail.toLowerCase().includes(query)
-      })
-      .filter((session) => !taskDateFilter || session.workDate === taskDateFilter)
-
-    const grouped = new Map<string, DailyWorkSummary>()
-    matchingSessions.forEach((session) => {
-      const key = `${session.staffEmail}:${session.workDate}`
-      const existing = grouped.get(key)
-      if (existing) {
-        existing.sessions.push(session)
-        existing.durationMinutes += workSessionDurationMinutes(session, workClock)
-        if (session.status === 'active') existing.status = 'active'
-      } else {
-        grouped.set(key, {
-          key,
-          staffEmail: session.staffEmail,
-          workDate: session.workDate,
-          sessions: [session],
-          status: session.status,
-          durationMinutes: workSessionDurationMinutes(session, workClock),
-        })
-      }
-    })
-
-    let summaries = [...grouped.values()]
-    if (taskStatusFilter === 'working') summaries = summaries.filter((summary) => summary.status === 'active')
-    if (taskStatusFilter === 'completed') summaries = summaries.filter((summary) => summary.status === 'completed')
-    if (taskStatusFilter === 'not-started') {
-      const targetDate = taskDateFilter || todayLocalDateOnly()
-      const employeesWithSessions = new Set(
-        workSessionList.filter((session) => session.workDate === targetDate).map((session) => session.staffEmail),
-      )
-      summaries = staffList
-        .filter((staff) => staff.active && !employeesWithSessions.has(staff.email))
-        .filter((staff) => !query || staff.name.toLowerCase().includes(query) || staff.email.toLowerCase().includes(query))
-        .map((staff) => ({
-          key: `${staff.email}:${targetDate}`,
-          staffEmail: staff.email,
-          workDate: targetDate,
-          sessions: [],
-          status: 'not-started' as const,
-          durationMinutes: 0,
-        }))
-    }
-
-    return summaries.sort((a, b) => {
-      if (taskDurationSort === 'highest' && b.durationMinutes !== a.durationMinutes) return b.durationMinutes - a.durationMinutes
-      if (taskDurationSort === 'lowest' && a.durationMinutes !== b.durationMinutes) return a.durationMinutes - b.durationMinutes
-      if (query) {
-        const aName = staffNameByEmail.get(a.staffEmail)?.toLowerCase() || a.staffEmail.toLowerCase()
-        const bName = staffNameByEmail.get(b.staffEmail)?.toLowerCase() || b.staffEmail.toLowerCase()
-        const rankDifference = Number(!aName.startsWith(query)) - Number(!bName.startsWith(query))
-        if (rankDifference) return rankDifference
-      }
-      const dateDifference = b.workDate.localeCompare(a.workDate)
-      return dateDifference || a.staffEmail.localeCompare(b.staffEmail)
-    })
-  }, [staffList, staffNameByEmail, taskDateFilter, taskDurationSort, taskEmployeeSearch, taskStatusFilter, workClock, workSessionList])
-
-  const taskTodaySummary = useMemo(() => {
-    const today = todayLocalDateOnly()
-    const todaySessions = workSessionList.filter((session) => session.workDate === today)
-    const employeesWithSessions = new Set(todaySessions.map((session) => session.staffEmail))
-    return {
-      working: todaySessions.filter((session) => session.status === 'active').length,
-      completed: todaySessions.filter((session) => session.status === 'completed').length,
-      notStarted: staffList.filter((staff) => staff.active && !employeesWithSessions.has(staff.email)).length,
-    }
-  }, [staffList, workSessionList])
 
   const activeWorkSession = user.role === 'staff' ? workSessionList.find((session) => session.status === 'active') : undefined
   const todayCompletedSession = user.role === 'staff'
@@ -1595,92 +1444,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     </div>
                   ),
                   properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} />,
-                  tasks: (
-                    <div className="space-y-5">
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <TaskMetric label="Working now" value={taskTodaySummary.working} detail="Active today" tone="green" />
-                        <TaskMetric label="Completed today" value={taskTodaySummary.completed} detail="Work summaries submitted" tone="green" />
-                        <TaskMetric label="Not started" value={taskTodaySummary.notStarted} detail="Active employees today" tone="amber" />
-                      </div>
-                      <div className="surface rounded-lg">
-                        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
-                          <div>
-                            <p className="text-lg font-semibold text-ink">Daily Employee Summary</p>
-                            <p className="mt-1 text-sm text-sub">Compact daily totals with expandable work details.</p>
-                          </div>
-                          <div className="flex flex-wrap items-end gap-2">
-                            <label className="relative block"><span className="sr-only">Search employee</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={taskEmployeeSearch} onChange={(event) => setTaskEmployeeSearch(event.target.value)} className="h-10 w-56 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employee" aria-label="Search Tasks by employee name or email" /></label>
-                            <label className="block w-44"><span className="sr-only">Filter by work date</span><DatePickerInput value={taskDateFilter} onChange={setTaskDateFilter} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
-                            <label><span className="sr-only">Filter by status</span><select value={taskStatusFilter} onChange={(event) => setTaskStatusFilter(event.target.value as TaskStatusFilter)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="all">All statuses</option><option value="working">Working</option><option value="completed">Completed</option><option value="not-started">Not started</option></select></label>
-                            <label><span className="sr-only">Sort by duration</span><select value={taskDurationSort} onChange={(event) => setTaskDurationSort(event.target.value as TaskDurationSort)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="recent">Newest first</option><option value="highest">Highest hours</option><option value="lowest">Lowest hours</option></select></label>
-                            {taskEmployeeSearch || taskDateFilter || taskStatusFilter !== 'all' || taskDurationSort !== 'recent' ? <button type="button" onClick={() => { setTaskEmployeeSearch(''); setTaskDateFilter(''); setTaskStatusFilter('all'); setTaskDurationSort('recent') }} className="h-10 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub transition-colors hover:text-ink">Clear filters</button> : null}
-                            <button type="button" onClick={handleExportWorkingDays} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]" title="Export completed working days for the selected employee and date filters"><FileDown className="h-4 w-4" /> Export</button>
-                          </div>
-                        </div>
-                        <div className="overflow-x-auto">
-                          <table className="w-full min-w-[860px] text-sm">
-                            <thead className="border-b border-zinc-700 text-left">
-                              <tr>
-                                <th className="w-12 px-4 py-4"><span className="sr-only">Expand</span></th>
-                                <th className="px-4 py-4 font-medium text-sub">Employee</th>
-                                <th className="px-4 py-4 font-medium text-sub">Date</th>
-                                <th className="px-4 py-4 font-medium text-sub">Status</th>
-                                <th className="px-4 py-4 font-medium text-sub">Duration</th>
-                                <th className="px-4 py-4 font-medium text-sub">Summary</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {loading ? (
-                                <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
-                              ) : dailyWorkSummaries.length === 0 ? (
-                                <tr><td colSpan={6} className="py-10 text-center text-sub">{taskEmployeeSearch.trim() || taskDateFilter || taskStatusFilter !== 'all' ? 'No employee summaries match the selected filters.' : 'No work sessions recorded yet.'}</td></tr>
-                              ) : (
-                                dailyWorkSummaries.map((summary) => {
-                                  const expanded = expandedTaskSummary === summary.key
-                                  const firstNote = summary.sessions.find((session) => session.notes)?.notes
-                                  return (
-                                    <Fragment key={summary.key}>
-                                      <tr className="border-b border-zinc-800">
-                                        <td className="px-4 py-4">
-                                          {summary.sessions.length ? <button type="button" onClick={() => setExpandedTaskSummary(expanded ? '' : summary.key)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={`${expanded ? 'Collapse' : 'Expand'} ${staffNameByEmail.get(summary.staffEmail) || summary.staffEmail} work details`}>{expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button> : null}
-                                        </td>
-                                        <td className="px-4 py-4"><p className="font-medium text-ink">{staffNameByEmail.get(summary.staffEmail) || summary.staffEmail}</p><p className="text-xs text-sub">{summary.staffEmail}</p></td>
-                                        <td className="whitespace-nowrap px-4 py-4 text-sub">{formatDateOnlyDisplay(summary.workDate)}</td>
-                                        <td className="px-4 py-4"><TaskSummaryStatus status={summary.status} /></td>
-                                        <td className="whitespace-nowrap px-4 py-4 font-medium text-ink">{formatWorkDuration(summary.durationMinutes)}</td>
-                                        <td className="max-w-sm px-4 py-4 text-sub"><p className="truncate">{firstNote || (summary.status === 'active' ? 'Work currently in progress.' : summary.status === 'not-started' ? 'Work has not been started.' : 'No summary recorded.')}</p></td>
-                                      </tr>
-                                      {expanded ? (
-                                        <tr className="border-b border-zinc-800 bg-zinc-950/35">
-                                          <td colSpan={6} className="px-6 py-5">
-                                            <div className="space-y-3">
-                                              {summary.sessions.map((session) => (
-                                                <div key={session.id} className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4">
-                                                  <div className="flex flex-wrap items-center justify-between gap-3">
-                                                    <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub">
-                                                      <span>Start: <strong className="font-medium text-ink">{formatWorkTime(session.startedAt)}</strong></span>
-                                                      <span>End: <strong className="font-medium text-ink">{session.endedAt ? formatWorkTime(session.endedAt) : 'In progress'}</strong></span>
-                                                      <span>Duration: <strong className="font-medium text-ink">{formatWorkDuration(workSessionDurationMinutes(session, workClock))}</strong></span>
-                                                    </div>
-                                                    <button type="button" onClick={() => setCorrectingWorkSession(session)} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub transition-colors hover:border-[#66B159]/50 hover:text-ink" title="Correct start or end time"><Edit className="h-3.5 w-3.5" /> Correct time</button>
-                                                  </div>
-                                                  <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-sub">{session.notes || (session.status === 'active' ? 'Work currently in progress.' : 'No work summary recorded.')}</p>
-                                                </div>
-                                              ))}
-                                            </div>
-                                          </td>
-                                        </tr>
-                                      ) : null}
-                                    </Fragment>
-                                  )
-                                })
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  ),
+                  tasks: <AdminTasksPanel staff={staffList} sessions={workSessionList} loading={loading} now={workClock} onCorrect={setCorrectingWorkSession} onError={setError} />,
                   finance: <FinancePanel />,
                   expenses: (
                     <div className="space-y-6">
@@ -2211,7 +1975,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       {correctingWorkSession ? (
         <WorkSessionCorrectionModal
           session={correctingWorkSession}
-          employeeName={staffNameByEmail.get(correctingWorkSession.staffEmail) || correctingWorkSession.staffEmail}
+          employeeName={staffList.find((staff) => staff.email === correctingWorkSession.staffEmail)?.name || correctingWorkSession.staffEmail}
           onClose={() => setCorrectingWorkSession(null)}
           onSaved={(updatedSession) => {
             setWorkSessionList((current) => current.map((session) => session.id === updatedSession.id ? updatedSession : session))
@@ -2496,54 +2260,8 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
   )
 }
 
-function formatWorkTime(value?: string) {
-  if (!value) return '—'
-  const date = new Date(value)
-  return Number.isNaN(date.getTime()) ? '—' : date.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
-}
-
-function formatWorkDuration(minutes: number) {
-  const safeMinutes = Math.max(0, Math.round(minutes))
-  const hours = Math.floor(safeMinutes / 60)
-  const remainder = safeMinutes % 60
-  return hours ? `${hours}h ${remainder}m` : `${remainder}m`
-}
-
-function workSessionDurationMinutes(session: WorkSessionRecord, now: number) {
-  if (session.status !== 'active') return Math.max(0, session.durationMinutes)
-  const started = new Date(session.startedAt).getTime()
-  return Number.isFinite(started) ? Math.max(0, Math.floor((now - started) / 60_000)) : 0
-}
-
-function formatLiveWorkDuration(startedAt: string, now: number) {
-  const started = new Date(startedAt).getTime()
-  if (!Number.isFinite(started)) return '0m'
-  return formatWorkDuration(Math.max(0, Math.floor((now - started) / 60_000)))
-}
-
 function WorkSessionStatus({ status }: { status: WorkSessionRecord['status'] }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${status === 'completed' ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-[#66B159]/25 bg-[#66B159]/10 text-[#66B159]'}`}>{status === 'completed' ? 'Completed' : 'In progress'}</span>
-}
-
-function TaskSummaryStatus({ status }: { status: DailyWorkSummary['status'] }) {
-  const style = status === 'completed'
-    ? 'border-green-500/20 bg-green-500/10 text-green-400'
-    : status === 'not-started'
-      ? 'border-amber-500/20 bg-amber-500/10 text-amber-400'
-      : 'border-[#66B159]/25 bg-[#66B159]/10 text-[#66B159]'
-  const label = status === 'completed' ? 'Completed' : status === 'not-started' ? 'Not started' : 'Working'
-  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${style}`}>{label}</span>
-}
-
-function TaskMetric({ label, value, detail, tone }: { label: string; value: string | number; detail: string; tone: 'green' | 'amber' }) {
-  const valueStyle = tone === 'amber' ? 'text-amber-400' : 'text-[#66B159]'
-  return (
-    <div className="surface rounded-lg p-5">
-      <p className={`text-2xl font-semibold ${valueStyle}`}>{value}</p>
-      <p className="mt-2 text-sm font-medium text-ink">{label}</p>
-      <p className="mt-1 text-xs text-sub">{detail}</p>
-    </div>
-  )
 }
 
 function toDateTimeLocal(value?: string) {
