@@ -18,6 +18,7 @@ import { LEAVE_ALLOWANCES, leaveTypeLabel, type LeaveType } from '@/lib/leave'
 import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
+import { ADMIN_NAMES } from '@/lib/admin-options'
 
 type PortalHomeProps = {
   user: SessionUser
@@ -116,12 +117,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [expenseReceiptUrl, setExpenseReceiptUrl] = useState('')
   const [expenseDate, setExpenseDate] = useState(todayLocalDateOnly())
   const [deletingExpenseId, setDeletingExpenseId] = useState('')
+  const [correctingExpense, setCorrectingExpense] = useState<ExpenseRecord | null>(null)
   const [adminExpenseName, setAdminExpenseName] = useState('')
   const [expenseTrackingView, setExpenseTrackingView] = useState<'staff' | 'admin'>('staff')
   const [expensePersonSearch, setExpensePersonSearch] = useState('')
   const [expensePaymentFilter, setExpensePaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [expenseSettings, setExpenseSettings] = useState<ExpenseFieldSettings>({ cityRequired: true, descriptionRequired: true, receiptRequired: true })
-  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false })
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 12, minPasswordLength: 8, requireUppercase: false, requireNumber: false })
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
 
   // Password change state
@@ -946,9 +948,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       working: todaySessions.filter((session) => session.status === 'active').length,
       completed: todaySessions.filter((session) => session.status === 'completed').length,
       notStarted: staffList.filter((staff) => staff.active && !employeesWithSessions.has(staff.email)).length,
-      totalMinutes: todaySessions.reduce((total, session) => total + workSessionDurationMinutes(session, workClock), 0),
     }
-  }, [staffList, workClock, workSessionList])
+  }, [staffList, workSessionList])
 
   const activeWorkSession = user.role === 'staff' ? workSessionList.find((session) => session.status === 'active') : undefined
   const todayCompletedSession = user.role === 'staff'
@@ -1496,11 +1497,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} />,
                   tasks: (
                     <div className="space-y-5">
-                      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="grid gap-3 sm:grid-cols-3">
                         <TaskMetric label="Working now" value={taskTodaySummary.working} detail="Active today" tone="green" />
                         <TaskMetric label="Completed today" value={taskTodaySummary.completed} detail="Work summaries submitted" tone="green" />
                         <TaskMetric label="Not started" value={taskTodaySummary.notStarted} detail="Active employees today" tone="amber" />
-                        <TaskMetric label="Total hours today" value={formatWorkDuration(taskTodaySummary.totalMinutes)} detail="Completed and active time" tone="neutral" />
                       </div>
                       <div className="surface rounded-lg">
                         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
@@ -1589,7 +1589,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <p className="mt-1 text-sm text-sub">Track company expenses directly. Admin entries are recorded as approved.</p>
                         </div>
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                          <div><label htmlFor="adminExpenseName" className="label-upper mb-2 block text-ghost">Admin name</label><input id="adminExpenseName" value={adminExpenseName} onChange={(event) => setAdminExpenseName(event.target.value.replace(/\d/g, ''))} maxLength={160} className={inputClass} required /></div>
+                          <div><label htmlFor="adminExpenseName" className="label-upper mb-2 block text-ghost">Admin name</label><select id="adminExpenseName" value={adminExpenseName} onChange={(event) => setAdminExpenseName(event.target.value)} className={inputClass} required><option value="">Select Admin</option>{ADMIN_NAMES.map((name) => <option key={name} value={name}>{name}</option>)}</select></div>
                           <div><label htmlFor="adminExpenseDate" className="label-upper mb-2 block text-ghost">Expense date</label><DatePickerInput id="adminExpenseDate" value={expenseDate} onChange={setExpenseDate} className={inputClass} required /></div>
                           <div><label htmlFor="adminExpenseType" className="label-upper mb-2 block text-ghost">Expense type</label><select id="adminExpenseType" value={expenseType} onChange={(event) => { const value = event.target.value as typeof expenseType; setExpenseType(value); if (value !== 'other') setCustomExpenseType('') }} className={inputClass}><option value="travel">Travel</option><option value="food">Food</option><option value="fuel">Fuel</option><option value="other">Other</option></select></div>
                           {expenseType === 'other' ? <div><label htmlFor="adminCustomExpenseType" className="label-upper mb-2 block text-ghost">Specify expense type</label><input id="adminCustomExpenseType" value={customExpenseType} onChange={(event) => setCustomExpenseType(event.target.value)} maxLength={100} className={inputClass} required /></div> : null}
@@ -1653,19 +1653,22 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                   <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
                                   {expenseTrackingView === 'staff' ? <td className="px-6 py-4"><StatusBadge status={expense.status} />{expense.status === 'approved' ? <p className={`mt-1 text-xs font-medium ${expense.paymentStatus === 'paid' ? 'text-green-400' : 'text-amber-300'}`}>{expense.paymentStatus === 'paid' ? 'Reimbursement paid' : 'Reimbursement unpaid'}</p> : null}</td> : null}
                                   <td className="px-6 py-4">
-                                    {expense.submittedByRole === 'admin' ? (
-                                      <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <button type="button" onClick={() => setCorrectingExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub transition-colors hover:border-[#66B159]/50 hover:text-ink" title="Correct expense details"><Edit className="h-3.5 w-3.5" /> Correct</button>
+                                      {expense.submittedByRole === 'admin' ? (
+                                        <>
                                         {expense.paymentStatus !== 'paid' ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-[#66B159]/10 px-2.5 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark expense paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />} Mark paid</button> : <span className="text-xs font-medium text-green-400">Paid</span>}
                                         {expense.staffEmail.toLowerCase() === user.email.toLowerCase() ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawAdminExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw Admin expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : null}
-                                      </div>
+                                        </>
                                     ) : expense.status === 'pending' ? (
-                                      <div className="flex items-center gap-2">
+                                      <>
                                         <button type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'approved')} className="flex h-8 items-center gap-1.5 rounded-md bg-green-500/10 px-2.5 text-xs text-green-400 transition-colors hover:bg-green-500/20"><CheckCircle2 className="h-3.5 w-3.5" />Approve</button>
                                         <button type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'rejected')} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs text-red-400 transition-colors hover:bg-red-500/20"><XCircle className="h-3.5 w-3.5" />Reject</button>
-                                      </div>
+                                      </>
                                     ) : expense.status === 'approved' && expense.paymentStatus !== 'paid' ? (
                                       <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-[#66B159]/10 px-2.5 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark reimbursement paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />} Mark paid</button>
-                                    ) : <span className="text-xs text-ghost">No actions</span>}
+                                    ) : null}
+                                    </div>
                                   </td>
                                 </tr>
                               ))
@@ -1750,12 +1753,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <form className="surface rounded-lg p-6 sm:p-7" onSubmit={changeAdminPassword}>
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#66B159]/10 text-[#66B159]"><KeyRound className="h-5 w-5" /></div>
-                          <div><p className="text-base font-semibold text-ink">Change admin password</p><p className="mt-1 text-sm text-sub">Use at least 12 characters.</p></div>
+                          <div><p className="text-base font-semibold text-ink">Change admin password</p><p className="mt-1 text-sm text-sub">Use at least {securitySettings.minPasswordLength} characters.</p></div>
                         </div>
                         <div className="mt-5 space-y-4">
                           <div><label htmlFor="adminCurrentPassword" className="label-upper mb-2 block text-ghost">Current password</label><input id="adminCurrentPassword" type="password" value={adminCurrentPassword} onChange={(event) => setAdminCurrentPassword(event.target.value)} className={inputClass} required /></div>
-                          <div><label htmlFor="adminNewPassword" className="label-upper mb-2 block text-ghost">New password</label><input id="adminNewPassword" type="password" minLength={12} value={adminNewPassword} onChange={(event) => setAdminNewPassword(event.target.value)} className={inputClass} required /></div>
-                          <div><label htmlFor="adminConfirmPassword" className="label-upper mb-2 block text-ghost">Confirm new password</label><input id="adminConfirmPassword" type="password" minLength={12} value={adminConfirmPassword} onChange={(event) => setAdminConfirmPassword(event.target.value)} className={inputClass} required /></div>
+                          <div><label htmlFor="adminNewPassword" className="label-upper mb-2 block text-ghost">New password</label><input id="adminNewPassword" type="password" minLength={securitySettings.minPasswordLength} value={adminNewPassword} onChange={(event) => setAdminNewPassword(event.target.value)} className={inputClass} required /></div>
+                          <div><label htmlFor="adminConfirmPassword" className="label-upper mb-2 block text-ghost">Confirm new password</label><input id="adminConfirmPassword" type="password" minLength={securitySettings.minPasswordLength} value={adminConfirmPassword} onChange={(event) => setAdminConfirmPassword(event.target.value)} className={inputClass} required /></div>
                         </div>
                         <button type="submit" disabled={loading} className="mt-5 flex h-10 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Update password</button>
                       </form>
@@ -1764,7 +1767,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         <p className="text-base font-semibold text-ink">Security Policy</p>
                         <div className="mt-5 space-y-4">
                           <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Session duration</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select></div>
-                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="12" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 12 }))} className={inputClass} /></div>
+                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="8" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 8 }))} className={inputClass} /></div>
                           {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
                         </div>
                         <button type="button" onClick={saveSecuritySettings} disabled={loading} className="mt-5 flex h-10 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save security policy</button>
@@ -2116,6 +2119,17 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           }}
         />
       ) : null}
+      {correctingExpense ? (
+        <ExpenseCorrectionModal
+          expense={correctingExpense}
+          onClose={() => setCorrectingExpense(null)}
+          onSaved={(updatedExpense) => {
+            setExpenseList((current) => current.map((expense) => expense.id === updatedExpense.id ? updatedExpense : expense))
+            setCorrectingExpense(null)
+            setMessage('Expense corrected and added to the audit log.')
+          }}
+        />
+      ) : null}
     </main>
   )
 }
@@ -2420,8 +2434,8 @@ function TaskSummaryStatus({ status }: { status: DailyWorkSummary['status'] }) {
   return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${style}`}>{label}</span>
 }
 
-function TaskMetric({ label, value, detail, tone }: { label: string; value: string | number; detail: string; tone: 'green' | 'amber' | 'neutral' }) {
-  const valueStyle = tone === 'amber' ? 'text-amber-400' : tone === 'green' ? 'text-[#66B159]' : 'text-ink'
+function TaskMetric({ label, value, detail, tone }: { label: string; value: string | number; detail: string; tone: 'green' | 'amber' }) {
+  const valueStyle = tone === 'amber' ? 'text-amber-400' : 'text-[#66B159]'
   return (
     <div className="surface rounded-lg p-5">
       <p className={`text-2xl font-semibold ${valueStyle}`}>{value}</p>
@@ -2493,6 +2507,88 @@ function WorkSessionCorrectionModal({ session, employeeName, onClose, onSaved }:
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
           <button type="submit" disabled={loading || !startedAt || (session.status === 'completed' && !endedAt)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Save correction</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function ExpenseCorrectionModal({ expense, onClose, onSaved }: {
+  expense: ExpenseRecord
+  onClose: () => void
+  onSaved: (expense: ExpenseRecord) => void
+}) {
+  const [staffName, setStaffName] = useState(
+    expense.submittedByRole === 'admin' && (ADMIN_NAMES as readonly string[]).includes(expense.staffName)
+      ? expense.staffName
+      : '',
+  )
+  const [expenseDate, setExpenseDate] = useState(expense.expenseDate)
+  const [expenseType, setExpenseType] = useState<ExpenseRecord['expenseType']>(expense.expenseType)
+  const [customExpenseType, setCustomExpenseType] = useState(expense.customExpenseType || '')
+  const [amount, setAmount] = useState(String(expense.amount))
+  const [city, setCity] = useState(expense.city || '')
+  const [description, setDescription] = useState(expense.description || '')
+  const [receiptUrl, setReceiptUrl] = useState(expense.receiptUrl || '')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
+    try {
+      const response = await fetch(`/api/admin/expenses/${encodeURIComponent(expense.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'correct',
+          staffName: expense.submittedByRole === 'admin' ? staffName : '',
+          expenseDate,
+          expenseType,
+          customExpenseType: expenseType === 'other' ? customExpenseType : '',
+          amount: Number(amount),
+          city,
+          description,
+          receiptUrl,
+        }),
+      })
+      const data = await response.json() as { expense?: ExpenseRecord; message?: string }
+      if (!response.ok || !data.expense) throw new Error(data.message || 'Unable to correct this expense.')
+      onSaved(data.expense)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to correct this expense.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const modalInputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
+      <form onSubmit={submit} className="my-auto w-full max-w-2xl rounded-xl border border-zinc-700 bg-zinc-950 p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-lg font-semibold text-ink">Correct expense</p>
+            <p className="mt-1 text-sm text-sub">{expense.submittedByRole === 'admin' ? 'Admin expense' : `Staff expense · ${expense.staffName || expense.staffEmail}`}</p>
+          </div>
+          <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label="Close expense correction"><XCircle className="h-4 w-4" /></button>
+        </div>
+        <p className="mt-4 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-200">The expense status and reimbursement status will not change. Corrected fields and their previous values are saved in the Admin audit log.</p>
+        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+          {expense.submittedByRole === 'admin' ? <div><label htmlFor="correctExpenseAdmin" className="label-upper mb-2 block text-ghost">Admin name</label><select id="correctExpenseAdmin" value={staffName} onChange={(event) => setStaffName(event.target.value)} className={modalInputClass} required><option value="">Select Admin</option>{ADMIN_NAMES.map((name) => <option key={name} value={name}>{name}</option>)}</select></div> : null}
+          <div><label htmlFor="correctExpenseDate" className="label-upper mb-2 block text-ghost">Expense date</label><DatePickerInput id="correctExpenseDate" value={expenseDate} onChange={setExpenseDate} className={modalInputClass} required /></div>
+          <div><label htmlFor="correctExpenseType" className="label-upper mb-2 block text-ghost">Expense type</label><select id="correctExpenseType" value={expenseType} onChange={(event) => { const value = event.target.value as ExpenseRecord['expenseType']; setExpenseType(value); if (value !== 'other') setCustomExpenseType('') }} className={modalInputClass}><option value="travel">Travel</option><option value="food">Food</option><option value="fuel">Fuel</option><option value="other">Other</option></select></div>
+          {expenseType === 'other' ? <div><label htmlFor="correctExpenseCustomType" className="label-upper mb-2 block text-ghost">Specify type</label><input id="correctExpenseCustomType" value={customExpenseType} onChange={(event) => setCustomExpenseType(event.target.value)} maxLength={100} className={modalInputClass} required /></div> : null}
+          <div><label htmlFor="correctExpenseAmount" className="label-upper mb-2 block text-ghost">Amount</label><input id="correctExpenseAmount" type="number" inputMode="decimal" min="0.01" max="10000000" step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} className={modalInputClass} required /></div>
+          <div><label htmlFor="correctExpenseCity" className="label-upper mb-2 block text-ghost">City</label><input id="correctExpenseCity" value={city} onChange={(event) => setCity(event.target.value)} maxLength={100} className={modalInputClass} /></div>
+          <div className="sm:col-span-2"><label htmlFor="correctExpenseReceipt" className="label-upper mb-2 block text-ghost">Receipt link (optional)</label><input id="correctExpenseReceipt" type="url" inputMode="url" value={receiptUrl} onChange={(event) => setReceiptUrl(event.target.value)} maxLength={2048} className={modalInputClass} placeholder="https://..." /></div>
+          <div className="sm:col-span-2"><label htmlFor="correctExpenseDescription" className="label-upper mb-2 block text-ghost">Description</label><textarea id="correctExpenseDescription" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} className={`${modalInputClass} h-auto resize-y py-3`} /></div>
+        </div>
+        {error ? <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+        <div className="mt-6 flex justify-end gap-3">
+          <button type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
+          <button type="submit" disabled={loading || !expenseDate || !amount || (expense.submittedByRole === 'admin' && !staffName)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Save correction</button>
         </div>
       </form>
     </div>

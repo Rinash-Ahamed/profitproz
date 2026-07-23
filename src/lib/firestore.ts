@@ -1137,6 +1137,94 @@ export async function createExpense(input: { staffEmail: string; staffName: stri
   return mapDocToExpense(newDoc)
 }
 
+export async function correctExpense(
+  id: string,
+  input: {
+    actorEmail: string
+    staffName?: string
+    expenseDate: string
+    expenseType: ExpenseRecord['expenseType']
+    customExpenseType: string
+    city: string
+    description: string
+    amount: number
+    receiptUrl: string
+  },
+): Promise<ExpenseRecord> {
+  const db = ensureDb()
+  const expenseRef = db.collection(COLLECTIONS.EXPENSES).doc(id)
+  const receiptRef = db.collection(COLLECTIONS.EXPENSE_RECEIPTS).doc(id)
+  const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(expenseRef)
+    if (!snapshot.exists) throw new Error('EXPENSE_NOT_FOUND')
+    const existing = mapDocToExpense(snapshot)
+    if (existing.submittedByRole === 'admin' && !input.staffName?.trim()) throw new Error('ADMIN_NAME_REQUIRED')
+    const staffName = existing.submittedByRole === 'admin' ? input.staffName?.trim() || existing.staffName : existing.staffName
+    const expenseLabel = input.expenseType === 'other'
+      ? input.customExpenseType
+      : input.expenseType.charAt(0).toUpperCase() + input.expenseType.slice(1)
+    const corrected = {
+      staffName,
+      expenseDate: input.expenseDate,
+      expenseType: input.expenseType,
+      customExpenseType: input.expenseType === 'other' ? input.customExpenseType.trim() : '',
+      title: `${expenseLabel} expense`,
+      city: input.city.trim(),
+      description: input.description.trim(),
+      notes: input.description.trim(),
+      amount: input.amount,
+      receiptName: input.receiptUrl ? 'External receipt link' : '',
+      receiptUrl: input.receiptUrl,
+    }
+    const changes: AuditLogRecord['changes'] = {}
+    const comparableExisting: Record<keyof typeof corrected, unknown> = {
+      staffName: existing.staffName,
+      expenseDate: existing.expenseDate,
+      expenseType: existing.expenseType,
+      customExpenseType: existing.customExpenseType,
+      title: existing.title,
+      city: existing.city,
+      description: existing.description,
+      notes: existing.notes,
+      amount: existing.amount,
+      receiptName: existing.receiptName,
+      receiptUrl: existing.receiptUrl || '',
+    }
+    for (const key of Object.keys(corrected) as (keyof typeof corrected)[]) {
+      if (comparableExisting[key] !== corrected[key]) {
+        changes[key] = { from: comparableExisting[key], to: corrected[key] }
+      }
+    }
+    if (!Object.keys(changes).length) throw new Error('EXPENSE_NO_CHANGES')
+
+    transaction.update(expenseRef, { ...corrected, updatedAt: FieldValue.serverTimestamp() })
+    if (input.receiptUrl) {
+      transaction.set(receiptRef, {
+        expenseId: id,
+        staffEmail: existing.staffEmail,
+        receiptName: 'External receipt link',
+        receiptUrl: input.receiptUrl,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true })
+    } else {
+      transaction.delete(receiptRef)
+    }
+    transaction.set(auditRef, {
+      timestamp: FieldValue.serverTimestamp(),
+      actorEmail: input.actorEmail.trim().toLowerCase(),
+      action: 'EXPENSE_CORRECTION',
+      targetId: id,
+      details: `Admin corrected a ${existing.submittedByRole === 'admin' ? 'Admin' : 'Staff'} expense for ${existing.staffName || existing.staffEmail}.`,
+      changes,
+    })
+  })
+
+  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  return mapDocToExpense(await expenseRef.get())
+}
+
 export async function deletePendingExpense(id: string, staffEmail: string) {
   const db = ensureDb()
   const expenseRef = db.collection(COLLECTIONS.EXPENSES).doc(id)
@@ -1371,7 +1459,7 @@ export async function getSecuritySettings(): Promise<SecuritySettings> {
   const data = snapshot.data() || {}
   return {
     sessionHours: [1, 4, 8, 12, 24].includes(data.sessionHours) ? data.sessionHours as SecuritySettings['sessionHours'] : 24,
-    minPasswordLength: typeof data.minPasswordLength === 'number' ? Math.min(64, Math.max(12, data.minPasswordLength)) : 12,
+    minPasswordLength: typeof data.minPasswordLength === 'number' ? Math.min(64, Math.max(8, data.minPasswordLength)) : 8,
     requireUppercase: data.requireUppercase === true,
     requireNumber: data.requireNumber === true,
   }
@@ -1428,7 +1516,7 @@ export type SecuritySettings = {
 }
 
 const defaultExpenseFieldSettings: ExpenseFieldSettings = { cityRequired: true, descriptionRequired: true, receiptRequired: true }
-const defaultSecuritySettings: SecuritySettings = { sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false }
+const defaultSecuritySettings: SecuritySettings = { sessionHours: 12, minPasswordLength: 8, requireUppercase: false, requireNumber: false }
 
 async function deleteAuditLogSnapshot(snapshot: FirebaseFirestore.QuerySnapshot) {
   if (!db || snapshot.empty) return 0

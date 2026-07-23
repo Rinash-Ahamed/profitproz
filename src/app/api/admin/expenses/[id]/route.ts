@@ -1,7 +1,9 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { deleteAdminExpense, logAdminAction, markExpensePaid, updateExpenseStatus } from '@/lib/firestore'
+import { correctExpense, deleteAdminExpense, logAdminAction, markExpensePaid, updateExpenseStatus } from '@/lib/firestore'
+import { parseDateOnly } from '@/lib/date-only'
+import { ADMIN_NAMES } from '@/lib/admin-options'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -30,6 +32,62 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   const { status, decisionNote, action } = body as { status?: unknown; decisionNote?: unknown; action?: unknown }
+
+  if (action === 'correct') {
+    const correction = body as {
+      staffName?: unknown
+      expenseDate?: unknown
+      expenseType?: unknown
+      customExpenseType?: unknown
+      city?: unknown
+      description?: unknown
+      amount?: unknown
+      receiptUrl?: unknown
+    }
+    const staffName = typeof correction.staffName === 'string' ? correction.staffName.trim() : ''
+    const expenseDate = typeof correction.expenseDate === 'string' ? correction.expenseDate : ''
+    const expenseType = correction.expenseType === 'travel' || correction.expenseType === 'food' || correction.expenseType === 'fuel' || correction.expenseType === 'other' ? correction.expenseType : ''
+    const customExpenseType = typeof correction.customExpenseType === 'string' ? correction.customExpenseType.trim() : ''
+    const city = typeof correction.city === 'string' ? correction.city.trim() : ''
+    const description = typeof correction.description === 'string' ? correction.description.trim() : ''
+    const amount = Number(correction.amount)
+    const receiptUrl = typeof correction.receiptUrl === 'string' ? correction.receiptUrl.trim() : ''
+
+    if (
+      (staffName && !(ADMIN_NAMES as readonly string[]).includes(staffName)) ||
+      !parseDateOnly(expenseDate) ||
+      !expenseType ||
+      (expenseType === 'other' && (!customExpenseType || customExpenseType.length > 100)) ||
+      (expenseType !== 'other' && customExpenseType.length > 0) ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      amount > 10_000_000 ||
+      city.length > 100 ||
+      description.length > 2000 ||
+      receiptUrl.length > 2048
+    ) {
+      return NextResponse.json({ message: 'Enter valid corrected expense details.' }, { status: 400 })
+    }
+    if (receiptUrl) {
+      try {
+        const parsed = new URL(receiptUrl)
+        if (parsed.protocol !== 'https:' || parsed.username || parsed.password) throw new Error('UNSAFE_URL')
+      } catch {
+        return NextResponse.json({ message: 'Enter a valid HTTPS receipt link.' }, { status: 400 })
+      }
+    }
+
+    try {
+      const expense = await correctExpense(id, { actorEmail: user.email, staffName, expenseDate, expenseType, customExpenseType, city, description, amount, receiptUrl })
+      return NextResponse.json({ expense })
+    } catch (error) {
+      if (error instanceof Error && error.message === 'EXPENSE_NOT_FOUND') return NextResponse.json({ message: 'Expense was not found.' }, { status: 404 })
+      if (error instanceof Error && error.message === 'ADMIN_NAME_REQUIRED') return NextResponse.json({ message: 'Select the Admin who recorded this expense.' }, { status: 400 })
+      if (error instanceof Error && error.message === 'EXPENSE_NO_CHANGES') return NextResponse.json({ message: 'Change at least one expense field before saving.' }, { status: 400 })
+      console.error(`Failed to correct expense ${id}:`, error)
+      return NextResponse.json({ message: 'Failed to correct expense.' }, { status: 500 })
+    }
+  }
 
   if (action === 'mark_paid') {
     try {
