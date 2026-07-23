@@ -1171,6 +1171,7 @@ export async function correctExpense(
     const snapshot = await transaction.get(expenseRef)
     if (!snapshot.exists) throw new Error('EXPENSE_NOT_FOUND')
     const existing = mapDocToExpense(snapshot)
+    if (existing.paymentStatus === 'paid') throw new Error('EXPENSE_ALREADY_PAID')
     if (existing.submittedByRole === 'admin' && !input.staffName?.trim()) throw new Error('ADMIN_NAME_REQUIRED')
     const staffName = existing.submittedByRole === 'admin' ? input.staffName?.trim() || existing.staffName : existing.staffName
     const expenseLabel = input.expenseType === 'other'

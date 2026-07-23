@@ -82,6 +82,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({ expense })
     } catch (error) {
       if (error instanceof Error && error.message === 'EXPENSE_NOT_FOUND') return NextResponse.json({ message: 'Expense was not found.' }, { status: 404 })
+      if (error instanceof Error && error.message === 'EXPENSE_ALREADY_PAID') return NextResponse.json({ message: 'Paid expenses are locked and cannot be corrected.' }, { status: 409 })
       if (error instanceof Error && error.message === 'ADMIN_NAME_REQUIRED') return NextResponse.json({ message: 'Select the Admin who recorded this expense.' }, { status: 400 })
       if (error instanceof Error && error.message === 'EXPENSE_NO_CHANGES') return NextResponse.json({ message: 'Change at least one expense field before saving.' }, { status: 400 })
       console.error(`Failed to correct expense ${id}:`, error)
