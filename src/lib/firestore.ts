@@ -745,22 +745,26 @@ async function getApprovedExpenseTotal(query: Query) {
 export async function getDashboardSummary(staffEmail?: string): Promise<DashboardSummary> {
   const db = ensureDb()
   const email = staffEmail?.trim().toLowerCase()
-  const activeWorkQuery: Query = db.collection(COLLECTIONS.WORK_SESSIONS).where('status', '==', 'active')
   let expensePendingQuery: Query = db.collection(COLLECTIONS.EXPENSES).where('status', '==', 'pending')
   let expenseApprovedQuery: Query = db.collection(COLLECTIONS.EXPENSES).where('status', '==', 'approved')
   if (email) {
     expensePendingQuery = expensePendingQuery.where('staffEmail', '==', email)
     expenseApprovedQuery = expenseApprovedQuery.where('staffEmail', '==', email)
   }
-  const [staffCount, activeWorkSnapshot, expenseCount, approvedTotal] = await Promise.all([
+  const activeWorkPromise = email
+    ? db.collection(COLLECTIONS.WORK_SESSIONS).where('staffEmail', '==', email).select('status').get()
+        .then((snapshot) => snapshot.docs.filter((document) => document.data().status === 'active').length)
+    : db.collection(COLLECTIONS.WORK_SESSIONS).where('status', '==', 'active').count().get()
+        .then((snapshot) => snapshot.data().count)
+  const [staffCount, activeWorkSessions, expenseCount, approvedTotal] = await Promise.all([
     email ? Promise.resolve({ data: () => ({ count: 0 }) }) : db.collection(COLLECTIONS.STAFF).count().get(),
-    activeWorkQuery.get(),
+    activeWorkPromise,
     expensePendingQuery.count().get(),
     getApprovedExpenseTotal(expenseApprovedQuery),
   ])
   return {
     staffCount: staffCount.data().count,
-    activeWorkSessions: email ? activeWorkSnapshot.docs.filter((document) => document.data().staffEmail === email).length : activeWorkSnapshot.size,
+    activeWorkSessions,
     pendingExpenses: expenseCount.data().count,
     approvedExpenseTotal: approvedTotal,
   }
@@ -930,17 +934,24 @@ export async function createRevenueInvoiceSequence(propertyId: string, input: In
 
 export async function getFinanceOverview(): Promise<FinanceOverview> {
   const db = ensureDb()
-  const [invoiceSnapshot, paymentSnapshot, expenses] = await Promise.all([
+  const [invoiceSnapshot, paymentSnapshot, expenseSnapshot] = await Promise.all([
     db.collection(COLLECTIONS.FINANCE_INVOICES).get(),
     db.collection(COLLECTIONS.FINANCE_PAYMENTS).get(),
-    listExpenses(),
+    db.collection(COLLECTIONS.EXPENSES).select('amount', 'status', 'paymentStatus').get(),
   ])
   const invoices = invoiceSnapshot.docs.map(mapDocToFinanceInvoice).sort((a, b) => (b.invoiceDate || b.createdAt || '').localeCompare(a.invoiceDate || a.createdAt || ''))
   const payments = paymentSnapshot.docs.map(mapDocToFinancePayment).sort((a, b) => (b.paymentDate || b.createdAt || '').localeCompare(a.paymentDate || a.createdAt || ''))
   const totalInvoiced = invoices.filter((invoice) => invoice.status !== 'cancelled').reduce((total, invoice) => total + invoice.amount, 0)
   const incomeReceived = payments.reduce((total, payment) => total + payment.amount, 0)
-  const paidExpenses = expenses.filter((expense) => expense.paymentStatus === 'paid').reduce((total, expense) => total + expense.amount, 0)
-  const unpaidExpenses = expenses.filter((expense) => expense.status === 'approved' && expense.paymentStatus !== 'paid').reduce((total, expense) => total + expense.amount, 0)
+  const expenseTotals = expenseSnapshot.docs.reduce((totals, document) => {
+    const data = document.data()
+    const amount = typeof data.amount === 'number' && Number.isFinite(data.amount) ? data.amount : 0
+    if (data.paymentStatus === 'paid') totals.paid += amount
+    else if (data.status === 'approved') totals.unpaid += amount
+    return totals
+  }, { paid: 0, unpaid: 0 })
+  const paidExpenses = expenseTotals.paid
+  const unpaidExpenses = expenseTotals.unpaid
   const revenueIncome = payments.filter((payment) => payment.service === 'revenue_management').reduce((total, payment) => total + payment.amount, 0)
   const onboardingIncome = payments.filter((payment) => payment.service === 'ota_onboarding').reduce((total, payment) => total + payment.amount, 0)
   return { invoices, payments, totalInvoiced, incomeReceived, paidExpenses, unpaidExpenses, netCashBalance: incomeReceived - paidExpenses, revenueIncome, onboardingIncome }
@@ -1434,22 +1445,32 @@ export async function completeStaffOnboarding(staffId: string, input: { password
   return mapDocToStaff(updatedDoc)
 }
 
+const EXPENSE_SETTINGS_CACHE_MS = 30_000
+let expenseSettingsCache: { value: ExpenseFieldSettings; expiresAt: number } | null = null
+
 export async function getExpenseFieldSettings(): Promise<ExpenseFieldSettings> {
   if (!db) return defaultExpenseFieldSettings
+  if (expenseSettingsCache && expenseSettingsCache.expiresAt > Date.now()) return expenseSettingsCache.value
   const snapshot = await db.collection(COLLECTIONS.SETTINGS).doc('expense-fields').get()
-  if (!snapshot.exists) return defaultExpenseFieldSettings
+  if (!snapshot.exists) {
+    expenseSettingsCache = { value: defaultExpenseFieldSettings, expiresAt: Date.now() + EXPENSE_SETTINGS_CACHE_MS }
+    return defaultExpenseFieldSettings
+  }
   const data = snapshot.data() || {}
-  return {
+  const settings = {
     cityRequired: typeof data.cityRequired === 'boolean' ? data.cityRequired : defaultExpenseFieldSettings.cityRequired,
     descriptionRequired: typeof data.descriptionRequired === 'boolean' ? data.descriptionRequired : defaultExpenseFieldSettings.descriptionRequired,
     receiptRequired: typeof data.receiptRequired === 'boolean' ? data.receiptRequired : defaultExpenseFieldSettings.receiptRequired,
   }
+  expenseSettingsCache = { value: settings, expiresAt: Date.now() + EXPENSE_SETTINGS_CACHE_MS }
+  return settings
 }
 
 export async function saveExpenseFieldSettings(input: ExpenseFieldSettings): Promise<ExpenseFieldSettings> {
   const db = ensureDb()
   await db.collection(COLLECTIONS.SETTINGS).doc('expense-fields').set({ ...input, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
-  return getExpenseFieldSettings()
+  expenseSettingsCache = { value: input, expiresAt: Date.now() + EXPENSE_SETTINGS_CACHE_MS }
+  return input
 }
 
 export async function getSecuritySettings(): Promise<SecuritySettings> {

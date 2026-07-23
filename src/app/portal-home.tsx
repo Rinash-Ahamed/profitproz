@@ -76,6 +76,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffOnboardingAccess, setStaffOnboardingAccess] = useState(false)
   // Staff list state
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
+  const staffListLoadedRef = useRef(false)
   const [staffSearch, setStaffSearch] = useState('')
   const [salaryList, setSalaryList] = useState<SalaryRecord[]>([])
   const [editingStaff, setEditingStaff] = useState<PublicStaffRecord | null>(null)
@@ -196,6 +197,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         .then((data) => {
           if (data.staff) {
             setStaffList(data.staff)
+            staffListLoadedRef.current = true
           }
         })
         .catch(() => setError('Could not load employee list.'))
@@ -216,12 +218,20 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
     if (activeTab === 'tasks') {
       setLoading(true)
-      Promise.all([fetch('/api/admin/tasks'), fetch('/api/admin/staff')])
+      Promise.all([
+        fetch('/api/admin/tasks'),
+        staffListLoadedRef.current ? Promise.resolve(null) : fetch('/api/admin/staff'),
+      ])
         .then(async ([taskRes, staffRes]) => {
           const taskData = await taskRes.json()
           if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
-          const staffData = await staffRes.json()
-          if (staffData.staff) setStaffList(staffData.staff)
+          if (staffRes) {
+            const staffData = await staffRes.json()
+            if (staffData.staff) {
+              setStaffList(staffData.staff)
+              staffListLoadedRef.current = true
+            }
+          }
         })
         .catch(() => setError('Could not load employee task logs.'))
         .finally(() => setLoading(false))
@@ -246,7 +256,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       Promise.all([fetch('/api/admin/salaries'), fetch('/api/admin/tasks')])
         .then(async ([salaryRes, taskRes]) => {
           const [salaryData, taskData] = await Promise.all([salaryRes.json(), taskRes.json()])
-          if (salaryData.staff) setStaffList(salaryData.staff)
+          if (salaryData.staff) {
+            setStaffList(salaryData.staff)
+            staffListLoadedRef.current = true
+          }
           if (salaryData.salaries) setSalaryList(salaryData.salaries)
           if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
         })
