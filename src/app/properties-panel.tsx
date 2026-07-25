@@ -1,14 +1,15 @@
 'use client'
 
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { FormEvent, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Building2, Download, Edit, FileText, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
+import { Building2, ChevronDown, ChevronRight, Download, Edit, FileText, KeyRound, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
 import type { PropertyInput, PropertyRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
+import { PropertyCredentialsModal } from './property-credentials-modal'
 
 type PropertiesPanelProps = {
   properties: PropertyRecord[]
@@ -40,9 +41,11 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
   const [editing, setEditing] = useState<PropertyRecord | null>(null)
   const [contractProperty, setContractProperty] = useState<PropertyRecord | null>(null)
   const [invoiceProperty, setInvoiceProperty] = useState<PropertyRecord | null>(null)
+  const [credentialsProperty, setCredentialsProperty] = useState<PropertyRecord | null>(null)
   const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
+  const [expandedPropertyId, setExpandedPropertyId] = useState('')
   const visibleProperties = useMemo(() => {
     const query = search.trim().toLowerCase()
     return properties
@@ -65,6 +68,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
       const data = await response.json() as { message?: string }
       if (!response.ok) throw new Error(data.message || 'Failed to delete property.')
       onChange(properties.filter((item) => item.id !== property.id))
+      if (expandedPropertyId === property.id) setExpandedPropertyId('')
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to delete property.')
     } finally {
@@ -94,36 +98,94 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
 
       <div className="surface rounded-lg">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] text-sm">
+          <table className="w-full min-w-[680px] text-sm">
             <thead className="border-b border-zinc-700 text-left">
               <tr>
+                <th className="w-14 px-4 py-4"><span className="sr-only">Show details</span></th>
                 <th className="px-6 py-4 font-medium text-sub">Property</th>
                 <th className="px-6 py-4 font-medium text-sub">Contact</th>
-                <th className="px-6 py-4 font-medium text-sub">Rooms</th>
-                <th className="px-6 py-4 font-medium text-sub">Commission</th>
-                <th className="px-6 py-4 font-medium text-sub">Contract</th>
                 <th className="px-6 py-4 font-medium text-sub">Status</th>
-                {!readOnly && !editorOnly ? <th className="px-6 py-4 font-medium text-sub">Agreement</th> : null}
                 {!readOnly ? <th className="px-6 py-4 font-medium text-sub">Actions</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={readOnly ? 6 : editorOnly ? 7 : 8} className="py-12 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
+                <tr><td colSpan={readOnly ? 4 : 5} className="py-12 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
               ) : visibleProperties.length === 0 ? (
-                <tr><td colSpan={readOnly ? 6 : editorOnly ? 7 : 8} className="px-6 py-12 text-center"><Building2 className="mx-auto h-8 w-8 text-zinc-600" /><p className="mt-3 font-medium text-ink">{search ? 'No matching properties' : 'No client properties yet'}</p>{!readOnly && !search ? <p className="mt-1 text-sm text-sub">Add your first property to start the client register.</p> : null}</td></tr>
-              ) : visibleProperties.map((property) => (
-                <tr key={property.id} className="border-b border-zinc-800 last:border-none">
-                  <td className="px-6 py-4"><p className="font-medium text-ink">{property.name}</p><p className="mt-1 text-xs capitalize text-sub">{property.propertyType.replace('-', ' ')} · {property.city}{property.address ? ` · ${property.address}` : ''}</p>{property.notes ? <p className="mt-2 max-w-72 whitespace-pre-wrap text-xs text-sub">{property.notes}</p> : null}</td>
-                  <td className="px-6 py-4"><p className="text-ink">{property.contactName || 'Not provided'}</p>{property.contactEmail ? <p className="mt-1 text-xs text-sub">{property.contactEmail}</p> : null}{property.contactPhone ? <p className="mt-1 text-xs text-sub">{property.contactPhone}</p> : null}{!property.contactEmail && !property.contactPhone ? <p className="mt-1 text-xs text-sub">No contact details</p> : null}</td>
-                  <td className="px-6 py-4 text-sub">{property.roomCount.toLocaleString('en-IN')}</td>
-                  <td className="px-6 py-4 font-semibold text-[#66B159]">{property.commissionPercent}%</td>
-                  <td className="px-6 py-4 text-sub"><p>{property.contractStartDate ? new Date(`${property.contractStartDate}T00:00:00`).toLocaleDateString('en-IN') : 'Not set'}</p>{!readOnly && !editorOnly && property.signedContractUrl ? <a href={property.signedContractUrl} target="_blank" rel="noopener noreferrer" className="mt-1 inline-block text-xs font-medium text-[#66B159] hover:underline">View signed contract</a> : null}</td>
-                  <td className="px-6 py-4"><PropertyStatusBadge status={property.status} /></td>
-                  {!readOnly && !editorOnly ? <td className="px-6 py-4">{property.signedContractUrl ? <span className="text-xs text-ghost">Signed</span> : <button type="button" onClick={() => setContractProperty(property)} className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-[#66B159]/30 bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20" aria-label={`Generate contract PDF for ${property.name}`} title="Generate contract PDF"><FileText className="h-4 w-4" /> Contract PDF</button>}</td> : null}
-                  {!readOnly ? <td className="px-6 py-4"><div className="flex gap-2">{!editorOnly && property.status === 'active' ? <button type="button" onClick={() => setInvoiceProperty(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159]" aria-label={`Generate revenue invoice for ${property.name}`} title="Generate revenue invoice"><FileText className="h-4 w-4" /></button> : null}<button type="button" onClick={() => setEditing(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label={`Edit ${property.name}`} title="Edit property"><Edit className="h-4 w-4" /></button>{!editorOnly ? <button type="button" disabled={deletingId === property.id} onClick={() => deleteRecord(property)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete ${property.name}`} title="Delete property">{deletingId === property.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button> : null}</div></td> : null}
-                </tr>
-              ))}
+                <tr><td colSpan={readOnly ? 4 : 5} className="px-6 py-12 text-center"><Building2 className="mx-auto h-8 w-8 text-zinc-600" /><p className="mt-3 font-medium text-ink">{search ? 'No matching properties' : 'No client properties yet'}</p>{!readOnly && !search ? <p className="mt-1 text-sm text-sub">Add your first property to start the client register.</p> : null}</td></tr>
+              ) : visibleProperties.map((property) => {
+                const isExpanded = expandedPropertyId === property.id
+                const detailsId = `revenue-property-details-${property.id}`
+                return (
+                  <Fragment key={property.id}>
+                    <tr className={`border-b border-zinc-800 transition-colors ${isExpanded ? 'bg-zinc-900/70' : 'hover:bg-zinc-900/40'}`}>
+                      <td className="px-4 py-4">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedPropertyId(isExpanded ? '' : property.id)}
+                          className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink"
+                          aria-expanded={isExpanded}
+                          aria-controls={detailsId}
+                          aria-label={`${isExpanded ? 'Hide' : 'Show'} details for ${property.name}`}
+                          title={`${isExpanded ? 'Hide' : 'Show'} property details`}
+                        >
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button type="button" onClick={() => setExpandedPropertyId(isExpanded ? '' : property.id)} className="text-left">
+                          <span className="block font-medium text-ink">{property.name}</span>
+                          <span className="mt-1 block text-xs capitalize text-sub">{property.propertyType.replace('-', ' ')}{property.city ? ` · ${property.city}` : ''}</span>
+                        </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-ink">{property.contactName || 'Not provided'}</p>
+                        <p className="mt-1 text-xs text-sub">{property.contactEmail || property.contactPhone || 'No contact details'}</p>
+                      </td>
+                      <td className="px-6 py-4"><PropertyStatusBadge status={property.status} /></td>
+                      {!readOnly ? (
+                        <td className="px-6 py-4">
+                          <div className="flex gap-2">
+                            {!editorOnly ? <button type="button" onClick={() => setCredentialsProperty(property)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159]" aria-label={`Manage platform credentials for ${property.name}`} title="Platform credentials"><KeyRound className="h-4 w-4" /></button> : null}
+                            {!editorOnly && property.status === 'active' ? <button type="button" onClick={() => setInvoiceProperty(property)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159]" aria-label={`Generate revenue invoice for ${property.name}`} title="Generate revenue invoice"><FileText className="h-4 w-4" /></button> : null}
+                            <button type="button" onClick={() => setEditing(property)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label={`Edit ${property.name}`} title="Edit property"><Edit className="h-4 w-4" /></button>
+                            {!editorOnly ? <button type="button" disabled={deletingId === property.id} onClick={() => deleteRecord(property)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete ${property.name}`} title="Delete property">{deletingId === property.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button> : null}
+                          </div>
+                        </td>
+                      ) : null}
+                    </tr>
+                    {isExpanded ? (
+                      <tr id={detailsId} className="border-b border-zinc-800 bg-zinc-950/40">
+                        <td colSpan={readOnly ? 4 : 5} className="px-6 py-5">
+                          <div className="grid gap-4 md:grid-cols-3">
+                            <PropertyDetailGroup title="Property details" items={[
+                              { label: 'Type', value: property.propertyType.replace('-', ' '), capitalize: true },
+                              { label: 'City', value: property.city || 'Not provided' },
+                              { label: 'Address', value: property.address || 'Not provided' },
+                              { label: 'Rooms', value: property.roomCount.toLocaleString('en-IN') },
+                            ]} />
+                            <PropertyDetailGroup title="Client contact" items={[
+                              { label: 'Name', value: property.contactName || 'Not provided' },
+                              { label: 'Email', value: property.contactEmail || 'Not provided' },
+                              { label: 'Phone', value: property.contactPhone || 'Not provided' },
+                              { label: 'GST', value: property.gstNumber || 'Not provided' },
+                            ]} />
+                            <PropertyDetailGroup title="Commercial & agreement" items={[
+                              { label: 'Commission', value: `${property.commissionPercent}%`, accent: true },
+                              { label: 'Effective date', value: property.contractStartDate ? formatDateOnlyDisplay(property.contractStartDate) : 'Not set' },
+                              { label: 'Agreement', value: property.signedContractUrl ? 'Signed' : 'Pending' },
+                            ]}>
+                              {!readOnly && !editorOnly && property.signedContractUrl ? <a href={property.signedContractUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-xs font-medium text-[#66B159] hover:underline">View signed contract</a> : null}
+                              {!readOnly && !editorOnly && !property.signedContractUrl ? <button type="button" onClick={() => setContractProperty(property)} className="mt-3 inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-[#66B159]/30 bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20" aria-label={`Generate contract PDF for ${property.name}`} title="Generate contract PDF"><FileText className="h-4 w-4" /> Contract PDF</button> : null}
+                            </PropertyDetailGroup>
+                          </div>
+                          {property.notes ? <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ghost">Notes</p><p className="mt-2 whitespace-pre-wrap text-sm text-sub">{property.notes}</p></div> : null}
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -133,7 +195,32 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
       {editing ? <PropertyModal title="Edit Client Property" initial={editing} propertyId={editing.id} editorOnly={editorOnly} onClose={() => setEditing(null)} onSaved={(property) => { onChange(properties.map((item) => item.id === property.id ? property : item).sort((a, b) => a.name.localeCompare(b.name))); setEditing(null) }} /> : null}
       {contractProperty ? <ContractPreviewModal property={contractProperty} onClose={() => setContractProperty(null)} /> : null}
       {invoiceProperty ? <RevenueInvoiceModal property={invoiceProperty} onClose={() => setInvoiceProperty(null)} /> : null}
+      {credentialsProperty ? <PropertyCredentialsModal property={credentialsProperty} onClose={() => setCredentialsProperty(null)} /> : null}
     </div>
+  )
+}
+
+type PropertyDetailItem = {
+  label: string
+  value: string
+  accent?: boolean
+  capitalize?: boolean
+}
+
+function PropertyDetailGroup({ title, items, children }: { title: string; items: PropertyDetailItem[]; children?: ReactNode }) {
+  return (
+    <section className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-ghost">{title}</h3>
+      <dl className="mt-3 space-y-2">
+        {items.map((item) => (
+          <div key={item.label} className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 text-sm">
+            <dt className="text-sub">{item.label}</dt>
+            <dd className={`${item.accent ? 'font-semibold text-[#66B159]' : 'text-ink'} ${item.capitalize ? 'capitalize' : ''} break-words`}>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {children}
+    </section>
   )
 }
 
