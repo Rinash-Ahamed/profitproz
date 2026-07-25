@@ -9,6 +9,7 @@ export const OTA_PLATFORMS = [
   'Trip.com',
   'Tripadvisor',
   'Trivago',
+  'Yatra',
 ] as const
 
 export type OtaPlatform = (typeof OTA_PLATFORMS)[number]

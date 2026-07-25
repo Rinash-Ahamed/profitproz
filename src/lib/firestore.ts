@@ -136,6 +136,7 @@ const COLLECTIONS = {
   ADMINS: 'admins',
   STAFF: 'staff',
   PROPERTIES: 'properties',
+  PROPERTY_CREDENTIALS: 'property_credentials',
     OTA_ONBOARDINGS: 'ota_onboardings',
   REVENUE_INVOICES: 'revenue_invoices',
   FINANCE_INVOICES: 'finance_invoices',
@@ -1084,12 +1085,31 @@ export async function updateProperty(id: string, updates: Partial<PropertyInput>
   return mapDocToProperty(await docRef.get())
 }
 
+export async function getEncryptedPropertyCredentials(id: string): Promise<string> {
+  const db = ensureDb()
+  const snapshot = await db.collection(COLLECTIONS.PROPERTY_CREDENTIALS).doc(id).get()
+  return typeof snapshot.data()?.payload === 'string' ? snapshot.data()!.payload : ''
+}
+
+export async function saveEncryptedPropertyCredentials(id: string, payload: string): Promise<void> {
+  const db = ensureDb()
+  const property = await db.collection(COLLECTIONS.PROPERTIES).doc(id).get()
+  if (!property.exists) throw new Error('PROPERTY_NOT_FOUND')
+  await db.collection(COLLECTIONS.PROPERTY_CREDENTIALS).doc(id).set({
+    payload,
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+}
+
 export async function deleteProperty(id: string): Promise<void> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.PROPERTIES).doc(id)
   const existing = await docRef.get()
   if (!existing.exists) throw new Error('PROPERTY_NOT_FOUND')
-  await docRef.delete()
+  const batch = db.batch()
+  batch.delete(docRef)
+  batch.delete(db.collection(COLLECTIONS.PROPERTY_CREDENTIALS).doc(id))
+  await batch.commit()
 }
 
 export async function listExpenses(staffEmail?: string) {

@@ -32,6 +32,8 @@ Production authentication requires Firestore and `AUTH_SECRET`. Admin and staff 
 
 `AUTH_SECRET` must contain at least 32 bytes in production. The idle session timeout and password rules are managed in the Admin security settings. Active portal sessions renew securely; users are logged out after the configured period without activity.
 
+`CLIENT_CREDENTIALS_ENCRYPTION_KEY` must be a separate secret containing at least 32 characters. It encrypts each client’s OTA platform usernames and passwords with AES-256-GCM before Firestore storage. Add the same value to local and Vercel environments and back it up securely; changing or losing it makes existing credentials unreadable.
+
 The repository does not automatically create the first production admin. Provision the initial `admins` document through an approved deployment/bootstrap process with a PBKDF2 password hash compatible with `src/lib/auth.ts`; never store a plaintext production password in Firestore.
 
 ## Templates
