@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Analytics } from '@vercel/analytics/next'
 import { Instrument_Serif, Inter } from 'next/font/google'
 import './globals.css'
 
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${inter.variable} ${instrument.variable}`}>
       <body className="bg-zinc-1000 text-ink font-sans antialiased overflow-x-hidden">
         {children}
+        <Analytics />
       </body>
     </html>
   )
