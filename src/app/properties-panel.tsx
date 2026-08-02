@@ -363,87 +363,69 @@ function PropertyModal({ title, initial, propertyId, editorOnly = false, onClose
 }
 
 function ContractPreviewModal({ property, onClose }: { property: PropertyRecord; onClose: () => void }) {
-  const previewRef = useRef<HTMLDivElement>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [template, setTemplate] = useState('')
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
-  const [reloadKey, setReloadKey] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
-
-    async function loadContract() {
-      setLoading(true)
-      setError('')
-      try {
-        const response = await fetch(`/api/admin/properties/${encodeURIComponent(property.id)}/contract`, { signal: controller.signal })
-        if (!response.ok) {
-          const data = await response.json().catch(() => ({})) as { message?: string }
-          throw new Error(data.message || 'Failed to generate contract preview.')
-        }
-
-        const contract = await response.arrayBuffer()
-        if (controller.signal.aborted || !previewRef.current) return
-        const { renderAsync } = await import('docx-preview')
-        previewRef.current.innerHTML = ''
-        await renderAsync(contract, previewRef.current, undefined, {
-          breakPages: true,
-          ignoreHeight: false,
-          ignoreWidth: false,
-          renderHeaders: true,
-          renderFooters: true,
-          useBase64URL: true,
-        })
-      } catch (caught) {
-        if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Failed to generate contract preview.')
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
-    }
-
-    void loadContract()
+    setLoading(true)
+    setError('')
+    fetch('/template/ProfitPro_Revenue_Management_Contract_Template.html', { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('The contract template could not be loaded.')
+        return response.text()
+      })
+      .then((html) => { if (!controller.signal.aborted) setTemplate(html) })
+      .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Failed to generate contract preview.') })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [property.id, reloadKey])
+  }, [property.id])
+
+  const rendered = useMemo(() => {
+    if (!template) return ''
+    const dateValue = property.contractStartDate || property.createdAt || ''
+    const date = dateValue ? new Date(dateValue.includes('T') ? dateValue : `${dateValue}T00:00:00Z`) : null
+    const effectiveDate = date && !Number.isNaN(date.valueOf())
+      ? new Intl.DateTimeFormat('en-IN', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date)
+      : ''
+    const values: Record<string, string | number> = {
+      contract_number: property.contractNumber || 'Pending assignment',
+      effective_date: effectiveDate,
+      client_name: property.contactName || property.name,
+      property_name: property.name,
+      percentage: property.commissionPercent.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
+      property_address: [property.address, property.city].filter(Boolean).join(', '),
+      email_address: property.contactEmail || 'N/A',
+      phone: property.contactPhone || 'N/A',
+      gst: property.gstNumber || 'N/A',
+    }
+    return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeHtml(value)), template)
+  }, [property, template])
 
   async function downloadPdf() {
-    const preview = previewRef.current
-    if (!preview || loading || error) return
+    const frameDocument = iframeRef.current?.contentDocument
+    const pages = frameDocument ? Array.from(frameDocument.querySelectorAll('.contract-page')) as HTMLElement[] : []
+    if (!pages.length || loading || error) return
     setDownloading(true)
     setError('')
-
-    const sourceWrapper = (preview.querySelector('.docx-wrapper') as HTMLElement | null) || preview
-    const exportHost = document.createElement('div')
-    const wrapper = sourceWrapper.cloneNode(true) as HTMLElement
-    exportHost.style.position = 'fixed'
-    exportHost.style.left = '-100000px'
-    exportHost.style.top = '0'
-    exportHost.style.background = '#ffffff'
-    exportHost.appendChild(wrapper)
-    document.body.appendChild(exportHost)
-    const sections = Array.from(wrapper.querySelectorAll('section.docx')) as HTMLElement[]
-
     try {
-      wrapper.style.padding = '0'
-      wrapper.style.background = '#ffffff'
-      sections.forEach((section, index) => {
-        section.style.margin = '0 auto'
-        section.style.boxShadow = 'none'
-        section.style.breakAfter = index === sections.length - 1 ? 'auto' : 'page'
-      })
-
-      const { default: html2pdf } = await import('html2pdf.js')
+      await waitForPdfAssets(pages)
+      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true })
+      for (let index = 0; index < pages.length; index += 1) {
+        const canvas = await html2canvas(pages[index], { scale: getPdfRenderScale(), useCORS: true, backgroundColor: '#ffffff', logging: false })
+        if (index > 0) pdf.addPage('a4', 'portrait')
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight(), undefined, 'FAST')
+        releasePdfCanvas(canvas)
+      }
       const safeName = property.name.trim().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'property'
-      await html2pdf().set({
-        margin: 0,
-        filename: `${safeName}-ProfitPro-Contract.pdf`,
-        image: { type: 'jpeg', quality: 1 },
-        html2canvas: { scale: getPdfRenderScale(), useCORS: true, backgroundColor: '#ffffff', logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      }).from(wrapper).save()
+      pdf.save(`${safeName}-ProfitPro-Contract.pdf`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to download the contract PDF.')
     } finally {
-      exportHost.remove()
       setDownloading(false)
     }
   }
@@ -454,7 +436,7 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-700 px-5 py-4 sm:px-6">
           <div>
             <p className="text-lg font-semibold text-ink">Contract preview</p>
-            <p className="mt-1 text-sm text-sub">{property.name} · placeholders filled from the property record</p>
+            <p className="mt-1 text-sm text-sub">{property.name} · HTML preview with fixed A4 alignment</p>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error)} className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60">
@@ -465,10 +447,10 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
           </div>
         </div>
 
-        {error ? <div className="m-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 sm:m-6"><span>{error}</span><button type="button" onClick={() => setReloadKey((current) => current + 1)} className="rounded-md border border-red-300/30 px-3 py-1.5 text-xs font-semibold transition-colors hover:bg-red-500/10">Retry preview</button></div> : null}
+        {error ? <div className="m-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 sm:m-6">{error}</div> : null}
         <div className="max-h-[calc(100vh-9rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">
           {loading ? <div className="flex min-h-96 items-center justify-center gap-3 text-sm text-sub"><Loader2 className="h-5 w-5 animate-spin" /> Generating contract preview…</div> : null}
-          <div ref={previewRef} className={loading ? 'hidden' : 'mx-auto min-w-fit [&_.docx-wrapper]:!bg-transparent [&_.docx-wrapper]:!p-0'} />
+          {!loading && rendered ? <iframe ref={iframeRef} title={`Contract preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[3441px] w-[842px] max-w-none border-0 bg-transparent" /> : null}
         </div>
       </div>
     </div>,

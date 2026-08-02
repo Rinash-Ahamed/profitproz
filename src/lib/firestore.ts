@@ -1049,33 +1049,6 @@ export async function createProperty(input: PropertyInput): Promise<PropertyReco
   return mapDocToProperty(snapshot)
 }
 
-export async function ensurePropertyContractNumber(id: string): Promise<PropertyRecord> {
-  const db = ensureDb()
-  const docRef = db.collection(COLLECTIONS.PROPERTIES).doc(id)
-  const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('contract-sequence')
-
-  await db.runTransaction(async (transaction) => {
-    const property = await transaction.get(docRef)
-    if (!property.exists) throw new Error('PROPERTY_NOT_FOUND')
-    if (typeof property.data()?.contractNumber === 'string' && property.data()?.contractNumber) return
-
-    const counter = await transaction.get(counterRef)
-    const storedLastNumber = counter.data()?.lastNumber
-    const lastNumber = Number.isInteger(storedLastNumber) ? Math.max(storedLastNumber, CONTRACT_SEQUENCE_START) : CONTRACT_SEQUENCE_START
-    const nextNumber = lastNumber + 1
-
-    transaction.set(counterRef, { lastNumber: nextNumber, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
-    transaction.update(docRef, {
-      contractNumber: formatContractNumber(nextNumber, property.data()?.contractStartDate),
-      updatedAt: FieldValue.serverTimestamp(),
-    })
-  })
-
-  const property = await docRef.get()
-  if (!property.exists) throw new Error('PROPERTY_NOT_FOUND')
-  return mapDocToProperty(property)
-}
-
 export async function updateProperty(id: string, updates: Partial<PropertyInput>): Promise<PropertyRecord> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.PROPERTIES).doc(id)
