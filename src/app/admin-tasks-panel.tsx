@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Edit, FileDown, Loader2, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, Edit, FileDown, Info, Loader2, Search } from 'lucide-react'
 import type { PublicStaffRecord, WorkSessionRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
@@ -162,6 +162,10 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
         <TaskMetric label="Working now" value={todaySummary.working} detail="Active today" tone="green" />
         <TaskMetric label="Completed today" value={todaySummary.completed} detail="Work summaries submitted" tone="green" />
         <TaskMetric label="Not started" value={todaySummary.notStarted} detail="Active employees today" tone="amber" />
+      </div>
+      <div role="note" className="flex items-start gap-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+        <Info className="mt-0.5 h-4 w-4 flex-none" />
+        <p><span className="font-semibold">Task history:</span> Only the latest 3 months of task records are available. Older records are automatically deleted from Firestore.</p>
       </div>
       <div className="surface rounded-lg">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
