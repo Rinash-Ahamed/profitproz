@@ -152,6 +152,11 @@ const COLLECTIONS = {
 } as const
 
 const AUDIT_LOG_RETENTION_DAYS = 120
+const WORK_SESSION_RETENTION_MONTHS = 3
+const WORK_SESSION_PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000
+
+let lastWorkSessionPruneAt = 0
+let workSessionPrunePromise: Promise<number> | null = null
 
 function createDocumentId() {
   return crypto.randomUUID()
@@ -578,6 +583,7 @@ export type WorkSessionRecord = {
   durationMinutes: number
   notes: string
   status: 'active' | 'completed'
+  expiresAt?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -634,6 +640,7 @@ function mapDocToWorkSession(doc: DocumentSnapshot): WorkSessionRecord {
     durationMinutes: typeof data.durationMinutes === 'number' ? data.durationMinutes : 0,
     notes: data.notes || '',
     status: data.status === 'completed' ? 'completed' : 'active',
+    expiresAt: mapTimestamp(data.expiresAt),
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
@@ -1292,6 +1299,7 @@ export async function markExpensePaid(id: string): Promise<ExpenseRecord> {
 
 export async function listWorkSessions(staffEmail?: string): Promise<WorkSessionRecord[]> {
   if (!db) return []
+  await pruneOldWorkSessions().catch((error) => console.error('Failed to prune old work sessions:', error))
   let query: Query = db.collection(COLLECTIONS.WORK_SESSIONS)
   if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
   const snapshot = await query.get()
@@ -1300,10 +1308,51 @@ export async function listWorkSessions(staffEmail?: string): Promise<WorkSession
     .sort((a, b) => (b.startedAt || b.createdAt || '').localeCompare(a.startedAt || a.createdAt || ''))
 }
 
-export function listWorkSessionsPage(page: PaginationRequest, staffEmail?: string) {
+export async function listWorkSessionsPage(page: PaginationRequest, staffEmail?: string) {
+  await pruneOldWorkSessions().catch((error) => console.error('Failed to prune old work sessions:', error))
   let query: Query = ensureDb().collection(COLLECTIONS.WORK_SESSIONS)
   if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
   return paginateQuery(query, mapDocToWorkSession, page)
+}
+
+function addUtcMonths(date: Date, months: number) {
+  const result = new Date(date)
+  const originalDay = result.getUTCDate()
+  result.setUTCDate(1)
+  result.setUTCMonth(result.getUTCMonth() + months)
+  const daysInTargetMonth = new Date(Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0)).getUTCDate()
+  result.setUTCDate(Math.min(originalDay, daysInTargetMonth))
+  return result
+}
+
+export async function pruneOldWorkSessions() {
+  if (!db) return 0
+  const now = Date.now()
+  if (workSessionPrunePromise) return workSessionPrunePromise
+  if (now - lastWorkSessionPruneAt < WORK_SESSION_PRUNE_INTERVAL_MS) return 0
+
+  workSessionPrunePromise = (async () => {
+    const cutoffDate = addUtcMonths(new Date(now), -WORK_SESSION_RETENTION_MONTHS).toISOString().slice(0, 10)
+    let deleted = 0
+    let snapshot = await db.collection(COLLECTIONS.WORK_SESSIONS).where('workDate', '<', cutoffDate).limit(400).get()
+
+    while (!snapshot.empty) {
+      const batch = db.batch()
+      snapshot.docs.forEach((doc) => batch.delete(doc.ref))
+      await batch.commit()
+      deleted += snapshot.size
+      snapshot = await db.collection(COLLECTIONS.WORK_SESSIONS).where('workDate', '<', cutoffDate).limit(400).get()
+    }
+
+    lastWorkSessionPruneAt = Date.now()
+    return deleted
+  })()
+
+  try {
+    return await workSessionPrunePromise
+  } finally {
+    workSessionPrunePromise = null
+  }
 }
 
 function workSessionDocumentId(staffEmail: string, workDate: string) {
@@ -1328,6 +1377,7 @@ export async function startWorkSession(staffEmail: string, workDate: string): Pr
       durationMinutes: 0,
       notes: '',
       status: 'active',
+      expiresAt: Timestamp.fromDate(addUtcMonths(now.toDate(), WORK_SESSION_RETENTION_MONTHS)),
       createdAt: now,
       updatedAt: now,
     })
