@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProfitPro Revenue Management Services Agreement</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: #e8ebe6; color: #171917; font-family: Arial, Helvetica, sans-serif; }
+    body { padding: 24px 0; }
+    .contract-page {
+      position: relative;
+      width: 794px;
+      height: 1123px;
+      margin: 0 auto 24px;
+      overflow: hidden;
+      background: #fff;
+      padding: 56px 62px 48px;
+      box-shadow: 0 8px 28px rgba(20, 28, 18, .12);
+      page-break-after: always;
+    }
+    .contract-page:last-child { margin-bottom: 0; page-break-after: auto; }
+    .topbar { position: absolute; inset: 0 0 auto; height: 8px; background: #66b159; }
+    .header { display: flex; align-items: flex-start; justify-content: space-between; gap: 32px; border-bottom: 2px solid #66b159; padding-bottom: 15px; }
+    .logo { width: 190px; height: 62px; object-fit: contain; object-position: left center; }
+    .document-meta { width: 275px; border-collapse: collapse; font-size: 10px; }
+    .document-meta th, .document-meta td { border-bottom: 1px solid #dce3d8; padding: 5px 7px; text-align: left; vertical-align: top; }
+    .document-meta th { width: 96px; color: #687066; font-size: 8px; letter-spacing: .08em; text-transform: uppercase; }
+    .document-meta td { font-weight: 700; overflow-wrap: anywhere; }
+    .eyebrow { margin: 24px 0 8px; color: #4b8d40; font-size: 9px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: 28px; line-height: 1.12; letter-spacing: -.02em; }
+    .subtitle { margin: 7px 0 0; color: #687066; font-size: 12px; }
+    .intro-card { margin-top: 22px; border: 1px solid #cfe3ca; border-left: 5px solid #66b159; border-radius: 8px; background: #f6faf4; padding: 15px 17px; }
+    .intro-card strong { display: block; margin-bottom: 7px; font-size: 12px; }
+    .body-copy, .clause p { margin: 0 0 9px; color: #343934; font-size: 10.5px; line-height: 1.5; text-align: justify; }
+    .section-title { margin: 21px 0 10px; color: #202420; font-size: 13px; }
+    .term-card { margin-top: 9px; border: 1px solid #dce3d8; border-radius: 8px; padding: 10px 13px; }
+    .term-card h3 { margin: 0 0 6px; color: #4b8d40; font-size: 10.5px; }
+    .formula { margin: 8px 0 10px; border-radius: 6px; background: #edf5ea; padding: 9px 12px; color: #2f6228; font-size: 10px; font-weight: 700; text-align: center; }
+    .page-heading { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #66b159; padding-bottom: 13px; }
+    .page-heading img { width: 145px; height: 45px; object-fit: contain; object-position: left center; }
+    .page-heading span { color: #687066; font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+    .clauses { margin-top: 20px; }
+    .clause { margin-bottom: 17px; break-inside: avoid; }
+    .clause-head { display: flex; align-items: center; gap: 11px; margin-bottom: 7px; }
+    .clause-number { display: inline-flex; width: 28px; height: 28px; flex: 0 0 28px; align-items: center; justify-content: center; border-radius: 50%; background: #66b159; color: #fff; font-size: 11px; font-weight: 700; }
+    .clause h2 { margin: 0; font-size: 15px; }
+    .acknowledgement { margin-top: 13px; border: 1px solid #cfe3ca; border-radius: 8px; background: #f6faf4; padding: 13px 15px; }
+    .acknowledgement h3 { margin: 0 0 7px; color: #387630; font-size: 11px; }
+    .details { margin: 17px auto 0; width: 610px; border: 1px solid #dce3d8; border-radius: 8px; overflow: hidden; }
+    .details-title { background: #f2f6f0; padding: 9px 13px; color: #3f493d; font-size: 9px; font-weight: 700; letter-spacing: .1em; text-align: center; text-transform: uppercase; }
+    .details-grid { display: grid; grid-template-columns: 1fr 1fr; }
+    .detail { min-height: 47px; border-right: 1px solid #e2e7df; border-top: 1px solid #e2e7df; padding: 8px 11px; }
+    .detail:nth-child(even) { border-right: 0; }
+    .detail.wide { grid-column: 1 / -1; border-right: 0; }
+    .detail-label { display: block; margin-bottom: 4px; color: #747c72; font-size: 7.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+    .detail-value { display: block; font-size: 10px; font-weight: 700; overflow-wrap: anywhere; }
+    .signature-panel { width: 610px; margin: 18px auto 0; }
+    .signature-title { margin-bottom: 9px; color: #3f493d; font-size: 9px; font-weight: 700; letter-spacing: .1em; text-align: center; text-transform: uppercase; }
+    .signature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .signature-box { height: 175px; border: 1.5px solid #66b159; border-radius: 8px; padding: 12px 14px; text-align: center; }
+    .signature-party { color: #2f6228; font-size: 10px; font-weight: 700; }
+    .signature-space { display: flex; height: 93px; align-items: center; justify-content: center; overflow: hidden; }
+    .provider-signature { display: block; width: 132px; height: 68px; object-fit: contain; object-position: center; transform: scale(1.6); }
+    .signature-fields { display: block; }
+    .signature-field { display: block; border-top: 1px solid #9ba399; padding-top: 6px; color: #747c72; font-size: 7.5px; text-align: left; }
+    .footer { position: absolute; right: 62px; bottom: 18px; left: 62px; display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 18px; border-top: 1px solid #dce3d8; padding-top: 7px; color: #7a8278; font-size: 7.5px; line-height: 1.45; }
+    .footer-contact { max-width: 535px; }
+    .footer a { color: inherit; text-decoration: none; }
+    .footer-status { color: #525a50; font-weight: 700; letter-spacing: .06em; text-align: right; }
+    @media print {
+      html, body { background: #fff; }
+      body { padding: 0; }
+      .contract-page { margin: 0; box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <section class="contract-page">
+    <div class="topbar"></div>
+    <header class="header">
+      <img class="logo" src="/invoice.png" alt="ProfitPro" />
+      <table class="document-meta">
+        <tr><th>Contract No.</th><td>{{contract_number}}</td></tr>
+        <tr><th>Property</th><td>{{property_name}}</td></tr>
+        <tr><th>Effective Date</th><td>{{effective_date}}</td></tr>
+      </table>
+    </header>
+
+    <p class="eyebrow">Revenue Management Company</p>
+    <h1>Revenue Management<br />Services Agreement</h1>
+    <p class="subtitle">Between ProfitPro PVT. LTD. and {{client_name}} ({{property_name}})</p>
+
+    <div class="intro-card">
+      <strong>Document purpose</strong>
+      <p class="body-copy">This policy document sets out the principles, standards, and professional practices that guide our operations, client relationships, data handling, communication, and overall service delivery. It is designed to ensure consistency, transparency, accountability, and compliance across all areas of our business.</p>
+      <p class="body-copy">The document also defines the responsibilities of the Company, its employees, representatives, and clients in maintaining an ethical, secure, and professional working relationship. It outlines our commitment to protecting confidential information, delivering services with due care and accuracy, maintaining clear communication, and continuously improving our processes to meet client expectations and industry standards.</p>
+      <p class="body-copy">All employees, consultants, partners, and clients associated with the Company are expected to understand and adhere to the applicable provisions of this policy. The Company reserves the right to review, amend, or update these policies periodically to reflect changes in business requirements, technology, legal obligations, and operational practices.</p>
+    </div>
+
+    <h2 class="section-title">Commercial Terms</h2>
+    <p class="body-copy">The client, <strong>{{property_name}}</strong>, agrees to pay ProfitPro a one-time commission of <strong>{{percentage}}%</strong> on the total monthly revenue generated through Online Travel Agencies (OTAs) and other online booking channels for the Property. This commission shall apply only to the properties specifically covered under this Agreement, including any additional properties that are subsequently added through mutual written consent.</p>
+    <p class="body-copy">The commission shall be calculated based on the monthly revenue generated from all eligible online booking platforms and shall be payable within 3 days from the date of invoice issued by ProfitPro.</p>
+
+    <div class="term-card">
+      <h3>Commission Calculation</h3>
+      <div class="formula">Monthly Commission = (Total Monthly OTA &amp; Online Room Revenue − OTA Commission) × Agreed Commission Percentage</div>
+      <p class="body-copy">For the avoidance of doubt, “Monthly OTA &amp; Online Room Revenue” means the total room revenue generated through Online Travel Agencies (OTAs) and other online booking channels during the relevant calendar month. The commission payable to ProfitPro shall be calculated on the revenue remaining after deducting the applicable OTA commissions. Any taxes collected on behalf of the Government (including GST), cancellations, refunds, or chargebacks shall not form part of the commission calculation unless otherwise agreed in writing. ProfitPro shall raise a monthly invoice based on revenue information obtained from the Property Management System, Revenue Management System, Channel Manager, booking platforms, financial records, or any other reports mutually accepted by the parties.</p>
+    </div>
+    <div class="term-card">
+      <h3>Third-Party Software &amp; Termination</h3>
+      <p class="body-copy"><strong>Third-Party Software Charges:</strong> Any charges for third-party software or services, including Channel Manager, PMS, HMS, Booking Engine, or other technology platforms, shall be paid directly by the Client to the respective vendor. ProfitPro may assist with coordination and share the vendor’s quotation or invoice for reference but shall not collect these payments.</p>
+      <p class="body-copy"><strong>Termination &amp; Outstanding Payments:</strong> Either party may terminate this Agreement by providing 30 (thirty) days’ prior written notice to the other party. The Client shall clear all outstanding commissions, service fees, and any other amounts due to ProfitPro before the effective date of termination. Any unpaid dues shall remain payable even after the Agreement is terminated.</p>
+    </div>
+
+    <footer class="footer">
+      <div class="footer-contact">ProfitPro Pvt. Ltd. · Coimbatore, Tamil Nadu 641008, India · <a href="tel:+919363509110">+91 93635 09110</a> · <a href="mailto:support@profitproz.com">support@profitproz.com</a> · <a href="https://www.profitproz.com">www.profitproz.com</a></div>
+      <div class="footer-status">CONFIDENTIAL<br />Page 1 of 3</div>
+    </footer>
+  </section>
+
+  <section class="contract-page">
+    <div class="topbar"></div>
+    <header class="page-heading"><img src="/invoice.png" alt="ProfitPro" /><span>Policy Terms</span></header>
+    <div class="clauses">
+      <article class="clause">
+        <div class="clause-head"><span class="clause-number">1</span><h2>Purpose</h2></div>
+        <p>The purpose of this Policy is to establish the standards, principles, and responsibilities that guide ProfitPro in delivering professional revenue management services. It is intended to ensure that all services are provided with integrity, transparency, accountability, accuracy, and a strong commitment to client success.</p>
+      </article>
+      <article class="clause">
+        <div class="clause-head"><span class="clause-number">2</span><h2>Scope</h2></div>
+        <p>This Policy applies to all employees, contractors, and authorized representatives of ProfitPro and governs all interactions with clients, data, systems, and third parties.</p>
+      </article>
+      <article class="clause">
+        <div class="clause-head"><span class="clause-number">3</span><h2>Confidentiality &amp; Data Protection</h2></div>
+        <p>ProfitPro is committed to protecting the confidentiality, integrity, availability, and security of all client information entrusted to us. Client information may include financial records, revenue reports, pricing strategies, occupancy data, reservation details, customer information, login credentials, business plans, performance reports, and other commercially sensitive information.</p>
+      </article>
+      <article class="clause">
+        <div class="clause-head"><span class="clause-number">4</span><h2>Client Access &amp; System Usage</h2></div>
+        <p>Clients will be provided secure, role-based access to systems and reports as agreed. Users must keep credentials confidential and notify ProfitPro immediately of any unauthorized access or security concerns. ProfitPro reserves the right to suspend or restrict system access where misuse, unauthorized activity, security risk, or violation of this Policy is identified.</p>
+      </article>
+      <article class="clause">
+        <div class="clause-head"><span class="clause-number">5</span><h2>Service Standards</h2></div>
+        <p>ProfitPro is dedicated to delivering accurate insights, actionable recommendations, and measurable results. We continuously monitor performance and invest in tools, people, and processes to maintain the highest standards of service.</p>
+      </article>
+      <article class="clause">
+        <div class="clause-head"><span class="clause-number">6</span><h2>Compliance</h2></div>
+        <p>We comply with all applicable laws, regulations, and industry standards. Our team conducts business ethically and transparently, avoiding any conflict of interest and maintaining fair competition. Any suspected violation of applicable law, contractual obligations, data protection requirements, or this Policy should be reported promptly to ProfitPro management.</p>
+      </article>
+      <article class="clause">
+        <div class="clause-head"><span class="clause-number">7</span><h2>Approval &amp; Acknowledgement</h2></div>
+        <p>By signing below, you acknowledge that you have read, understood, and agreed to comply with this Policy. This Policy may be updated from time to time; continued use of our services constitutes acceptance of any updates.</p>
+      </article>
+    </div>
+    <footer class="footer">
+      <div class="footer-contact">ProfitPro Pvt. Ltd. · Coimbatore, Tamil Nadu 641008, India · <a href="tel:+919363509110">+91 93635 09110</a> · <a href="mailto:support@profitproz.com">support@profitproz.com</a> · <a href="https://www.profitproz.com">www.profitproz.com</a></div>
+      <div class="footer-status">CONFIDENTIAL<br />Page 2 of 3</div>
+    </footer>
+  </section>
+
+  <section class="contract-page">
+    <div class="topbar"></div>
+    <header class="page-heading"><img src="/invoice.png" alt="ProfitPro" /><span>Approval &amp; Signatures</span></header>
+    <div class="acknowledgement" style="margin-top: 22px;">
+      <h3>Client acknowledgement</h3>
+      <p class="body-copy">By signing below, the Client confirms that it has read, understood, and accepted this Policy, and that the authorized signatory has authority to bind the Client. This Policy forms part of the service documentation and should be read together with the signed Revenue Management Services Agreement and its schedules.</p>
+    </div>
+
+    <section class="details">
+      <div class="details-title">Property Owner / Authorized Representative Details</div>
+      <div class="details-grid">
+        <div class="detail"><span class="detail-label">Representative</span><span class="detail-value">{{client_name}}</span></div>
+        <div class="detail"><span class="detail-label">Property</span><span class="detail-value">{{property_name}}</span></div>
+        <div class="detail wide"><span class="detail-label">Property Address</span><span class="detail-value">{{property_address}}</span></div>
+        <div class="detail"><span class="detail-label">Email Address</span><span class="detail-value">{{email_address}}</span></div>
+        <div class="detail"><span class="detail-label">Contact Number</span><span class="detail-value">{{phone}}</span></div>
+        <div class="detail wide"><span class="detail-label">GST Number (if applicable)</span><span class="detail-value">{{gst}}</span></div>
+      </div>
+    </section>
+
+    <section class="signature-panel">
+      <div class="signature-title">Authorized Signatures</div>
+      <div class="signature-grid">
+        <div class="signature-box">
+          <div class="signature-party">For ProfitPro PVT. LTD.</div>
+          <div class="signature-space"><img class="provider-signature" src="/portal/signature.png" alt="ProfitPro authorized signature" /></div>
+          <div class="signature-fields"><span class="signature-field">Authorized Signatory</span></div>
+        </div>
+        <div class="signature-box">
+          <div class="signature-party">For {{client_name}}</div>
+          <div class="signature-space"></div>
+          <div class="signature-fields"><span class="signature-field">Authorized Signatory</span></div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <div class="footer-contact">ProfitPro Pvt. Ltd. · Coimbatore, Tamil Nadu 641008, India · <a href="tel:+919363509110">+91 93635 09110</a> · <a href="mailto:support@profitproz.com">support@profitproz.com</a> · <a href="https://www.profitproz.com">www.profitproz.com</a></div>
+      <div class="footer-status">CONFIDENTIAL<br />Page 3 of 3</div>
+    </footer>
+  </section>
+</body>
+</html>

@@ -98,12 +98,12 @@ export function Nav() {
           </nav>
 
           <div className="flex items-center gap-3">
-            {/* CTA */}
+            {/* Login */}
             <Link
-              href="/contact"
+              href="/login"
               className="group hidden lg:flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] text-xs font-sans font-semibold px-4 py-2 rounded-lg transition-colors duration-200"
             >
-              Free Audit
+              Login
               <svg width="11" height="11" viewBox="0 0 11 11" fill="none" className="transition-transform duration-200 group-hover:translate-x-0.5">
                 <path d="M1.5 5.5h8M6 2l3.5 3.5L6 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
@@ -182,11 +182,11 @@ export function Nav() {
               })}
               <div className="h-px bg-zinc-800 my-2 mx-1" />
               <Link
-                href="/contact"
+                href="/login"
                 onClick={() => setOpen(false)}
                 className="mx-1 flex items-center justify-center gap-2 bg-[#66B159] text-[#FFFCFC] text-sm font-sans font-semibold py-2.5 rounded-lg"
               >
-                Get Free Audit
+                Login
               </Link>
             </div>
           </motion.div>
