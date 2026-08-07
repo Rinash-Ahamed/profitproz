@@ -13,6 +13,11 @@ export const OTA_PLATFORMS = [
 ] as const
 
 export type OtaPlatform = (typeof OTA_PLATFORMS)[number]
+
+export function getOtaPlatformLabel(platform: OtaPlatform): string {
+  return platform === 'Expedia' ? 'Vrbo' : platform
+}
+
 export type OnboardingPlatformStatus = 'pending' | 'live'
 export type OnboardingPaymentStatus = 'not_invoiced' | 'pending' | 'complete'
 

@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, ChevronDown, CreditCard, Download, Edit, FileText, Loader2, Plus, Save, Search, Trash2 } from 'lucide-react'
-import { OTA_PLATFORMS, type OnboardingPlatformProgress, type OnboardingRecord, type OtaPlatform } from '@/lib/onboarding'
+import { getOtaPlatformLabel, OTA_PLATFORMS, type OnboardingPlatformProgress, type OnboardingRecord, type OtaPlatform } from '@/lib/onboarding'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
@@ -249,7 +249,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       property_address: record.propertyAddress,
       email_address: record.emailAddress,
       phone: record.phone,
-      platform_list: record.platforms.map((progress) => progress.platform).join(', '),
+      platform_list: record.platforms.map((progress) => getOtaPlatformLabel(progress.platform)).join(', '),
       platform_count: record.platforms.length,
       rate_per_platform: record.ratePerPlatform.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
       subtotal: subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
@@ -389,7 +389,7 @@ function PlatformProgressCard({ onboardingId, progress, onSaved, readOnly = fals
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950/30 p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-semibold text-ink">{progress.platform}</p>
+        <p className="font-semibold text-ink">{getOtaPlatformLabel(progress.platform)}</p>
         <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'live' ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-amber-500/20 bg-amber-500/10 text-amber-400'}`}>
           {status === 'live' ? 'Live' : 'Pending'}
         </span>
@@ -507,7 +507,7 @@ function OnboardingDetailsModal({ initial, onClose, onSaved }: { initial?: Onboa
               {OTA_PLATFORMS.map((platform) => (
                 <label key={platform} className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition-colors ${selectedPlatforms.includes(platform) ? 'border-[#66B159] bg-[#66B159]/10 text-ink' : 'border-zinc-700 text-sub hover:border-zinc-600'}`}>
                   <input type="checkbox" checked={selectedPlatforms.includes(platform)} onChange={() => togglePlatform(platform)} className="h-4 w-4 accent-[#66B159]" />
-                  {platform}
+                  {getOtaPlatformLabel(platform)}
                 </label>
               ))}
             </div>
