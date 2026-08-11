@@ -1369,19 +1369,28 @@ export async function markExpensePaid(id: string): Promise<ExpenseRecord> {
   return mapDocToExpense(await docRef.get())
 }
 
-export async function listWorkSessions(staffEmail?: string): Promise<WorkSessionRecord[]> {
+type WorkSessionDateRange = { from: string; to?: string }
+
+export async function listWorkSessions(staffEmail?: string, dateRange?: WorkSessionDateRange): Promise<WorkSessionRecord[]> {
   if (!db) return []
-  await pruneOldWorkSessions().catch((error) => console.error('Failed to prune old work sessions:', error))
+  pruneOldWorkSessions().catch((error) => console.error('Failed to prune old work sessions:', error))
   let query: Query = db.collection(COLLECTIONS.WORK_SESSIONS)
-  if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
+  const fromDate = dateRange?.from || addUtcMonths(new Date(), -WORK_SESSION_RETENTION_MONTHS).toISOString().slice(0, 10)
+  if (staffEmail) {
+    query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
+  } else {
+    query = query.where('workDate', '>=', fromDate)
+    if (dateRange?.to) query = query.where('workDate', '<=', dateRange.to)
+  }
   const snapshot = await query.get()
   return snapshot.docs
     .map(mapDocToWorkSession)
+    .filter((session) => session.workDate >= fromDate && (!dateRange?.to || session.workDate <= dateRange.to))
     .sort((a, b) => (b.startedAt || b.createdAt || '').localeCompare(a.startedAt || a.createdAt || ''))
 }
 
 export async function listWorkSessionsPage(page: PaginationRequest, staffEmail?: string) {
-  await pruneOldWorkSessions().catch((error) => console.error('Failed to prune old work sessions:', error))
+  pruneOldWorkSessions().catch((error) => console.error('Failed to prune old work sessions:', error))
   let query: Query = ensureDb().collection(COLLECTIONS.WORK_SESSIONS)
   if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
   return paginateQuery(query, mapDocToWorkSession, page)
@@ -1647,11 +1656,13 @@ export async function listPayrollRecords(month: string): Promise<PayrollRecord[]
 
 export async function generatePayrollRecords(month: string, actorEmail: string): Promise<PayrollRecord[]> {
   const db = ensureDb()
+  const monthStartDate = `${month}-01`
+  const monthEndDate = payrollMonthEndDate(month)
   const [staff, salaries, workSessions, leaves, priorPayrollSnapshot, currentPayrollSnapshot] = await Promise.all([
     listStaffAccounts(),
     listSalaries(),
-    listWorkSessions(),
-    listLeaveRequests(),
+    listWorkSessions(undefined, { from: monthStartDate, to: monthEndDate }),
+    listApprovedLeaveRequests(),
     db.collection(COLLECTIONS.PAYROLL).where('month', '<', month).get(),
     db.collection(COLLECTIONS.PAYROLL).where('month', '==', month).get(),
   ])
@@ -1918,6 +1929,12 @@ export async function listLeaveRequests(staffEmail?: string): Promise<LeaveReque
   let query: Query = db.collection(COLLECTIONS.LEAVE_REQUESTS)
   if (staffEmail) query = query.where('staffEmail', '==', staffEmail.trim().toLowerCase())
   const snapshot = await query.get()
+  return snapshot.docs.map(mapDocToLeaveRequest)
+}
+
+async function listApprovedLeaveRequests(): Promise<LeaveRequestRecord[]> {
+  if (!db) return []
+  const snapshot = await db.collection(COLLECTIONS.LEAVE_REQUESTS).where('status', '==', 'approved').get()
   return snapshot.docs.map(mapDocToLeaveRequest)
 }
 

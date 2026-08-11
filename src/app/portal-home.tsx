@@ -69,6 +69,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [onboardingList, setOnboardingList] = useState<OnboardingRecord[]>([])
   // Daily task and work-session state
   const [workSessionList, setWorkSessionList] = useState<WorkSessionRecord[]>([])
+  const [adminTaskRefreshToken, setAdminTaskRefreshToken] = useState(0)
   const [correctingWorkSession, setCorrectingWorkSession] = useState<WorkSessionRecord | null>(null)
   const [workNotes, setWorkNotes] = useState('')
   const [workActionLoading, setWorkActionLoading] = useState(false)
@@ -256,25 +257,20 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }
 
     if (activeTab === 'tasks') {
-      setLoading(true)
-      Promise.all([
-        tabFetch('/api/admin/tasks'),
-        staffListLoadedRef.current ? Promise.resolve(null) : tabFetch('/api/admin/staff'),
-      ])
-        .then(async ([taskRes, staffRes]) => {
-          const taskData = await taskRes.json()
-          if (controller.signal.aborted) return
-          if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
-          if (staffRes) {
-            const staffData = await staffRes.json()
-            if (staffData.staff) {
-              setStaffList(staffData.staff)
+      if (!staffListLoadedRef.current) {
+        setLoading(true)
+        tabFetch('/api/admin/staff')
+          .then((response) => response.json())
+          .then((data) => {
+            if (controller.signal.aborted) return
+            if (data.staff) {
+              setStaffList(data.staff)
               staffListLoadedRef.current = true
             }
-          }
-        })
-        .catch(reportError('Could not load employee task logs.'))
-        .finally(finishLoading)
+          })
+          .catch(reportError('Could not load employee list.'))
+          .finally(finishLoading)
+      }
     }
 
     if (activeTab === 'expenses') {
@@ -1414,7 +1410,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     </div>
                   ),
                   properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} />,
-                  tasks: <AdminTasksPanel staff={staffList} sessions={workSessionList} loading={loading} now={workClock} onCorrect={setCorrectingWorkSession} onError={setError} />,
+                  tasks: <AdminTasksPanel staff={staffList} sessions={workSessionList} loading={loading} now={workClock} serverPagination refreshToken={adminTaskRefreshToken} onCorrect={setCorrectingWorkSession} onError={setError} />,
                   finance: <FinancePanel />,
                   expenses: (
                     <div className="space-y-6">
@@ -1896,6 +1892,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           onClose={() => setCorrectingWorkSession(null)}
           onSaved={(updatedSession) => {
             setWorkSessionList((current) => current.map((session) => session.id === updatedSession.id ? updatedSession : session))
+            setAdminTaskRefreshToken((current) => current + 1)
             setCorrectingWorkSession(null)
             setMessage('Work-session time corrected and added to the audit log.')
           }}

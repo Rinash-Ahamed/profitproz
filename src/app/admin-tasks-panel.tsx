@@ -6,6 +6,7 @@ import type { PublicStaffRecord, WorkSessionRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { formatWorkDuration, formatWorkTime, workSessionDurationMinutes } from '@/lib/work-session-format'
+import { authenticatedFetch as fetch } from '@/lib/client-api'
 
 type TaskStatusFilter = 'all' | 'working' | 'completed' | 'not-started'
 type TaskDurationSort = 'recent' | 'highest' | 'lowest'
@@ -16,15 +17,18 @@ type DailyWorkSummary = {
   sessions: WorkSessionRecord[]
   status: 'active' | 'completed' | 'not-started'
   durationMinutes: number
+  employeeName?: string
 }
 
-export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onError }: {
+export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onError, serverPagination = false, refreshToken = 0 }: {
   staff: PublicStaffRecord[]
   sessions: WorkSessionRecord[]
   loading: boolean
   now: number
   onCorrect: (session: WorkSessionRecord) => void
   onError: (message: string) => void
+  serverPagination?: boolean
+  refreshToken?: number
 }) {
   const [employeeSearch, setEmployeeSearch] = useState('')
   const [dateFilter, setDateFilter] = useState('')
@@ -32,9 +36,13 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
   const [durationSort, setDurationSort] = useState<TaskDurationSort>('recent')
   const [expandedSummary, setExpandedSummary] = useState('')
   const [page, setPage] = useState(1)
+  const [serverSummaries, setServerSummaries] = useState<DailyWorkSummary[]>([])
+  const [serverTotal, setServerTotal] = useState(0)
+  const [serverTodaySummary, setServerTodaySummary] = useState({ working: 0, completed: 0, notStarted: 0 })
+  const [serverLoading, setServerLoading] = useState(serverPagination)
   const staffNameByEmail = useMemo(() => new Map(staff.map((employee) => [employee.email, employee.name])), [staff])
 
-  const summaries = useMemo(() => {
+  const clientSummaries = useMemo(() => {
     const query = employeeSearch.trim().toLowerCase()
     const matchingSessions = sessions
       .filter((session) => {
@@ -56,6 +64,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
         grouped.set(key, {
           key,
           staffEmail: session.staffEmail,
+          employeeName: staffNameByEmail.get(session.staffEmail) || session.staffEmail,
           workDate: session.workDate,
           sessions: [session],
           status: session.status,
@@ -76,6 +85,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
         .map((employee) => ({
           key: `${employee.email}:${targetDate}`,
           staffEmail: employee.email,
+          employeeName: employee.name,
           workDate: targetDate,
           sessions: [],
           status: 'not-started' as const,
@@ -96,7 +106,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
     })
   }, [dateFilter, durationSort, employeeSearch, now, sessions, staff, staffNameByEmail, statusFilter])
 
-  const todaySummary = useMemo(() => {
+  const clientTodaySummary = useMemo(() => {
     const today = todayLocalDateOnly()
     const todaySessions = sessions.filter((session) => session.workDate === today)
     const employeesWithSessions = new Set(todaySessions.map((session) => session.staffEmail))
@@ -108,13 +118,52 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
   }, [sessions, staff])
 
   useEffect(() => { setPage(1); setExpandedSummary('') }, [dateFilter, durationSort, employeeSearch, statusFilter])
-  const totalPages = Math.max(1, Math.ceil(summaries.length / 10))
-  const currentPage = Math.min(page, totalPages)
-  const paginatedSummaries = summaries.slice((currentPage - 1) * 10, currentPage * 10)
+  useEffect(() => {
+    if (!serverPagination) return
+    const controller = new AbortController()
+    const timeout = window.setTimeout(async () => {
+      setServerLoading(true)
+      const params = new URLSearchParams({ view: 'summary', page: String(page), employeeSearch, status: statusFilter, sort: durationSort })
+      if (dateFilter) params.set('date', dateFilter)
+      try {
+        const response = await fetch(`/api/admin/tasks?${params.toString()}`, { signal: controller.signal })
+        const data = await response.json() as { summaries?: DailyWorkSummary[]; total?: number; todaySummary?: { working: number; completed: number; notStarted: number }; message?: string }
+        if (!response.ok || !data.summaries || typeof data.total !== 'number' || !data.todaySummary) throw new Error(data.message || 'Unable to load employee task summaries.')
+        setServerSummaries(data.summaries)
+        setServerTotal(data.total)
+        setServerTodaySummary(data.todaySummary)
+      } catch (caught) {
+        if (!(caught instanceof Error && caught.name === 'AbortError')) onError(caught instanceof Error ? caught.message : 'Unable to load employee task summaries.')
+      } finally {
+        if (!controller.signal.aborted) setServerLoading(false)
+      }
+    }, employeeSearch ? 250 : 0)
+    return () => { controller.abort(); window.clearTimeout(timeout) }
+  }, [dateFilter, durationSort, employeeSearch, onError, page, refreshToken, serverPagination, statusFilter])
 
-  function exportWorkingDays() {
+  const summaries = serverPagination ? serverSummaries : clientSummaries
+  const summaryTotal = serverPagination ? serverTotal : summaries.length
+  const todaySummary = serverPagination ? serverTodaySummary : clientTodaySummary
+  const effectiveLoading = serverPagination ? serverLoading : loading
+  const totalPages = Math.max(1, Math.ceil(summaryTotal / 10))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedSummaries = serverPagination ? summaries : summaries.slice((currentPage - 1) * 10, currentPage * 10)
+
+  async function exportWorkingDays() {
     const query = employeeSearch.trim().toLowerCase()
-    const completed = sessions
+    let exportSessions = sessions
+    if (serverPagination) {
+      const params = new URLSearchParams({ view: 'export', employeeSearch })
+      if (dateFilter) params.set('date', dateFilter)
+      const response = await fetch(`/api/admin/tasks?${params.toString()}`)
+      const data = await response.json() as { workSessions?: WorkSessionRecord[]; message?: string }
+      if (!response.ok || !data.workSessions) {
+        onError(data.message || 'Unable to export employee working days.')
+        return
+      }
+      exportSessions = data.workSessions
+    }
+    const completed = exportSessions
       .filter((session) => session.status === 'completed')
       .filter((session) => !dateFilter || session.workDate === dateFilter)
       .filter((session) => {
@@ -179,7 +228,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
             <div><p className="text-lg font-semibold text-ink">Daily Employee Summary</p><p className="mt-1 text-sm text-sub">Compact daily totals with expandable work details.</p></div>
             <div className="flex flex-wrap items-center justify-end gap-2">
               <label className="relative block"><span className="sr-only">Search employee</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} className="h-10 w-56 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employee" /></label>
-              <button type="button" onClick={exportWorkingDays} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
+              <button type="button" onClick={() => void exportWorkingDays()} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap items-end justify-end gap-2 border-t border-zinc-800 pt-4">
@@ -193,16 +242,17 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
           <table className="w-full min-w-[860px] text-sm">
             <thead className="border-b border-zinc-700 text-left"><tr><th className="w-12 px-4 py-4"><span className="sr-only">Expand</span></th><th className="px-4 py-4 font-medium text-sub">Employee</th><th className="px-4 py-4 font-medium text-sub">Date</th><th className="px-4 py-4 font-medium text-sub">Status</th><th className="px-4 py-4 font-medium text-sub">Duration</th><th className="px-4 py-4 font-medium text-sub">Summary</th></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr> : summaries.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{hasFilters ? 'No employee summaries match the selected filters.' : 'No work sessions recorded yet.'}</td></tr> : paginatedSummaries.map((summary) => {
+              {effectiveLoading ? <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr> : summaryTotal === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{hasFilters ? 'No employee summaries match the selected filters.' : 'No work sessions recorded yet.'}</td></tr> : paginatedSummaries.map((summary) => {
                 const expanded = expandedSummary === summary.key
                 const firstNote = summary.sessions.find((session) => session.notes)?.notes
+                const displayedDuration = serverPagination ? summary.sessions.reduce((total, session) => total + workSessionDurationMinutes(session, now), 0) : summary.durationMinutes
                 return <Fragment key={summary.key}>
                   <tr className="border-b border-zinc-800">
                     <td className="px-4 py-4">{summary.sessions.length ? <button type="button" onClick={() => setExpandedSummary(expanded ? '' : summary.key)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink">{expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}</button> : null}</td>
-                    <td className="px-4 py-4"><p className="font-medium text-ink">{staffNameByEmail.get(summary.staffEmail) || summary.staffEmail}</p><p className="text-xs text-sub">{summary.staffEmail}</p></td>
+                    <td className="px-4 py-4"><p className="font-medium text-ink">{summary.employeeName || staffNameByEmail.get(summary.staffEmail) || summary.staffEmail}</p><p className="text-xs text-sub">{summary.staffEmail}</p></td>
                     <td className="whitespace-nowrap px-4 py-4 text-sub">{formatDateOnlyDisplay(summary.workDate)}</td>
                     <td className="px-4 py-4"><TaskStatus status={summary.status} /></td>
-                    <td className="whitespace-nowrap px-4 py-4 font-medium text-ink">{formatWorkDuration(summary.durationMinutes)}</td>
+                    <td className="whitespace-nowrap px-4 py-4 font-medium text-ink">{formatWorkDuration(displayedDuration)}</td>
                     <td className="max-w-sm px-4 py-4 text-sub"><p className="truncate">{firstNote || (summary.status === 'active' ? 'Work currently in progress.' : summary.status === 'not-started' ? 'Work has not been started.' : 'No summary recorded.')}</p></td>
                   </tr>
                   {expanded ? <tr className="border-b border-zinc-800 bg-zinc-950/35"><td colSpan={6} className="px-6 py-5"><div className="space-y-3">{summary.sessions.map((session) => <div key={session.id} className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub"><span>Start: <strong className="font-medium text-ink">{formatWorkTime(session.startedAt)}</strong></span><span>End: <strong className="font-medium text-ink">{session.endedAt ? formatWorkTime(session.endedAt) : 'In progress'}</strong></span><span>Duration: <strong className="font-medium text-ink">{formatWorkDuration(workSessionDurationMinutes(session, now))}</strong></span></div><button type="button" onClick={() => onCorrect(session)} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub hover:border-[#66B159]/50 hover:text-ink"><Edit className="h-3.5 w-3.5" /> Correct time</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-sub">{session.notes || (session.status === 'active' ? 'Work currently in progress.' : 'No work summary recorded.')}</p></div>)}</div></td></tr> : null}
@@ -211,7 +261,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
             </tbody>
           </table>
         </div>
-        {!loading && summaries.length > 10 ? <div className="flex items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">Showing {(currentPage - 1) * 10 + 1}–{Math.min(currentPage * 10, summaries.length)} of {summaries.length} records</p><div className="flex items-center gap-2"><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Previous</button><span className="text-xs text-sub">Page {currentPage} of {totalPages}</span><button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage === totalPages} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Next</button></div></div> : null}
+        {!effectiveLoading && summaryTotal > 10 ? <div className="flex items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">Showing {(currentPage - 1) * 10 + 1}–{Math.min(currentPage * 10, summaryTotal)} of {summaryTotal} records</p><div className="flex items-center gap-2"><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Previous</button><span className="text-xs text-sub">Page {currentPage} of {totalPages}</span><button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage === totalPages} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Next</button></div></div> : null}
       </div>
     </div>
   )
