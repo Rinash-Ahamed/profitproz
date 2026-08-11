@@ -1,6 +1,7 @@
 import { parseDateOnly } from './date-only'
 
 export const PAYROLL_STATUSES = ['draft', 'calculated', 'approved', 'paid'] as const
+export const PAYROLL_START_MONTH = '2026-08'
 
 export type PayrollStatus = (typeof PAYROLL_STATUSES)[number]
 
@@ -26,7 +27,11 @@ export type PayrollRecord = {
   sundayHolidays: number
   totalWorkingDays: number
   daysPresent: number
+  openingCasualLeaveBalance: number
+  casualLeaveEntitlement: number
+  casualLeaveAvailable: number
   casualLeaveUsed: number
+  closingCasualLeaveBalance: number
   lopDays: number
   payableDays: number
   grossSalary: number
@@ -38,6 +43,7 @@ export type PayrollRecord = {
   status: PayrollStatus
   snapshotVersion: 1
   statusHistory: PayrollStatusHistoryEntry[]
+  calculationThroughDate: string
   generatedAt: string
   generatedBy: string
   calculatedAt?: string
@@ -45,12 +51,15 @@ export type PayrollRecord = {
   approvedBy?: string
   paidAt?: string
   paidBy?: string
+  refreshedAt?: string
   updatedAt?: string
 }
 
 export type PayrollCalculationInput = {
   month: string
   monthlySalary: number
+  openingCasualLeaveBalance?: number
+  calculationThroughDate?: string
   completedWorkDates: Iterable<string>
   approvedLeaves: Array<{ id: string; startDate: string; endDate: string }>
 }
@@ -60,7 +69,11 @@ export type PayrollCalculation = Pick<PayrollRecord,
   | 'sundayHolidays'
   | 'totalWorkingDays'
   | 'daysPresent'
+  | 'openingCasualLeaveBalance'
+  | 'casualLeaveEntitlement'
+  | 'casualLeaveAvailable'
   | 'casualLeaveUsed'
+  | 'closingCasualLeaveBalance'
   | 'lopDays'
   | 'payableDays'
   | 'grossSalary'
@@ -97,15 +110,8 @@ export function currentPayrollMonth(date = new Date()) {
   return `${year}-${month}`
 }
 
-export function previousPayrollMonth(date = new Date()) {
-  const current = parsePayrollMonth(currentPayrollMonth(date))!
-  const month = current.month === 1 ? 12 : current.month - 1
-  const year = current.month === 1 ? current.year - 1 : current.year
-  return `${year}-${String(month).padStart(2, '0')}`
-}
-
-export function isCompletedPayrollMonth(month: string, date = new Date()) {
-  return !!parsePayrollMonth(month) && month < currentPayrollMonth(date)
+export function isPayrollMonthAvailable(month: string, date = new Date()) {
+  return !!parsePayrollMonth(month) && month >= PAYROLL_START_MONTH && month <= currentPayrollMonth(date)
 }
 
 export function payrollMonthDates(month: string) {
@@ -116,6 +122,10 @@ export function payrollMonthDates(month: string) {
     const day = String(index + 1).padStart(2, '0')
     return `${parsed.year}-${String(parsed.month).padStart(2, '0')}-${day}`
   })
+}
+
+export function payrollMonthEndDate(month: string) {
+  return payrollMonthDates(month).at(-1)!
 }
 
 function datesWithinMonth(startDate: string, endDate: string, month: string) {
@@ -133,6 +143,10 @@ function datesWithinMonth(startDate: string, endDate: string, month: string) {
 export function calculatePayroll(input: PayrollCalculationInput): PayrollCalculation {
   const calendarDates = payrollMonthDates(input.month)
   const workingDates = calendarDates.filter((date) => parseDateOnly(date)?.getUTCDay() !== 0)
+  const calculationThroughDate = input.calculationThroughDate && input.calculationThroughDate.startsWith(`${input.month}-`)
+    ? input.calculationThroughDate
+    : calendarDates.at(-1)!
+  const assessedWorkingDates = workingDates.filter((date) => date <= calculationThroughDate)
   const workingDateSet = new Set(workingDates)
   const attendanceDates = [...new Set(input.completedWorkDates)]
     .filter((date) => workingDateSet.has(date))
@@ -143,13 +157,17 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
   const approvedLeaveDateSet = new Set<string>()
   for (const leave of input.approvedLeaves) {
     const dates = datesWithinMonth(leave.startDate, leave.endDate, input.month)
-      .filter((date) => workingDateSet.has(date) && !attendanceDateSet.has(date))
+      .filter((date) => workingDateSet.has(date) && date <= calculationThroughDate && !attendanceDateSet.has(date))
     if (dates.length) approvedLeaveIds.add(leave.id)
     dates.forEach((date) => approvedLeaveDateSet.add(date))
   }
   const approvedLeaveDates = [...approvedLeaveDateSet].sort()
-  const casualLeaveUsed = Math.min(1, approvedLeaveDates.length)
-  const absentDates = workingDates.filter((date) => !attendanceDateSet.has(date))
+  const openingCasualLeaveBalance = Math.max(0, Math.floor(input.openingCasualLeaveBalance || 0))
+  const casualLeaveEntitlement = 1
+  const casualLeaveAvailable = openingCasualLeaveBalance + casualLeaveEntitlement
+  const casualLeaveUsed = Math.min(casualLeaveAvailable, approvedLeaveDates.length)
+  const closingCasualLeaveBalance = casualLeaveAvailable - casualLeaveUsed
+  const absentDates = assessedWorkingDates.filter((date) => !attendanceDateSet.has(date))
   const lopDays = Math.max(0, absentDates.length - casualLeaveUsed)
   const totalWorkingDays = workingDates.length
   const monthlySalary = Math.max(0, input.monthlySalary)
@@ -161,7 +179,11 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
     sundayHolidays: calendarDates.length - totalWorkingDays,
     totalWorkingDays,
     daysPresent: attendanceDates.length,
+    openingCasualLeaveBalance,
+    casualLeaveEntitlement,
+    casualLeaveAvailable,
     casualLeaveUsed,
+    closingCasualLeaveBalance,
     lopDays,
     payableDays: totalWorkingDays - lopDays,
     grossSalary,

@@ -4,9 +4,9 @@ import crypto from 'crypto'
 import 'server-only'
 import type { OnboardingDetailsInput, OnboardingRecord, OnboardingPlatformProgress, OtaPlatform } from './onboarding'
 import type { PaginationRequest } from './pagination'
-import { countNonSundayDaysInclusive } from './date-only'
+import { countNonSundayDaysInclusive, todayInTimeZone } from './date-only'
 import type { HistoricalLeaveType } from './leave'
-import { calculatePayroll, nextPayrollStatus, type PayrollRecord, type PayrollStatus } from './payroll'
+import { calculatePayroll, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthEndDate, type PayrollRecord, type PayrollStatus } from './payroll'
 import type { FinanceInvoiceRecord, FinanceOverview, FinancePaymentRecord, FinanceService, PaymentMethod } from './finance'
 
 export type StaffRecord = {
@@ -670,9 +670,11 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
   const data = doc.data() || {}
   const status: PayrollStatus = data.status === 'calculated' || data.status === 'approved' || data.status === 'paid' ? data.status : 'draft'
   const history = Array.isArray(data.statusHistory) ? data.statusHistory : []
+  const storedMonth = typeof data.month === 'string' ? data.month : ''
+  const month = parsePayrollMonth(storedMonth) ? storedMonth : PAYROLL_START_MONTH
   return {
     id: doc.id,
-    month: typeof data.month === 'string' ? data.month : '',
+    month,
     employeeId: typeof data.employeeId === 'string' ? data.employeeId : '',
     staffId: typeof data.staffId === 'string' ? data.staffId : '',
     employeeName: typeof data.employeeName === 'string' ? data.employeeName : '',
@@ -685,7 +687,13 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
     sundayHolidays: Number(data.sundayHolidays) || 0,
     totalWorkingDays: Number(data.totalWorkingDays) || 0,
     daysPresent: Number(data.daysPresent) || 0,
+    openingCasualLeaveBalance: Number(data.openingCasualLeaveBalance) || 0,
+    casualLeaveEntitlement: Number(data.casualLeaveEntitlement) || 1,
+    casualLeaveAvailable: Number(data.casualLeaveAvailable) || ((Number(data.openingCasualLeaveBalance) || 0) + 1),
     casualLeaveUsed: Number(data.casualLeaveUsed) || 0,
+    closingCasualLeaveBalance: Number.isFinite(Number(data.closingCasualLeaveBalance))
+      ? Number(data.closingCasualLeaveBalance)
+      : Math.max(0, (Number(data.openingCasualLeaveBalance) || 0) + 1 - (Number(data.casualLeaveUsed) || 0)),
     lopDays: Number(data.lopDays) || 0,
     payableDays: Number(data.payableDays) || 0,
     grossSalary: Number(data.grossSalary) || 0,
@@ -709,6 +717,7 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
         at: typeof value.at === 'string' ? value.at : '',
       }]
     }),
+    calculationThroughDate: typeof data.calculationThroughDate === 'string' ? data.calculationThroughDate : payrollMonthEndDate(month),
     generatedAt: mapTimestamp(data.generatedAt) || (typeof data.generatedAt === 'string' ? data.generatedAt : ''),
     generatedBy: typeof data.generatedBy === 'string' ? data.generatedBy : '',
     calculatedAt: mapTimestamp(data.calculatedAt),
@@ -716,6 +725,7 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
     approvedBy: typeof data.approvedBy === 'string' ? data.approvedBy : undefined,
     paidAt: mapTimestamp(data.paidAt),
     paidBy: typeof data.paidBy === 'string' ? data.paidBy : undefined,
+    refreshedAt: mapTimestamp(data.refreshedAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
 }
@@ -1631,25 +1641,35 @@ export async function listPayrollRecords(month: string): Promise<PayrollRecord[]
 
 export async function generatePayrollRecords(month: string, actorEmail: string): Promise<PayrollRecord[]> {
   const db = ensureDb()
-  const [staff, salaries, workSessions, leaves] = await Promise.all([
+  const [staff, salaries, workSessions, leaves, priorPayrollSnapshot] = await Promise.all([
     listStaffAccounts(),
     listSalaries(),
     listWorkSessions(),
     listLeaveRequests(),
+    db.collection(COLLECTIONS.PAYROLL).where('month', '<', month).get(),
   ])
   const activeStaff = staff.filter((employee) => employee.active)
   const salaryByStaffId = new Map(salaries.map((salary) => [salary.id, salary]))
   const salaryByEmail = new Map(salaries.map((salary) => [salary.staffEmail, salary]))
   const normalizedActor = actorEmail.trim().toLowerCase()
+  const latestPriorPayrollByStaff = new Map<string, PayrollRecord>()
+  priorPayrollSnapshot.docs.map(mapDocToPayroll).filter((record) => record.month >= PAYROLL_START_MONTH).forEach((record) => {
+    const existing = latestPriorPayrollByStaff.get(record.staffId)
+    if (!existing || record.month > existing.month) latestPriorPayrollByStaff.set(record.staffId, record)
+  })
 
   await Promise.all(activeStaff.map(async (employee) => {
     const docRef = db.collection(COLLECTIONS.PAYROLL).doc(`${month}_${employee.id}`)
     const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
     const salary = salaryByStaffId.get(employee.id) || salaryByEmail.get(employee.email)
     const monthlySalary = salary?.baseSalary ?? (employee.annualCtc || 0) / 12
+    const openingCasualLeaveBalance = latestPriorPayrollByStaff.get(employee.id)?.closingCasualLeaveBalance || 0
+    const calculationThroughDate = month === currentPayrollMonth() ? todayInTimeZone('Asia/Kolkata') : payrollMonthEndDate(month)
     const calculation = calculatePayroll({
       month,
       monthlySalary,
+      openingCasualLeaveBalance,
+      calculationThroughDate,
       completedWorkDates: workSessions
         .filter((session) => session.staffEmail === employee.email && session.status === 'completed')
         .map((session) => session.workDate),
@@ -1661,8 +1681,8 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
 
     await db.runTransaction(async (transaction) => {
       const existing = await transaction.get(docRef)
-      if (existing.exists) return
-      transaction.create(docRef, {
+      if (existing.exists && mapDocToPayroll(existing).status !== 'draft') return
+      const snapshotData = {
         month,
         employeeId: employee.employeeId || employee.id,
         staffId: employee.id,
@@ -1673,19 +1693,28 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
         monthlySalary,
         annualCtc: employee.annualCtc || monthlySalary * 12,
         ...calculation,
+        calculationThroughDate,
+        refreshedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }
+      if (existing.exists) {
+        transaction.update(docRef, snapshotData)
+      } else {
+        transaction.create(docRef, {
+        ...snapshotData,
         status: 'draft',
         snapshotVersion: 1,
         statusHistory: [{ from: null, to: 'draft', actorEmail: normalizedActor, at: generatedAt }],
         generatedAt: FieldValue.serverTimestamp(),
         generatedBy: normalizedActor,
-        updatedAt: FieldValue.serverTimestamp(),
-      })
+        })
+      }
       transaction.set(auditRef, {
         timestamp: FieldValue.serverTimestamp(),
         actorEmail: normalizedActor,
-        action: 'PAYROLL_GENERATE',
+        action: existing.exists ? 'PAYROLL_REFRESH' : 'PAYROLL_GENERATE',
         targetId: docRef.id,
-        details: `Generated ${month} payroll snapshot for ${employee.name} (${employee.employeeId || employee.email}).`,
+        details: `${existing.exists ? 'Refreshed Draft' : 'Generated'} ${month} payroll snapshot for ${employee.name} (${employee.employeeId || employee.email}) through ${calculationThroughDate}.`,
       })
     })
   }))
