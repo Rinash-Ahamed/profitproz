@@ -2,7 +2,7 @@
 
 import { FormEvent, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Building2, ChevronDown, ChevronRight, Download, Edit, ExternalLink, FileText, KeyRound, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
+import { Building2, ChevronDown, ChevronRight, Download, Edit, ExternalLink, FileText, Info, KeyRound, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
 import type { PropertyInput, PropertyRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
@@ -85,15 +85,36 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
           <p className="mt-1 text-sm text-sub">{readOnly ? 'View the hospitality properties served by ProfitPro.' : 'Manage hotels, resorts, stays, and other client properties.'}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <a
-            href="https://app-live.axisrooms.com/supplier/home.html"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"
-            aria-label="Open AxisRooms channel manager login"
-          >
-            AxisRooms Login <ExternalLink className="h-4 w-4" />
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="https://app-live.axisrooms.com/supplier/home.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"
+              aria-label="Open AxisRooms channel manager login"
+            >
+              AxisRooms Login <ExternalLink className="h-4 w-4" />
+            </a>
+            <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs" aria-label="AxisRooms supplier admin access">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-300" />
+              <div><p className="font-semibold text-blue-200">Supplier Admin access</p><p className="mt-1 text-sub">Username: <span className="font-medium text-ink">support@profitproz.com</span> <span className="mx-1 text-ghost">|</span> Password: <span className="font-medium text-ink">Profit@2026</span></p></div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="https://web.emsigner.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"
+              aria-label="Open emSigner login"
+            >
+              emSigner Login <ExternalLink className="h-4 w-4" />
+            </a>
+            <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs" aria-label="emSigner admin access">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-300" />
+              <div><p className="font-semibold text-blue-200">emSigner Admin access</p><p className="mt-1 text-sub">Username: <span className="font-medium text-ink">admin@profitproz.com</span> <span className="mx-1 text-ghost">|</span> Password: <span className="font-medium text-ink">ProfitPro@2026</span></p></div>
+            </div>
+          </div>
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} className="h-11 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search property name" aria-label="Search revenue management properties" />

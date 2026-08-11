@@ -6,7 +6,7 @@ import type { OnboardingDetailsInput, OnboardingRecord, OnboardingPlatformProgre
 import type { PaginationRequest } from './pagination'
 import { countNonSundayDaysInclusive, todayInTimeZone } from './date-only'
 import type { HistoricalLeaveType } from './leave'
-import { calculatePayroll, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthEndDate, type PayrollRecord, type PayrollStatus } from './payroll'
+import { calculatePayroll, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthEndDate, type MissingAttendanceDecision, type PayrollRecord, type PayrollStatus } from './payroll'
 import type { FinanceInvoiceRecord, FinanceOverview, FinancePaymentRecord, FinanceService, PaymentMethod } from './finance'
 
 export type StaffRecord = {
@@ -696,6 +696,10 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
       : Math.max(0, (Number(data.openingCasualLeaveBalance) || 0) + 1 - (Number(data.casualLeaveUsed) || 0)),
     missingAttendanceDays: Number(data.missingAttendanceDays) || 0,
     missingAttendanceDates: Array.isArray(data.missingAttendanceDates) ? data.missingAttendanceDates.filter((value: unknown): value is string => typeof value === 'string') : [],
+    missingAttendanceDecisions: data.missingAttendanceDecisions && typeof data.missingAttendanceDecisions === 'object'
+      ? Object.fromEntries(Object.entries(data.missingAttendanceDecisions).filter((entry): entry is [string, MissingAttendanceDecision] => entry[1] === 'lop' || entry[1] === 'ignored'))
+      : {},
+    missingAttendanceLopDays: Number(data.missingAttendanceLopDays) || 0,
     lopDays: Number(data.lopDays) || 0,
     payableDays: Number(data.payableDays) || 0,
     grossSalary: Number(data.grossSalary) || 0,
@@ -1643,18 +1647,20 @@ export async function listPayrollRecords(month: string): Promise<PayrollRecord[]
 
 export async function generatePayrollRecords(month: string, actorEmail: string): Promise<PayrollRecord[]> {
   const db = ensureDb()
-  const [staff, salaries, workSessions, leaves, priorPayrollSnapshot] = await Promise.all([
+  const [staff, salaries, workSessions, leaves, priorPayrollSnapshot, currentPayrollSnapshot] = await Promise.all([
     listStaffAccounts(),
     listSalaries(),
     listWorkSessions(),
     listLeaveRequests(),
     db.collection(COLLECTIONS.PAYROLL).where('month', '<', month).get(),
+    db.collection(COLLECTIONS.PAYROLL).where('month', '==', month).get(),
   ])
   const activeStaff = staff.filter((employee) => employee.active)
   const salaryByStaffId = new Map(salaries.map((salary) => [salary.id, salary]))
   const salaryByEmail = new Map(salaries.map((salary) => [salary.staffEmail, salary]))
   const normalizedActor = actorEmail.trim().toLowerCase()
   const latestPriorPayrollByStaff = new Map<string, PayrollRecord>()
+  const currentPayrollByStaff = new Map(currentPayrollSnapshot.docs.map(mapDocToPayroll).map((record) => [record.staffId, record]))
   priorPayrollSnapshot.docs.map(mapDocToPayroll).filter((record) => record.month >= PAYROLL_START_MONTH).forEach((record) => {
     const existing = latestPriorPayrollByStaff.get(record.staffId)
     if (!existing || record.month > existing.month) latestPriorPayrollByStaff.set(record.staffId, record)
@@ -1678,6 +1684,7 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
       approvedLeaves: leaves
         .filter((leave) => leave.staffEmail === employee.email && leave.status === 'approved')
         .map((leave) => ({ id: leave.id, startDate: leave.startDate, endDate: leave.endDate })),
+      missingAttendanceDecisions: currentPayrollByStaff.get(employee.id)?.missingAttendanceDecisions,
     })
     const generatedAt = new Date().toISOString()
 
@@ -1725,6 +1732,52 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
   return listPayrollRecords(month)
 }
 
+export async function decideMissingAttendance(id: string, date: string, decision: MissingAttendanceDecision, actorEmail: string): Promise<PayrollRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.PAYROLL).doc(id)
+  const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
+  const normalizedActor = actorEmail.trim().toLowerCase()
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('PAYROLL_NOT_FOUND')
+    const payroll = mapDocToPayroll(snapshot)
+    if (payroll.status !== 'draft') throw new Error('PAYROLL_DECISION_LOCKED')
+    if (!payroll.missingAttendanceDates.includes(date)) throw new Error('MISSING_ATTENDANCE_DATE_NOT_FOUND')
+
+    const previousDecision = payroll.missingAttendanceDecisions[date]
+    const decisions = { ...payroll.missingAttendanceDecisions, [date]: decision }
+    const missingAttendanceLopDays = payroll.missingAttendanceDates.filter((missingDate) => decisions[missingDate] === 'lop').length
+    const leaveLopDays = Math.max(0, payroll.lopDays - payroll.missingAttendanceLopDays)
+    const lopDays = leaveLopDays + missingAttendanceLopDays
+    const lopDeduction = payroll.totalWorkingDays
+      ? Math.round(((payroll.grossSalary / payroll.totalWorkingDays) * lopDays + Number.EPSILON) * 100) / 100
+      : 0
+    const netSalary = Math.round((Math.max(0, payroll.grossSalary - lopDeduction) + Number.EPSILON) * 100) / 100
+
+    transaction.update(docRef, {
+      missingAttendanceDecisions: decisions,
+      missingAttendanceLopDays,
+      lopDays,
+      payableDays: payroll.totalWorkingDays - lopDays,
+      lopDeduction,
+      netSalary,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+    transaction.set(auditRef, {
+      timestamp: FieldValue.serverTimestamp(),
+      actorEmail: normalizedActor,
+      action: 'PAYROLL_MISSING_ATTENDANCE_DECISION',
+      targetId: id,
+      details: `${date} missing attendance for ${payroll.employeeName} marked as ${decision === 'lop' ? 'LOP' : 'ignored'}.`,
+      changes: { [`missingAttendanceDecisions.${date}`]: { from: previousDecision || null, to: decision } },
+    })
+  })
+
+  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  return mapDocToPayroll(await docRef.get())
+}
+
 export async function transitionPayrollStatus(id: string, requestedStatus: PayrollStatus, actorEmail: string): Promise<PayrollRecord> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.PAYROLL).doc(id)
@@ -1737,6 +1790,9 @@ export async function transitionPayrollStatus(id: string, requestedStatus: Payro
     const payroll = mapDocToPayroll(snapshot)
     const expectedStatus = nextPayrollStatus(payroll.status)
     if (requestedStatus !== expectedStatus) throw new Error('INVALID_PAYROLL_TRANSITION')
+    if (payroll.status === 'draft' && payroll.missingAttendanceDates.some((date) => !payroll.missingAttendanceDecisions[date])) {
+      throw new Error('PENDING_MISSING_ATTENDANCE_DECISIONS')
+    }
     const now = new Date().toISOString()
     const updates: Record<string, unknown> = {
       status: requestedStatus,

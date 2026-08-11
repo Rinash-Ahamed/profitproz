@@ -4,6 +4,7 @@ export const PAYROLL_STATUSES = ['draft', 'calculated', 'approved', 'paid'] as c
 export const PAYROLL_START_MONTH = '2026-08'
 
 export type PayrollStatus = (typeof PAYROLL_STATUSES)[number]
+export type MissingAttendanceDecision = 'lop' | 'ignored'
 
 export type PayrollStatusHistoryEntry = {
   from: PayrollStatus | null
@@ -34,6 +35,8 @@ export type PayrollRecord = {
   closingCasualLeaveBalance: number
   missingAttendanceDays: number
   missingAttendanceDates: string[]
+  missingAttendanceDecisions: Record<string, MissingAttendanceDecision>
+  missingAttendanceLopDays: number
   lopDays: number
   payableDays: number
   grossSalary: number
@@ -64,6 +67,7 @@ export type PayrollCalculationInput = {
   calculationThroughDate?: string
   completedWorkDates: Iterable<string>
   approvedLeaves: Array<{ id: string; startDate: string; endDate: string }>
+  missingAttendanceDecisions?: Record<string, MissingAttendanceDecision>
 }
 
 export type PayrollCalculation = Pick<PayrollRecord,
@@ -78,6 +82,8 @@ export type PayrollCalculation = Pick<PayrollRecord,
   | 'closingCasualLeaveBalance'
   | 'missingAttendanceDays'
   | 'missingAttendanceDates'
+  | 'missingAttendanceDecisions'
+  | 'missingAttendanceLopDays'
   | 'lopDays'
   | 'payableDays'
   | 'grossSalary'
@@ -174,7 +180,13 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
   const approvedLeaveDatesSet = new Set(approvedLeaveDates)
   const missingAttendanceDates = assessedWorkingDates
     .filter((date) => !attendanceDateSet.has(date) && !approvedLeaveDatesSet.has(date))
-  const lopDays = Math.max(0, approvedLeaveDates.length - casualLeaveUsed)
+  const missingDateSet = new Set(missingAttendanceDates)
+  const missingAttendanceDecisions = Object.fromEntries(
+    Object.entries(input.missingAttendanceDecisions || {})
+      .filter(([date, decision]) => missingDateSet.has(date) && (decision === 'lop' || decision === 'ignored')),
+  ) as Record<string, MissingAttendanceDecision>
+  const missingAttendanceLopDays = Object.values(missingAttendanceDecisions).filter((decision) => decision === 'lop').length
+  const lopDays = Math.max(0, approvedLeaveDates.length - casualLeaveUsed) + missingAttendanceLopDays
   const totalWorkingDays = workingDates.length
   const monthlySalary = Math.max(0, input.monthlySalary)
   const grossSalary = roundMoney(monthlySalary)
@@ -192,6 +204,8 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
     closingCasualLeaveBalance,
     missingAttendanceDays: missingAttendanceDates.length,
     missingAttendanceDates,
+    missingAttendanceDecisions,
+    missingAttendanceLopDays,
     lopDays,
     payableDays: totalWorkingDays - lopDays,
     grossSalary,
