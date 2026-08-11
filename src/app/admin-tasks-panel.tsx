@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, Edit, FileDown, Info, Loader2, Search } from 'lucide-react'
 import type { PublicStaffRecord, WorkSessionRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
@@ -31,6 +31,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('all')
   const [durationSort, setDurationSort] = useState<TaskDurationSort>('recent')
   const [expandedSummary, setExpandedSummary] = useState('')
+  const [page, setPage] = useState(1)
   const staffNameByEmail = useMemo(() => new Map(staff.map((employee) => [employee.email, employee.name])), [staff])
 
   const summaries = useMemo(() => {
@@ -105,6 +106,11 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
       notStarted: staff.filter((employee) => employee.active && !employeesWithSessions.has(employee.email)).length,
     }
   }, [sessions, staff])
+
+  useEffect(() => { setPage(1); setExpandedSummary('') }, [dateFilter, durationSort, employeeSearch, statusFilter])
+  const totalPages = Math.max(1, Math.ceil(summaries.length / 10))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedSummaries = summaries.slice((currentPage - 1) * 10, currentPage * 10)
 
   function exportWorkingDays() {
     const query = employeeSearch.trim().toLowerCase()
@@ -183,7 +189,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
           <table className="w-full min-w-[860px] text-sm">
             <thead className="border-b border-zinc-700 text-left"><tr><th className="w-12 px-4 py-4"><span className="sr-only">Expand</span></th><th className="px-4 py-4 font-medium text-sub">Employee</th><th className="px-4 py-4 font-medium text-sub">Date</th><th className="px-4 py-4 font-medium text-sub">Status</th><th className="px-4 py-4 font-medium text-sub">Duration</th><th className="px-4 py-4 font-medium text-sub">Summary</th></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr> : summaries.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{hasFilters ? 'No employee summaries match the selected filters.' : 'No work sessions recorded yet.'}</td></tr> : summaries.map((summary) => {
+              {loading ? <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr> : summaries.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{hasFilters ? 'No employee summaries match the selected filters.' : 'No work sessions recorded yet.'}</td></tr> : paginatedSummaries.map((summary) => {
                 const expanded = expandedSummary === summary.key
                 const firstNote = summary.sessions.find((session) => session.notes)?.notes
                 return <Fragment key={summary.key}>
@@ -201,6 +207,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
             </tbody>
           </table>
         </div>
+        {!loading && summaries.length > 10 ? <div className="flex items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">Showing {(currentPage - 1) * 10 + 1}–{Math.min(currentPage * 10, summaries.length)} of {summaries.length} records</p><div className="flex items-center gap-2"><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Previous</button><span className="text-xs text-sub">Page {currentPage} of {totalPages}</span><button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage === totalPages} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Next</button></div></div> : null}
       </div>
     </div>
   )

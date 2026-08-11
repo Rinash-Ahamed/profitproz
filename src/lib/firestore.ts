@@ -694,6 +694,8 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
     closingCasualLeaveBalance: Number.isFinite(Number(data.closingCasualLeaveBalance))
       ? Number(data.closingCasualLeaveBalance)
       : Math.max(0, (Number(data.openingCasualLeaveBalance) || 0) + 1 - (Number(data.casualLeaveUsed) || 0)),
+    missingAttendanceDays: Number(data.missingAttendanceDays) || 0,
+    missingAttendanceDates: Array.isArray(data.missingAttendanceDates) ? data.missingAttendanceDates.filter((value: unknown): value is string => typeof value === 'string') : [],
     lopDays: Number(data.lopDays) || 0,
     payableDays: Number(data.payableDays) || 0,
     grossSalary: Number(data.grossSalary) || 0,

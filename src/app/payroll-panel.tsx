@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { CheckCircle2, CreditCard, FileDown, Loader2, RefreshCw } from 'lucide-react'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
+import { ToastMessage } from '@/components/ui/ToastMessage'
 import { currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthDates, type PayrollRecord, type PayrollStatus } from '@/lib/payroll'
 
 const money = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(value)
@@ -114,8 +115,8 @@ export function PayrollPanel() {
       setError('Generate payroll before exporting it.')
       return
     }
-    const headings = ['Employee Name', 'Employee ID', 'Calendar Days', 'Sundays', 'Working Days', 'Days Present', 'CL Available', 'Casual Leave Used', 'Closing CL Balance', 'LOP Days', 'Payable Days', 'Gross Salary', 'LOP Deduction', 'Net Salary', 'Status']
-    const rows = records.map((record) => [record.employeeName, record.employeeId, record.totalCalendarDays, record.sundayHolidays, record.totalWorkingDays, record.daysPresent, record.casualLeaveAvailable, record.casualLeaveUsed, record.closingCasualLeaveBalance, record.lopDays, record.payableDays, record.grossSalary, record.lopDeduction, record.netSalary, record.status].map(csvValue).join(','))
+    const headings = ['Employee Name', 'Employee ID', 'Calendar Days', 'Sundays', 'Working Days', 'Days Present', 'CL Available', 'Casual Leave Used', 'Closing CL Balance', 'Missing Attendance', 'LOP Days', 'Payable Days', 'Gross Salary', 'LOP Deduction', 'Net Salary', 'Status']
+    const rows = records.map((record) => [record.employeeName, record.employeeId, record.totalCalendarDays, record.sundayHolidays, record.totalWorkingDays, record.daysPresent, record.casualLeaveAvailable, record.casualLeaveUsed, record.closingCasualLeaveBalance, record.missingAttendanceDays, record.lopDays, record.payableDays, record.grossSalary, record.lopDeduction, record.netSalary, record.status].map(csvValue).join(','))
     const csv = ['sep=,', headings.map(csvValue).join(','), ...rows].join('\r\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }))
     const link = document.createElement('a')
@@ -135,8 +136,7 @@ export function PayrollPanel() {
 
   return (
     <div className="space-y-5">
-      {message ? <p className="rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p> : null}
-      {error ? <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+      <ToastMessage message={error || message} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setMessage('') }} />
 
       <div className="surface rounded-lg">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
@@ -148,24 +148,24 @@ export function PayrollPanel() {
             <span className="flex h-10 items-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs text-sub">Calendar days: <strong className="ml-1 font-semibold text-ink">{selectedMonthDates.length}</strong></span>
             <span className="flex h-10 items-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs text-sub">Sundays: <strong className="ml-1 font-semibold text-ink">{selectedMonthSundays}</strong></span>
             <button type="button" onClick={() => void load()} disabled={loading} className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>
-            <button type="button" onClick={generate} disabled={!!actionId || !month || month < PAYROLL_START_MONTH || month > currentMonth} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{actionId === 'generate' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Generate / Refresh Draft</button>
-            <button type="button" onClick={exportCsv} disabled={!records.length} className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink disabled:opacity-50"><FileDown className="h-4 w-4" /> Export CSV</button>
+            <button type="button" onClick={generate} disabled={!!actionId || !month || month < PAYROLL_START_MONTH || month > currentMonth} className="flex h-10 items-center gap-2 rounded-lg border border-[#66B159]/35 bg-[#66B159]/15 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/25 disabled:opacity-50">{actionId === 'generate' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Generate / Refresh Draft</button>
+            <button type="button" onClick={exportCsv} disabled={!records.length} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66] disabled:opacity-50"><FileDown className="h-4 w-4" /> Export CSV</button>
           </div>
         </div>
 
-        {records.length ? <div className="grid gap-px border-b border-zinc-800 bg-zinc-800 sm:grid-cols-[auto_repeat(3,minmax(0,1fr))]"><div className="flex items-center bg-zinc-950/60 px-5 py-4 text-sm font-semibold text-ink">Overall</div><PayrollSummary label="Gross payroll" value={money(grossTotal)} /><PayrollSummary label="LOP deductions" value={money(deductionTotal)} /><PayrollSummary label="Net payroll" value={money(netTotal)} /></div> : null}
-        {records.length ? <p className="border-b border-zinc-800 px-6 py-3 text-xs text-sub">Attendance, leave, and LOP assessed through {records[0].calculationThroughDate.split('-').reverse().join('-')}. Future dates in an incomplete month are not treated as LOP.</p> : null}
+        {records.length ? <div className="grid gap-px border-b border-zinc-800 bg-zinc-800 sm:grid-cols-3"><PayrollSummary label="Gross payroll" value={money(grossTotal)} /><PayrollSummary label="LOP deductions" value={money(deductionTotal)} /><PayrollSummary label="Net payroll" value={money(netTotal)} /></div> : null}
+        {records.length ? <p className="border-b border-zinc-800 px-6 py-3 text-xs text-sub">Attendance and leave assessed through {records[0].calculationThroughDate.split('-').reverse().join('-')}. Missing attendance is flagged separately and does not affect LOP or salary deduction; correct the Task record and refresh the Draft.</p> : null}
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1500px] text-sm">
-            <thead className="border-b border-zinc-700 text-left"><tr><PayrollHeading>Employee</PayrollHeading><PayrollHeading>Working Days</PayrollHeading><PayrollHeading>Days Present</PayrollHeading><PayrollHeading>CL Available</PayrollHeading><PayrollHeading>CL Used</PayrollHeading><PayrollHeading>CL Balance</PayrollHeading><PayrollHeading>LOP Days</PayrollHeading><PayrollHeading>Payable Days</PayrollHeading><PayrollHeading>Gross Salary</PayrollHeading><PayrollHeading>LOP Deduction</PayrollHeading><PayrollHeading>Net Salary</PayrollHeading><PayrollHeading>Status</PayrollHeading><PayrollHeading>Action</PayrollHeading></tr></thead>
+          <table className="w-full min-w-[1650px] text-sm">
+            <thead className="border-b border-zinc-700 text-left"><tr><PayrollHeading>Employee</PayrollHeading><PayrollHeading>Working Days</PayrollHeading><PayrollHeading>Days Present</PayrollHeading><PayrollHeading>CL Available</PayrollHeading><PayrollHeading>CL Used</PayrollHeading><PayrollHeading>CL Balance</PayrollHeading><PayrollHeading>Missing Attendance</PayrollHeading><PayrollHeading>LOP Days</PayrollHeading><PayrollHeading>Payable Days</PayrollHeading><PayrollHeading>Gross Salary</PayrollHeading><PayrollHeading>LOP Deduction</PayrollHeading><PayrollHeading>Net Salary</PayrollHeading><PayrollHeading>Status</PayrollHeading><PayrollHeading>Action</PayrollHeading></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={13} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : records.length === 0 ? <tr><td colSpan={13} className="py-12 text-center text-sub">No payroll records for {monthLabel(month)}.</td></tr> : records.map((record) => (
+              {loading ? <tr><td colSpan={14} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : records.length === 0 ? <tr><td colSpan={14} className="py-12 text-center text-sub">No payroll records for {monthLabel(month)}.</td></tr> : records.map((record) => (
                 <tr key={record.id} className="border-b border-zinc-800 last:border-none">
                   <td className="px-4 py-4"><p className="font-medium text-ink">{record.employeeName}</p><p className="mt-1 text-xs text-sub">{record.employeeId}</p></td>
-                  <PayrollNumber>{record.totalWorkingDays}</PayrollNumber><PayrollNumber>{record.daysPresent}</PayrollNumber><PayrollNumber>{record.casualLeaveAvailable}</PayrollNumber><PayrollNumber>{record.casualLeaveUsed}</PayrollNumber><PayrollNumber>{record.closingCasualLeaveBalance}</PayrollNumber><PayrollNumber>{record.lopDays}</PayrollNumber><PayrollNumber>{record.payableDays}</PayrollNumber><PayrollNumber>{money(record.grossSalary)}</PayrollNumber><PayrollNumber>{money(record.lopDeduction)}</PayrollNumber><td className="px-4 py-4 font-semibold text-ink">{money(record.netSalary)}</td>
+                  <PayrollNumber>{record.totalWorkingDays}</PayrollNumber><PayrollNumber>{record.daysPresent}</PayrollNumber><PayrollNumber>{record.casualLeaveAvailable}</PayrollNumber><PayrollNumber>{record.casualLeaveUsed}</PayrollNumber><PayrollNumber>{record.closingCasualLeaveBalance}</PayrollNumber><td className={`px-4 py-4 font-medium ${record.missingAttendanceDays ? 'text-amber-300' : 'text-sub'}`} title={record.missingAttendanceDates.join(', ')}>{record.missingAttendanceDays}</td><PayrollNumber>{record.lopDays}</PayrollNumber><PayrollNumber>{record.payableDays}</PayrollNumber><PayrollNumber>{money(record.grossSalary)}</PayrollNumber><PayrollNumber>{money(record.lopDeduction)}</PayrollNumber><td className="px-4 py-4 font-semibold text-ink">{money(record.netSalary)}</td>
                   <td className="px-4 py-4"><PayrollStatusBadge status={record.status} /></td>
-                  <td className="px-4 py-4">{nextPayrollStatus(record.status) ? <button type="button" onClick={() => advance(record)} disabled={!!actionId} className="flex h-9 items-center gap-2 rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20 disabled:opacity-50">{actionId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : record.status === 'approved' ? <CreditCard className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{record.status === 'draft' ? 'Confirm calculation' : record.status === 'calculated' ? 'Approve' : 'Mark paid'}</button> : <span className="text-xs text-green-400">Complete</span>}</td>
+                  <td className="px-4 py-4">{nextPayrollStatus(record.status) ? <button type="button" onClick={() => advance(record)} disabled={!!actionId} className="flex h-9 items-center gap-2 rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20 disabled:opacity-50">{actionId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : record.status === 'approved' ? <CreditCard className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{record.status === 'draft' ? 'Confirm Calculation' : record.status === 'calculated' ? 'Approve' : 'Mark paid'}</button> : <span className="text-xs text-green-400">Complete</span>}</td>
                 </tr>
               ))}
             </tbody>

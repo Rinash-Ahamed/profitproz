@@ -1,10 +1,11 @@
 'use client'
 
-import { FormEvent, useEffect, useState } from 'react'
+import { FormEvent, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Eye, EyeOff, Loader2, LockKeyhole, Mail } from 'lucide-react'
+import { ToastMessage } from '@/components/ui/ToastMessage'
 
 type LoginResponse = {
   message?: string
@@ -18,13 +19,7 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-
-  useEffect(() => {
-    if (!error) return
-
-    const timer = setTimeout(() => setError(''), 3000)
-    return () => clearTimeout(timer)
-  }, [error])
+  const [showNotice, setShowNotice] = useState(Boolean(notice))
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -45,6 +40,7 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
         return
       }
 
+      window.sessionStorage.setItem('profitpro:login-toast', 'Login successful.')
       router.replace(data.redirectTo)
     } catch {
       setError('Something went wrong.')
@@ -55,6 +51,7 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
 
   return (
     <main className="min-h-screen">
+      <ToastMessage message={error || (showNotice ? notice : '')} tone={error ? 'error' : 'info'} onDismiss={() => { setError(''); setShowNotice(false) }} />
       <section className="grid min-h-screen grid-cols-1 lg:grid-cols-[minmax(0,1fr)_520px]">
         <div className="relative hidden lg:block">
           <video
@@ -156,18 +153,6 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
                     </button>
                   </div>
                 </div>
-
-                {error && (
-                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm leading-5 text-red-200">
-                    {error}
-                  </div>
-                )}
-
-                {notice && !error ? (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm leading-5 text-amber-100">
-                    {notice}
-                  </div>
-                ) : null}
 
                 <button
                   type="submit"

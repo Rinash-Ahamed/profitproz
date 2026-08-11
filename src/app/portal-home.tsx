@@ -10,6 +10,7 @@ import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveReques
 import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
+import { ToastMessage } from '@/components/ui/ToastMessage'
 import { LeaveDateSummary } from '@/components/ui/LeaveDateSummary'
 import { countNonSundayDaysInclusive, formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
@@ -116,14 +117,11 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [error, setError] = useState('')
 
   useEffect(() => {
-    if (!message && !error) return
-
-    const timer = setTimeout(() => {
-      setMessage('')
-      setError('')
-    }, 3000)
-    return () => clearTimeout(timer)
-  }, [message, error])
+    const loginMessage = window.sessionStorage.getItem('profitpro:login-toast')
+    if (!loginMessage) return
+    window.sessionStorage.removeItem('profitpro:login-toast')
+    setMessage(loginMessage)
+  }, [])
 
   useEffect(() => {
     if (!user.expiresAt) return
@@ -934,6 +932,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   return (
     <main className={`portal-app ${user.role === 'admin' ? 'admin-workspace' : ''} relative flex min-h-screen flex-col overflow-hidden bg-[#0a0b0c] px-6 py-8 text-ink sm:px-10`}>
+      <ToastMessage message={error || message} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setMessage('') }} />
       <video className="portal-video" autoPlay loop muted playsInline preload="metadata" aria-hidden="true">
         <source src="/portal/background.mp4" type="video/mp4" />
       </video>
@@ -1328,8 +1327,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             </div>
                           </fieldset>
 
-                          {message && <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p>}
-                          {error && <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
 
                           <button
                             type="submit"
@@ -1436,8 +1433,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <div><label htmlFor="adminExpenseReceipt" className="label-upper mb-2 block text-ghost">Receipt link (optional)</label><input id="adminExpenseReceipt" type="url" inputMode="url" value={expenseReceiptUrl} onChange={(event) => setExpenseReceiptUrl(event.target.value)} maxLength={2048} className={inputClass} placeholder="https://..." /></div>
                         </div>
                         <div className="mt-4"><label htmlFor="adminExpenseDescription" className="label-upper mb-2 block text-ghost">Description</label><textarea id="adminExpenseDescription" rows={2} value={expenseNotes} onChange={(event) => setExpenseNotes(event.target.value)} maxLength={2000} className={`${inputClass} h-auto resize-y py-3`} /></div>
-                        {message ? <p className="mt-4 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p> : null}
-                        {error ? <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
                         <button type="submit" disabled={loading} className="mt-5 flex h-11 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-5 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Record expense</button>
                       </form>
 
@@ -1528,8 +1523,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   ),
                   settings: (
                     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
-                      {message && <p className="lg:col-span-2 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p>}
-                      {error && <p className="lg:col-span-2 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
 
                       <div className="surface rounded-lg p-6 sm:p-7">
                         <p className="text-base font-semibold text-ink">Expense Claim Fields</p>
@@ -1668,8 +1661,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     <textarea id="profileDetails" rows={3} value={profileDetails} onChange={(event) => setProfileDetails(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} placeholder="Optional role details or other relevant information" />
                   </div>
 
-                  {message && <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p>}
-                  {error && <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
 
                   <button
                     type="submit"
@@ -1760,8 +1751,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <p className="mt-2 text-xs text-sub">Use a shareable Drive link or other secure receipt URL.</p>
                         </div>
 
-                        {message && <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p>}
-                        {error && <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
 
                         <button
                           type="submit"
@@ -1833,8 +1822,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         ) : (
                           <div className="mt-6"><p className="max-w-2xl text-sm leading-6 text-sub">Start the timer when you begin today’s work. After starting, the End Work option will appear and a work summary will be required before finishing.</p><button type="button" onClick={() => void startWork()} disabled={workActionLoading} className="mt-5 flex h-12 items-center gap-2 rounded-lg bg-[#66B159] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66] disabled:opacity-50">{workActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />} Start work</button></div>
                         )}
-                        {message ? <p className="mt-5 rounded-lg border border-[#66B159]/30 bg-[#66B159]/10 px-4 py-3 text-sm text-ink">{message}</p> : null}
-                        {error ? <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
                       </section>
 
                       <div className="staff-work-card rounded-lg">
@@ -2047,7 +2034,7 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
             <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Close</button>
           </div>
         </div>
-        {error ? <p className="m-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+        <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
         <div className="max-h-[calc(100vh-9rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">
           {loading ? <div className="flex min-h-96 items-center justify-center gap-3 text-sm text-sub"><Loader2 className="h-5 w-5 animate-spin" /> Loading offer letter…</div> : null}
           {!loading && renderedOffer ? <iframe ref={iframeRef} title={`Offer letter preview for ${staff.name}`} srcDoc={renderedOffer} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}
@@ -2175,7 +2162,7 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
                 <label className="flex cursor-pointer items-center gap-2 text-sm text-ink"><input type="checkbox" checked={onboardingAccess} onChange={(event) => setOnboardingAccess(event.target.checked)} className="h-4 w-4 accent-[#66B159]" /> OTA Onboarding</label>
               </div>
             </fieldset>
-            {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
+            <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
           </div>
 
           <div className="mt-8 flex justify-end gap-3">
@@ -2252,7 +2239,7 @@ function WorkSessionCorrectionModal({ session, employeeName, onClose, onSaved }:
           <div><label htmlFor="correctWorkStart" className="label-upper mb-2 block text-ghost">Start time</label><input id="correctWorkStart" type="datetime-local" value={startedAt} onChange={(event) => setStartedAt(event.target.value)} className={modalInputClass} required /></div>
           <div><label htmlFor="correctWorkEnd" className="label-upper mb-2 block text-ghost">End time</label><input id="correctWorkEnd" type="datetime-local" value={endedAt} onChange={(event) => setEndedAt(event.target.value)} className={modalInputClass} required={session.status === 'completed'} /></div>
         </div>
-        {error ? <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+        <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
           <button type="submit" disabled={loading || !startedAt || (session.status === 'completed' && !endedAt)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Save correction</button>
@@ -2334,7 +2321,7 @@ function ExpenseCorrectionModal({ expense, onClose, onSaved }: {
           <div className="sm:col-span-2"><label htmlFor="correctExpenseReceipt" className="label-upper mb-2 block text-ghost">Receipt link (optional)</label><input id="correctExpenseReceipt" type="url" inputMode="url" value={receiptUrl} onChange={(event) => setReceiptUrl(event.target.value)} maxLength={2048} className={modalInputClass} placeholder="https://..." /></div>
           <div className="sm:col-span-2"><label htmlFor="correctExpenseDescription" className="label-upper mb-2 block text-ghost">Description</label><textarea id="correctExpenseDescription" rows={3} value={description} onChange={(event) => setDescription(event.target.value)} maxLength={2000} className={`${modalInputClass} h-auto resize-y py-3`} /></div>
         </div>
-        {error ? <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+        <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
           <button type="submit" disabled={loading || !expenseDate || !amount || (expense.submittedByRole === 'admin' && !staffName)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Save correction</button>

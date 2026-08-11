@@ -32,6 +32,8 @@ export type PayrollRecord = {
   casualLeaveAvailable: number
   casualLeaveUsed: number
   closingCasualLeaveBalance: number
+  missingAttendanceDays: number
+  missingAttendanceDates: string[]
   lopDays: number
   payableDays: number
   grossSalary: number
@@ -74,6 +76,8 @@ export type PayrollCalculation = Pick<PayrollRecord,
   | 'casualLeaveAvailable'
   | 'casualLeaveUsed'
   | 'closingCasualLeaveBalance'
+  | 'missingAttendanceDays'
+  | 'missingAttendanceDates'
   | 'lopDays'
   | 'payableDays'
   | 'grossSalary'
@@ -167,8 +171,10 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
   const casualLeaveAvailable = openingCasualLeaveBalance + casualLeaveEntitlement
   const casualLeaveUsed = Math.min(casualLeaveAvailable, approvedLeaveDates.length)
   const closingCasualLeaveBalance = casualLeaveAvailable - casualLeaveUsed
-  const absentDates = assessedWorkingDates.filter((date) => !attendanceDateSet.has(date))
-  const lopDays = Math.max(0, absentDates.length - casualLeaveUsed)
+  const approvedLeaveDatesSet = new Set(approvedLeaveDates)
+  const missingAttendanceDates = assessedWorkingDates
+    .filter((date) => !attendanceDateSet.has(date) && !approvedLeaveDatesSet.has(date))
+  const lopDays = Math.max(0, approvedLeaveDates.length - casualLeaveUsed)
   const totalWorkingDays = workingDates.length
   const monthlySalary = Math.max(0, input.monthlySalary)
   const grossSalary = roundMoney(monthlySalary)
@@ -184,6 +190,8 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
     casualLeaveAvailable,
     casualLeaveUsed,
     closingCasualLeaveBalance,
+    missingAttendanceDays: missingAttendanceDates.length,
+    missingAttendanceDates,
     lopDays,
     payableDays: totalWorkingDays - lopDays,
     grossSalary,
