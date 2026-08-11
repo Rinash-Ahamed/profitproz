@@ -36,3 +36,14 @@ export function countDateOnlyDaysInclusive(startValue: string, endValue: string)
   if (!start || !end || end < start) return 0
   return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1
 }
+
+export function countNonSundayDaysInclusive(startValue: string, endValue: string) {
+  const start = parseDateOnly(startValue)
+  const end = parseDateOnly(endValue)
+  if (!start || !end || end < start) return 0
+  let count = 0
+  for (const date = new Date(start); date <= end; date.setUTCDate(date.getUTCDate() + 1)) {
+    if (date.getUTCDay() !== 0) count += 1
+  }
+  return count
+}

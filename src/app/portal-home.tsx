@@ -6,14 +6,13 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { Building2, CheckCircle2, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, Loader2, LogOut, Play, ReceiptText, RefreshCw, Search, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
-import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SalaryRecord, SecuritySettings, WorkSessionRecord } from '@/lib/firestore'
+import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SecuritySettings, WorkSessionRecord } from '@/lib/firestore'
 import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { LeaveDateSummary } from '@/components/ui/LeaveDateSummary'
-import { countDateOnlyDaysInclusive, formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
+import { countNonSundayDaysInclusive, formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
-import { LEAVE_ALLOWANCES, leaveTypeLabel, type LeaveType } from '@/lib/leave'
 import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
@@ -23,21 +22,13 @@ import { formatLiveWorkDuration, formatWorkDuration, formatWorkTime } from '@/li
 const ClientServicesPanel = dynamic(() => import('@/app/client-services-panel').then((module) => module.ClientServicesPanel))
 const FinancePanel = dynamic(() => import('@/app/finance-panel').then((module) => module.FinancePanel))
 const AdminTasksPanel = dynamic(() => import('@/app/admin-tasks-panel').then((module) => module.AdminTasksPanel))
+const PayrollPanel = dynamic(() => import('@/app/payroll-panel').then((module) => module.PayrollPanel))
 
 type PortalHomeProps = {
   user: SessionUser
   version: AppVersion
   title: string
   description?: string
-}
-
-type PayrollRow = {
-  employeeName: string
-  employeeId: string
-  department: string
-  payrollPeriod: string
-  monthlySalary: number
-  completedWorkDays: number
 }
 
 const ADMIN_TAB_LABELS: Record<string, string> = {
@@ -71,7 +62,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
   const staffListLoadedRef = useRef(false)
   const [staffSearch, setStaffSearch] = useState('')
-  const [salaryList, setSalaryList] = useState<SalaryRecord[]>([])
   const [editingStaff, setEditingStaff] = useState<PublicStaffRecord | null>(null)
   const [offerStaff, setOfferStaff] = useState<PublicStaffRecord | null>(null)
   const [propertyList, setPropertyList] = useState<PropertyRecord[]>([])
@@ -87,17 +77,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [leaveList, setLeaveList] = useState<LeaveRequestRecord[]>([])
   const [leaveStartDate, setLeaveStartDate] = useState('')
   const [leaveEndDate, setLeaveEndDate] = useState('')
-  const [leaveType, setLeaveType] = useState<LeaveType>('sick')
   const [leaveReason, setLeaveReason] = useState('')
   const [deletingLeaveId, setDeletingLeaveId] = useState('')
-  const requestedLeaveDays = countDateOnlyDaysInclusive(leaveStartDate, leaveEndDate)
-  const selectedLeaveYear = leaveStartDate.slice(0, 4) || String(new Date().getFullYear())
-  const usedLeaveDays = leaveList.reduce((total, leave) => {
-    if (leave.status === 'rejected' || leave.leaveType !== leaveType || !leave.startDate.startsWith(`${selectedLeaveYear}-`)) return total
-    return total + (leave.durationDays || countDateOnlyDaysInclusive(leave.startDate, leave.endDate))
-  }, 0)
-  const remainingLeaveDays = Math.max(0, LEAVE_ALLOWANCES[leaveType] - usedLeaveDays)
-  const exceedsLeaveBalance = requestedLeaveDays > remainingLeaveDays
+  const requestedLeaveDays = countNonSundayDaysInclusive(leaveStartDate, leaveEndDate)
   const [expenseCity, setExpenseCity] = useState('')
   const [expenseType, setExpenseType] = useState<'travel' | 'food' | 'fuel' | 'other'>('travel')
   const [customExpenseType, setCustomExpenseType] = useState('')
@@ -312,23 +294,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         .finally(finishLoading)
     }
 
-    if (activeTab === 'payroll') {
-      setLoading(true)
-      Promise.all([tabFetch('/api/admin/salaries'), tabFetch('/api/admin/tasks')])
-        .then(async ([salaryRes, taskRes]) => {
-          const [salaryData, taskData] = await Promise.all([salaryRes.json(), taskRes.json()])
-          if (controller.signal.aborted) return
-          if (salaryData.staff) {
-            setStaffList(salaryData.staff)
-            staffListLoadedRef.current = true
-          }
-          if (salaryData.salaries) setSalaryList(salaryData.salaries)
-          if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
-        })
-        .catch(reportError('Could not load payroll data.'))
-        .finally(finishLoading)
-    }
-
     if (activeTab === 'leaves') {
       setLoading(true)
       tabFetch('/api/admin/leaves').then((res) => res.json()).then((data) => { if (!controller.signal.aborted && data.leaves) setLeaveList(data.leaves) }).catch(reportError('Could not load leave requests.')).finally(finishLoading)
@@ -495,7 +460,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       }
 
       setStaffList((prev) => prev.filter((s) => s.id !== staffId))
-      setSalaryList((prev) => prev.filter((salary) => salary.id !== staffId && salary.staffEmail !== staffEmail))
       setWorkSessionList((prev) => prev.filter((session) => session.staffEmail !== staffEmail))
       setLeaveList((prev) => prev.filter((leave) => leave.staffEmail !== staffEmail))
       setMessage('Employee records deleted. Expense and receipt history was preserved.')
@@ -724,10 +688,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   async function submitLeaveRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setError(''); setMessage('')
     try {
-      const response = await fetch('/api/staff/leaves', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startDate: leaveStartDate, endDate: leaveEndDate, leaveType, reason: leaveReason }) })
+      const response = await fetch('/api/staff/leaves', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startDate: leaveStartDate, endDate: leaveEndDate, reason: leaveReason }) })
       const data = await response.json() as { leave?: LeaveRequestRecord; message?: string }
       if (!response.ok || !data.leave) throw new Error(data.message || 'Unable to submit leave request.')
-      setLeaveList((current) => [data.leave!, ...current]); setLeaveStartDate(''); setLeaveEndDate(''); setLeaveType('sick'); setLeaveReason(''); setMessage('Leave request submitted.')
+      setLeaveList((current) => [data.leave!, ...current]); setLeaveStartDate(''); setLeaveEndDate(''); setLeaveReason(''); setMessage('Leave request submitted.')
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to submit leave request.') } finally { setLoading(false) }
   }
 
@@ -838,35 +802,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }
   }
 
-  function handleExportPayroll() {
-    if (payrollRows.length === 0) {
-      setError('No payroll data is available to export.')
-      return
-    }
-
-    const headers: (keyof PayrollRow)[] = ['employeeName', 'employeeId', 'department', 'payrollPeriod', 'monthlySalary', 'completedWorkDays']
-    const headerRow = 'Employee Name,Employee ID,Department,Payroll Period,Monthly Salary,Completed Work Days'
-
-    const csvRows = payrollRows.map(row =>
-      headers.map(header => {
-        const value = row[header]
-        // Handle values that might contain commas by enclosing them in double quotes
-        return typeof value === 'string' && value.includes(',') ? `"${value}"` : value
-      }).join(',')
-    )
-
-    const csvContent = [headerRow, ...csvRows].join('\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const link = document.createElement('a')
-    const url = URL.createObjectURL(blob)
-    link.setAttribute('href', url)
-    link.setAttribute('download', 'payroll-report-june-2024.csv')
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-  }
-
   function handleExportExpenses() {
     const exportExpenses = visibleTrackedExpenses
     if (exportExpenses.length === 0) {
@@ -971,28 +906,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     const timer = window.setInterval(() => setWorkClock(Date.now()), 30_000)
     return () => window.clearInterval(timer)
   }, [workSessionList])
-
-  const payrollRows = useMemo<PayrollRow[]>(() => {
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth()
-    const period = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
-
-    return staffList.map((staff) => {
-      const monthlySalary = salaryList.find((salary) => salary.staffEmail === staff.email)?.baseSalary || 0
-      const workedDates = new Set(
-        workSessionList
-          .filter((session) => session.staffEmail === staff.email && session.status === 'completed')
-          .map((session) => session.workDate)
-          .filter((date) => {
-            const parsed = new Date(`${date}T00:00:00`)
-            return parsed.getFullYear() === currentYear && parsed.getMonth() === currentMonth
-          })
-      )
-
-      return { employeeName: staff.name, employeeId: staff.employeeId || 'N/A', department: staff.department || 'N/A', payrollPeriod: period, monthlySalary, completedWorkDays: workedDates.size }
-    })
-  }, [salaryList, staffList, workSessionList])
 
   const pendingExpenses = expenseList.filter((expense) => expense.status === 'pending')
   const expensePersonQuery = expensePersonSearch.trim().toLowerCase()
@@ -1611,50 +1524,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     </div>
                   ),
                   payroll: (
-                    <div className="surface rounded-lg">
-                      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
-                        <div>
-                          <p className="text-lg font-semibold text-ink">Payroll Processing</p>
-                          <p className="mt-1 text-sm text-sub">Monthly salary is paid in full. Completed work sessions are shown for reference only.</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <button type="button" className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 text-sm text-sub transition-colors hover:bg-zinc-800">
-                            Current month
-                          </button>
-                          <button type="button" onClick={handleExportPayroll} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66]">
-                            <FileDown className="h-4 w-4" />
-                            Export CSV
-                          </button>
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                          <thead className="border-b border-zinc-700 text-left">
-                            <tr>
-                              <th className="px-6 py-4 font-medium text-sub">Employee</th>
-                              <th className="px-6 py-4 font-medium text-sub">Department</th>
-                              <th className="px-6 py-4 font-medium text-sub">Salary</th>
-                              <th className="px-6 py-4 font-medium text-sub">Completed work days</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {payrollRows.length === 0 ? (
-                              <tr><td colSpan={4} className="py-10 text-center text-sub">No employee payroll records available yet.</td></tr>
-                            ) : payrollRows.map((p) => (
-                              <tr key={p.employeeId} className="border-b border-zinc-800 last:border-none">
-                                <td className="px-6 py-4">
-                                  <p className="font-medium text-ink">{p.employeeName}</p>
-                                  <p className="text-xs text-sub">{p.employeeId}</p>
-                                </td>
-                                <td className="px-6 py-4 text-sub">{p.department}</td>
-                                <td className="px-6 py-4 text-sub">₹{p.monthlySalary.toLocaleString('en-IN')}</td>
-                                <td className="px-6 py-4 text-sub">{p.completedWorkDays}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
+                    <PayrollPanel />
                   ),
                   settings: (
                     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
@@ -2008,7 +1878,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   ),
                   leaves: (
                     <div className="staff-workspace space-y-6 text-left">
-                      <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}><p className="text-lg font-semibold text-ink">Request Leave</p><div className="mt-5 grid gap-4 sm:grid-cols-3"><div><label className="label-upper mb-2 block text-ghost">Leave type</label><select value={leaveType} onChange={(event) => setLeaveType(event.target.value as LeaveType)} className={inputClass}><option value="sick">Sick leave</option><option value="flexi">Flexi leave</option></select></div><div><label className="label-upper mb-2 block text-ghost">Start date</label><DatePickerInput value={leaveStartDate} onChange={setLeaveStartDate} className={inputClass} required /></div><div><label className="label-upper mb-2 block text-ghost">End date</label><DatePickerInput value={leaveEndDate} onChange={setLeaveEndDate} className={inputClass} min={leaveStartDate || undefined} required /></div></div><div className={`mt-3 rounded-lg border px-4 py-3 text-sm ${exceedsLeaveBalance ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-zinc-700 bg-zinc-900/60 text-sub'}`}><p>{leaveTypeLabel(leaveType)} allowance for {selectedLeaveYear}: {remainingLeaveDays} of {LEAVE_ALLOWANCES[leaveType]} days remaining.</p>{requestedLeaveDays > 0 ? <p className="mt-1 font-medium">Selected duration: {requestedLeaveDays} {requestedLeaveDays === 1 ? 'day' : 'days'}{exceedsLeaveBalance ? ' — exceeds available balance' : ''}</p> : null}</div><div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div><button type="submit" disabled={requestedLeaveDays < 1 || exceedsLeaveBalance} className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Submit leave request</button></form>
+                      <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}><p className="text-lg font-semibold text-ink">Request Leave</p><p className="mt-2 text-sm leading-6 text-sub">Approved leave is assessed during monthly payroll. The first eligible working-day leave may use that month&apos;s CL; additional leave is LOP. Sundays are excluded.</p><div className="mt-5 grid gap-4 sm:grid-cols-2"><div><label className="label-upper mb-2 block text-ghost">Start date</label><DatePickerInput value={leaveStartDate} onChange={setLeaveStartDate} className={inputClass} required /></div><div><label className="label-upper mb-2 block text-ghost">End date</label><DatePickerInput value={leaveEndDate} onChange={setLeaveEndDate} className={inputClass} min={leaveStartDate || undefined} required /></div></div>{requestedLeaveDays > 0 ? <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900/60 px-4 py-3 text-sm text-sub">Selected working-day duration: <span className="font-medium text-ink">{requestedLeaveDays} {requestedLeaveDays === 1 ? 'day' : 'days'}</span>. Sundays are already excluded.</div> : null}<div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div><button type="submit" disabled={requestedLeaveDays < 1} className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Submit leave request</button></form>
                       <div className="staff-work-card rounded-lg"><div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">My Leave Requests</p></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800"><td className="px-6 py-4 text-ink"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <button type="button" disabled={deletingLeaveId === leave.id} onClick={() => withdrawLeaveRequest(leave)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw leave request">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : <span className="text-xs text-ghost">Locked</span>}</td></tr>)}</tbody></table></div></div>
                     </div>
                   ),
