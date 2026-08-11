@@ -4,8 +4,9 @@ import crypto from 'crypto'
 import 'server-only'
 import type { OnboardingDetailsInput, OnboardingRecord, OnboardingPlatformProgress, OtaPlatform } from './onboarding'
 import type { PaginationRequest } from './pagination'
-import { countDateOnlyDaysInclusive } from './date-only'
-import { LEAVE_ALLOWANCES, type LeaveType } from './leave'
+import { countNonSundayDaysInclusive, todayInTimeZone } from './date-only'
+import type { HistoricalLeaveType } from './leave'
+import { calculatePayroll, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthEndDate, type MissingAttendanceDecision, type PayrollRecord, type PayrollStatus } from './payroll'
 import type { FinanceInvoiceRecord, FinanceOverview, FinancePaymentRecord, FinanceService, PaymentMethod } from './finance'
 
 export type StaffRecord = {
@@ -147,6 +148,7 @@ const COLLECTIONS = {
   LEGACY_TIMESHEETS: 'timesheets',
   LEAVE_REQUESTS: 'leave_requests',
   SALARIES: 'salaries',
+  PAYROLL: 'payroll',
   AUDIT_LOG: 'audit_log',
   SETTINGS: 'settings',
 } as const
@@ -662,6 +664,76 @@ export async function listStaffAccounts() {
   if (!db) return []
   const snapshot = await db.collection(COLLECTIONS.STAFF).get()
   return snapshot.docs.map(mapDocToStaff)
+}
+
+function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
+  const data = doc.data() || {}
+  const status: PayrollStatus = data.status === 'calculated' || data.status === 'approved' || data.status === 'paid' ? data.status : 'draft'
+  const history = Array.isArray(data.statusHistory) ? data.statusHistory : []
+  const storedMonth = typeof data.month === 'string' ? data.month : ''
+  const month = parsePayrollMonth(storedMonth) ? storedMonth : PAYROLL_START_MONTH
+  return {
+    id: doc.id,
+    month,
+    employeeId: typeof data.employeeId === 'string' ? data.employeeId : '',
+    staffId: typeof data.staffId === 'string' ? data.staffId : '',
+    employeeName: typeof data.employeeName === 'string' ? data.employeeName : '',
+    staffEmail: typeof data.staffEmail === 'string' ? data.staffEmail : '',
+    designation: typeof data.designation === 'string' ? data.designation : '',
+    department: typeof data.department === 'string' ? data.department : '',
+    monthlySalary: Number(data.monthlySalary) || 0,
+    annualCtc: Number(data.annualCtc) || 0,
+    totalCalendarDays: Number(data.totalCalendarDays) || 0,
+    sundayHolidays: Number(data.sundayHolidays) || 0,
+    totalWorkingDays: Number(data.totalWorkingDays) || 0,
+    daysPresent: Number(data.daysPresent) || 0,
+    openingCasualLeaveBalance: Number(data.openingCasualLeaveBalance) || 0,
+    casualLeaveEntitlement: Number(data.casualLeaveEntitlement) || 1,
+    casualLeaveAvailable: Number(data.casualLeaveAvailable) || ((Number(data.openingCasualLeaveBalance) || 0) + 1),
+    casualLeaveUsed: Number(data.casualLeaveUsed) || 0,
+    closingCasualLeaveBalance: Number.isFinite(Number(data.closingCasualLeaveBalance))
+      ? Number(data.closingCasualLeaveBalance)
+      : Math.max(0, (Number(data.openingCasualLeaveBalance) || 0) + 1 - (Number(data.casualLeaveUsed) || 0)),
+    missingAttendanceDays: Number(data.missingAttendanceDays) || 0,
+    missingAttendanceDates: Array.isArray(data.missingAttendanceDates) ? data.missingAttendanceDates.filter((value: unknown): value is string => typeof value === 'string') : [],
+    missingAttendanceDecisions: data.missingAttendanceDecisions && typeof data.missingAttendanceDecisions === 'object'
+      ? Object.fromEntries(Object.entries(data.missingAttendanceDecisions).filter((entry): entry is [string, MissingAttendanceDecision] => entry[1] === 'lop' || entry[1] === 'ignored'))
+      : {},
+    missingAttendanceLopDays: Number(data.missingAttendanceLopDays) || 0,
+    lopDays: Number(data.lopDays) || 0,
+    payableDays: Number(data.payableDays) || 0,
+    grossSalary: Number(data.grossSalary) || 0,
+    lopDeduction: Number(data.lopDeduction) || 0,
+    netSalary: Number(data.netSalary) || 0,
+    attendanceDates: Array.isArray(data.attendanceDates) ? data.attendanceDates.filter((value: unknown): value is string => typeof value === 'string') : [],
+    approvedLeaveDates: Array.isArray(data.approvedLeaveDates) ? data.approvedLeaveDates.filter((value: unknown): value is string => typeof value === 'string') : [],
+    approvedLeaveIds: Array.isArray(data.approvedLeaveIds) ? data.approvedLeaveIds.filter((value: unknown): value is string => typeof value === 'string') : [],
+    status,
+    snapshotVersion: 1,
+    statusHistory: history.flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== 'object') return []
+      const value = entry as Record<string, unknown>
+      const to = value.to
+      if (to !== 'draft' && to !== 'calculated' && to !== 'approved' && to !== 'paid') return []
+      const from = value.from
+      return [{
+        from: from === 'draft' || from === 'calculated' || from === 'approved' || from === 'paid' ? from : null,
+        to,
+        actorEmail: typeof value.actorEmail === 'string' ? value.actorEmail : '',
+        at: typeof value.at === 'string' ? value.at : '',
+      }]
+    }),
+    calculationThroughDate: typeof data.calculationThroughDate === 'string' ? data.calculationThroughDate : payrollMonthEndDate(month),
+    generatedAt: mapTimestamp(data.generatedAt) || (typeof data.generatedAt === 'string' ? data.generatedAt : ''),
+    generatedBy: typeof data.generatedBy === 'string' ? data.generatedBy : '',
+    calculatedAt: mapTimestamp(data.calculatedAt),
+    approvedAt: mapTimestamp(data.approvedAt),
+    approvedBy: typeof data.approvedBy === 'string' ? data.approvedBy : undefined,
+    paidAt: mapTimestamp(data.paidAt),
+    paidBy: typeof data.paidBy === 'string' ? data.paidBy : undefined,
+    refreshedAt: mapTimestamp(data.refreshedAt),
+    updatedAt: mapTimestamp(data.updatedAt),
+  }
 }
 
 function mapDocToFinanceInvoice(doc: DocumentSnapshot): FinanceInvoiceRecord {
@@ -1462,7 +1534,7 @@ export type LeaveRequestRecord = {
   staffEmail: string
   startDate: string
   endDate: string
-  leaveType: LeaveType | 'legacy'
+  leaveType: HistoricalLeaveType
   durationDays: number
   reason: string
   status: 'pending' | 'approved' | 'rejected'
@@ -1565,6 +1637,190 @@ export async function saveSalary(staffId: string, input: { staffEmail: string; b
     throw new Error('Document not found after update.')
   }
   return mapDocToSalary(updatedDoc)
+}
+
+export async function listPayrollRecords(month: string): Promise<PayrollRecord[]> {
+  if (!db) return []
+  const snapshot = await db.collection(COLLECTIONS.PAYROLL).where('month', '==', month).get()
+  return snapshot.docs.map(mapDocToPayroll).sort((a, b) => a.employeeName.localeCompare(b.employeeName))
+}
+
+export async function generatePayrollRecords(month: string, actorEmail: string): Promise<PayrollRecord[]> {
+  const db = ensureDb()
+  const [staff, salaries, workSessions, leaves, priorPayrollSnapshot, currentPayrollSnapshot] = await Promise.all([
+    listStaffAccounts(),
+    listSalaries(),
+    listWorkSessions(),
+    listLeaveRequests(),
+    db.collection(COLLECTIONS.PAYROLL).where('month', '<', month).get(),
+    db.collection(COLLECTIONS.PAYROLL).where('month', '==', month).get(),
+  ])
+  const activeStaff = staff.filter((employee) => employee.active)
+  const salaryByStaffId = new Map(salaries.map((salary) => [salary.id, salary]))
+  const salaryByEmail = new Map(salaries.map((salary) => [salary.staffEmail, salary]))
+  const normalizedActor = actorEmail.trim().toLowerCase()
+  const latestPriorPayrollByStaff = new Map<string, PayrollRecord>()
+  const currentPayrollByStaff = new Map(currentPayrollSnapshot.docs.map(mapDocToPayroll).map((record) => [record.staffId, record]))
+  priorPayrollSnapshot.docs.map(mapDocToPayroll).filter((record) => record.month >= PAYROLL_START_MONTH).forEach((record) => {
+    const existing = latestPriorPayrollByStaff.get(record.staffId)
+    if (!existing || record.month > existing.month) latestPriorPayrollByStaff.set(record.staffId, record)
+  })
+
+  await Promise.all(activeStaff.map(async (employee) => {
+    const docRef = db.collection(COLLECTIONS.PAYROLL).doc(`${month}_${employee.id}`)
+    const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
+    const salary = salaryByStaffId.get(employee.id) || salaryByEmail.get(employee.email)
+    const monthlySalary = salary?.baseSalary ?? (employee.annualCtc || 0) / 12
+    const openingCasualLeaveBalance = latestPriorPayrollByStaff.get(employee.id)?.closingCasualLeaveBalance || 0
+    const calculationThroughDate = month === currentPayrollMonth() ? todayInTimeZone('Asia/Kolkata') : payrollMonthEndDate(month)
+    const calculation = calculatePayroll({
+      month,
+      monthlySalary,
+      openingCasualLeaveBalance,
+      calculationThroughDate,
+      completedWorkDates: workSessions
+        .filter((session) => session.staffEmail === employee.email && session.status === 'completed')
+        .map((session) => session.workDate),
+      approvedLeaves: leaves
+        .filter((leave) => leave.staffEmail === employee.email && leave.status === 'approved')
+        .map((leave) => ({ id: leave.id, startDate: leave.startDate, endDate: leave.endDate })),
+      missingAttendanceDecisions: currentPayrollByStaff.get(employee.id)?.missingAttendanceDecisions,
+    })
+    const generatedAt = new Date().toISOString()
+
+    await db.runTransaction(async (transaction) => {
+      const existing = await transaction.get(docRef)
+      if (existing.exists && mapDocToPayroll(existing).status !== 'draft') return
+      const snapshotData = {
+        month,
+        employeeId: employee.employeeId || employee.id,
+        staffId: employee.id,
+        employeeName: employee.name,
+        staffEmail: employee.email,
+        designation: employee.role || '',
+        department: employee.department || '',
+        monthlySalary,
+        annualCtc: employee.annualCtc || monthlySalary * 12,
+        ...calculation,
+        calculationThroughDate,
+        refreshedAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+      }
+      if (existing.exists) {
+        transaction.update(docRef, snapshotData)
+      } else {
+        transaction.create(docRef, {
+        ...snapshotData,
+        status: 'draft',
+        snapshotVersion: 1,
+        statusHistory: [{ from: null, to: 'draft', actorEmail: normalizedActor, at: generatedAt }],
+        generatedAt: FieldValue.serverTimestamp(),
+        generatedBy: normalizedActor,
+        })
+      }
+      transaction.set(auditRef, {
+        timestamp: FieldValue.serverTimestamp(),
+        actorEmail: normalizedActor,
+        action: existing.exists ? 'PAYROLL_REFRESH' : 'PAYROLL_GENERATE',
+        targetId: docRef.id,
+        details: `${existing.exists ? 'Refreshed Draft' : 'Generated'} ${month} payroll snapshot for ${employee.name} (${employee.employeeId || employee.email}) through ${calculationThroughDate}.`,
+      })
+    })
+  }))
+
+  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  return listPayrollRecords(month)
+}
+
+export async function decideMissingAttendance(id: string, date: string, decision: MissingAttendanceDecision, actorEmail: string): Promise<PayrollRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.PAYROLL).doc(id)
+  const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
+  const normalizedActor = actorEmail.trim().toLowerCase()
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('PAYROLL_NOT_FOUND')
+    const payroll = mapDocToPayroll(snapshot)
+    if (payroll.status !== 'draft') throw new Error('PAYROLL_DECISION_LOCKED')
+    if (!payroll.missingAttendanceDates.includes(date)) throw new Error('MISSING_ATTENDANCE_DATE_NOT_FOUND')
+
+    const previousDecision = payroll.missingAttendanceDecisions[date]
+    const decisions = { ...payroll.missingAttendanceDecisions, [date]: decision }
+    const missingAttendanceLopDays = payroll.missingAttendanceDates.filter((missingDate) => decisions[missingDate] === 'lop').length
+    const leaveLopDays = Math.max(0, payroll.lopDays - payroll.missingAttendanceLopDays)
+    const lopDays = leaveLopDays + missingAttendanceLopDays
+    const lopDeduction = payroll.totalWorkingDays
+      ? Math.round(((payroll.grossSalary / payroll.totalWorkingDays) * lopDays + Number.EPSILON) * 100) / 100
+      : 0
+    const netSalary = Math.round((Math.max(0, payroll.grossSalary - lopDeduction) + Number.EPSILON) * 100) / 100
+
+    transaction.update(docRef, {
+      missingAttendanceDecisions: decisions,
+      missingAttendanceLopDays,
+      lopDays,
+      payableDays: payroll.totalWorkingDays - lopDays,
+      lopDeduction,
+      netSalary,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+    transaction.set(auditRef, {
+      timestamp: FieldValue.serverTimestamp(),
+      actorEmail: normalizedActor,
+      action: 'PAYROLL_MISSING_ATTENDANCE_DECISION',
+      targetId: id,
+      details: `${date} missing attendance for ${payroll.employeeName} marked as ${decision === 'lop' ? 'LOP' : 'ignored'}.`,
+      changes: { [`missingAttendanceDecisions.${date}`]: { from: previousDecision || null, to: decision } },
+    })
+  })
+
+  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  return mapDocToPayroll(await docRef.get())
+}
+
+export async function transitionPayrollStatus(id: string, requestedStatus: PayrollStatus, actorEmail: string): Promise<PayrollRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.PAYROLL).doc(id)
+  const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
+  const normalizedActor = actorEmail.trim().toLowerCase()
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('PAYROLL_NOT_FOUND')
+    const payroll = mapDocToPayroll(snapshot)
+    const expectedStatus = nextPayrollStatus(payroll.status)
+    if (requestedStatus !== expectedStatus) throw new Error('INVALID_PAYROLL_TRANSITION')
+    if (payroll.status === 'draft' && payroll.missingAttendanceDates.some((date) => !payroll.missingAttendanceDecisions[date])) {
+      throw new Error('PENDING_MISSING_ATTENDANCE_DECISIONS')
+    }
+    const now = new Date().toISOString()
+    const updates: Record<string, unknown> = {
+      status: requestedStatus,
+      statusHistory: [...payroll.statusHistory, { from: payroll.status, to: requestedStatus, actorEmail: normalizedActor, at: now }],
+      updatedAt: FieldValue.serverTimestamp(),
+    }
+    if (requestedStatus === 'calculated') updates.calculatedAt = FieldValue.serverTimestamp()
+    if (requestedStatus === 'approved') {
+      updates.approvedAt = FieldValue.serverTimestamp()
+      updates.approvedBy = normalizedActor
+    }
+    if (requestedStatus === 'paid') {
+      updates.paidAt = FieldValue.serverTimestamp()
+      updates.paidBy = normalizedActor
+    }
+    transaction.update(docRef, updates)
+    transaction.set(auditRef, {
+      timestamp: FieldValue.serverTimestamp(),
+      actorEmail: normalizedActor,
+      action: `PAYROLL_${requestedStatus.toUpperCase()}`,
+      targetId: id,
+      details: `${payroll.month} payroll for ${payroll.employeeName} moved from ${payroll.status} to ${requestedStatus}.`,
+      changes: { status: { from: payroll.status, to: requestedStatus } },
+    })
+  })
+
+  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  return mapDocToPayroll(await docRef.get())
 }
 
 export type ExpenseFieldSettings = {
@@ -1674,8 +1930,8 @@ function mapDocToLeaveRequest(doc: DocumentSnapshot): LeaveRequestRecord {
     staffEmail: data.staffEmail || '',
     startDate,
     endDate,
-    leaveType: data.leaveType === 'sick' || data.leaveType === 'flexi' ? data.leaveType : 'legacy',
-    durationDays: Number.isInteger(data.durationDays) && data.durationDays > 0 ? data.durationDays : countDateOnlyDaysInclusive(startDate, endDate),
+    leaveType: data.leaveType === 'general' || data.leaveType === 'sick' || data.leaveType === 'flexi' ? data.leaveType : 'legacy',
+    durationDays: countNonSundayDaysInclusive(startDate, endDate),
     reason: data.reason || '',
     status: data.status === 'approved' || data.status === 'rejected' ? data.status : 'pending',
     decisionNote: data.decisionNote || '',
@@ -1689,35 +1945,19 @@ export function listLeaveRequestsPage(page: PaginationRequest, staffEmail?: stri
   return paginateQuery(query, mapDocToLeaveRequest, page)
 }
 
-export async function createLeaveRequest(input: { staffEmail: string; startDate: string; endDate: string; leaveType: LeaveType; reason: string }) {
+export async function createLeaveRequest(input: { staffEmail: string; startDate: string; endDate: string; reason: string }) {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc()
   const staffEmail = input.staffEmail.trim().toLowerCase()
-  const durationDays = countDateOnlyDaysInclusive(input.startDate, input.endDate)
-  const leaveYear = input.startDate.slice(0, 4)
-
-  await db.runTransaction(async (transaction) => {
-    const existing = await transaction.get(db.collection(COLLECTIONS.LEAVE_REQUESTS).where('staffEmail', '==', staffEmail))
-    const usedDays = existing.docs.reduce((total, document) => {
-      const data = document.data()
-      if (data.status === 'rejected' || data.leaveType !== input.leaveType || typeof data.startDate !== 'string' || !data.startDate.startsWith(`${leaveYear}-`)) return total
-      const days = Number.isInteger(data.durationDays) && data.durationDays > 0
-        ? data.durationDays
-        : countDateOnlyDaysInclusive(data.startDate, data.endDate || data.startDate)
-      return total + days
-    }, 0)
-    const remainingDays = LEAVE_ALLOWANCES[input.leaveType] - usedDays
-    if (durationDays < 1 || durationDays > remainingDays) throw new Error(`LEAVE_ALLOWANCE_EXCEEDED:${Math.max(0, remainingDays)}`)
-
-    transaction.set(docRef, {
-      ...input,
-      staffEmail,
-      reason: input.reason.trim(),
-      durationDays,
-      leaveYear,
-      status: 'pending',
-      createdAt: FieldValue.serverTimestamp(),
-    })
+  const durationDays = countNonSundayDaysInclusive(input.startDate, input.endDate)
+  await docRef.set({
+    ...input,
+    staffEmail,
+    leaveType: 'general',
+    reason: input.reason.trim(),
+    durationDays,
+    status: 'pending',
+    createdAt: FieldValue.serverTimestamp(),
   })
 
   return mapDocToLeaveRequest(await docRef.get())

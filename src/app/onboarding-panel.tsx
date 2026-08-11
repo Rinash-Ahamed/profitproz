@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CheckCircle2, ChevronDown, CreditCard, Download, Edit, FileText, Loader2, Plus, Save, Search, Trash2 } from 'lucide-react'
-import { OTA_PLATFORMS, type OnboardingPlatformProgress, type OnboardingRecord, type OtaPlatform } from '@/lib/onboarding'
+import { getOtaPlatformLabel, OTA_PLATFORMS, type OnboardingPlatformProgress, type OnboardingRecord, type OtaPlatform } from '@/lib/onboarding'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
@@ -11,6 +11,7 @@ import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import type { FinanceInvoiceRecord } from '@/lib/finance'
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
+import { ToastMessage } from '@/components/ui/ToastMessage'
 
 type OnboardingPanelProps = {
   onboardings: OnboardingRecord[]
@@ -114,7 +115,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
         </div>
       </div>
 
-      {error ? <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+      <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
 
       {loading ? (
         <div className="surface flex min-h-52 items-center justify-center rounded-lg"><Loader2 className="h-6 w-6 animate-spin text-sub" /></div>
@@ -249,7 +250,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       property_address: record.propertyAddress,
       email_address: record.emailAddress,
       phone: record.phone,
-      platform_list: record.platforms.map((progress) => progress.platform).join(', '),
+      platform_list: record.platforms.map((progress) => getOtaPlatformLabel(progress.platform)).join(', '),
       platform_count: record.platforms.length,
       rate_per_platform: record.ratePerPlatform.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
       subtotal: subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
@@ -343,7 +344,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
             <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Close</button>
           </div>
         </div>
-        {error ? <p className="m-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+        <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
         <div className="max-h-[calc(100vh-9rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">
           {loading ? <div className="flex min-h-96 items-center justify-center gap-3 text-sm text-sub"><Loader2 className="h-5 w-5 animate-spin" /> Loading invoice template…</div> : null}
           {!loading && renderedInvoice ? <iframe ref={iframeRef} title={`Invoice preview for ${record.propertyName}`} srcDoc={renderedInvoice} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}
@@ -389,7 +390,7 @@ function PlatformProgressCard({ onboardingId, progress, onSaved, readOnly = fals
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950/30 p-4">
       <div className="flex items-center justify-between gap-3">
-        <p className="font-semibold text-ink">{progress.platform}</p>
+        <p className="font-semibold text-ink">{getOtaPlatformLabel(progress.platform)}</p>
         <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${status === 'live' ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-amber-500/20 bg-amber-500/10 text-amber-400'}`}>
           {status === 'live' ? 'Live' : 'Pending'}
         </span>
@@ -406,7 +407,7 @@ function PlatformProgressCard({ onboardingId, progress, onSaved, readOnly = fals
         <span className="label-upper mb-2 block text-ghost">Notes</span>
         <textarea rows={3} maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} className="w-full resize-y rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Account setup, verification, pending documents…" />
       </label>
-      {error ? <p className="mt-2 text-xs text-red-300">{error}</p> : null}
+      <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
       <button type="button" onClick={saveProgress} disabled={!dirty || saving} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-[#66B159] px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save progress
       </button>
@@ -507,13 +508,13 @@ function OnboardingDetailsModal({ initial, onClose, onSaved }: { initial?: Onboa
               {OTA_PLATFORMS.map((platform) => (
                 <label key={platform} className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 text-sm transition-colors ${selectedPlatforms.includes(platform) ? 'border-[#66B159] bg-[#66B159]/10 text-ink' : 'border-zinc-700 text-sub hover:border-zinc-600'}`}>
                   <input type="checkbox" checked={selectedPlatforms.includes(platform)} onChange={() => togglePlatform(platform)} className="h-4 w-4 accent-[#66B159]" />
-                  {platform}
+                  {getOtaPlatformLabel(platform)}
                 </label>
               ))}
             </div>
           </fieldset>
 
-          {error ? <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+          <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
           <div className="mt-7 flex justify-end gap-3">
             <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
             <button type="submit" disabled={saving || selectedPlatforms.length === 0} className="flex h-11 min-w-32 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">

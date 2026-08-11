@@ -7,6 +7,7 @@ import type { FinanceInvoiceRecord, PaymentMethod } from '@/lib/finance'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import { todayLocalDateOnly } from '@/lib/date-only'
+import { ToastMessage } from '@/components/ui/ToastMessage'
 
 export function RecordPaymentModal({ invoice, onClose, onRecorded }: { invoice: FinanceInvoiceRecord; onClose: () => void; onRecorded: (invoice: FinanceInvoiceRecord) => void }) {
   const [paymentDate, setPaymentDate] = useState(todayLocalDateOnly())
@@ -44,7 +45,7 @@ export function RecordPaymentModal({ invoice, onClose, onRecorded }: { invoice: 
           <label><span className="label-upper mb-2 block text-ghost">Reference number (optional)</span><input value={reference} onChange={(event) => setReference(event.target.value)} maxLength={160} className={inputClass} /></label>
         </div>
         <label className="mt-4 block"><span className="label-upper mb-2 block text-ghost">Notes (optional)</span><textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto resize-y py-3`} /></label>
-        {error ? <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+        <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
         <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button><button type="submit" disabled={saving} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-5 text-sm font-semibold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Save payment</button></div>
       </form>
     </div>, document.body,

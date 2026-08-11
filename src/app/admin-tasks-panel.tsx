@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { ChevronDown, ChevronRight, Edit, FileDown, Info, Loader2, Search } from 'lucide-react'
 import type { PublicStaffRecord, WorkSessionRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
@@ -31,6 +31,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('all')
   const [durationSort, setDurationSort] = useState<TaskDurationSort>('recent')
   const [expandedSummary, setExpandedSummary] = useState('')
+  const [page, setPage] = useState(1)
   const staffNameByEmail = useMemo(() => new Map(staff.map((employee) => [employee.email, employee.name])), [staff])
 
   const summaries = useMemo(() => {
@@ -106,6 +107,11 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
     }
   }, [sessions, staff])
 
+  useEffect(() => { setPage(1); setExpandedSummary('') }, [dateFilter, durationSort, employeeSearch, statusFilter])
+  const totalPages = Math.max(1, Math.ceil(summaries.length / 10))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedSummaries = summaries.slice((currentPage - 1) * 10, currentPage * 10)
+
   function exportWorkingDays() {
     const query = employeeSearch.trim().toLowerCase()
     const completed = sessions
@@ -168,22 +174,26 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
         <p><span className="font-semibold">Task history:</span> Only the latest 3 months of task records are available. Older records are automatically deleted from Firestore.</p>
       </div>
       <div className="surface rounded-lg">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
-          <div><p className="text-lg font-semibold text-ink">Daily Employee Summary</p><p className="mt-1 text-sm text-sub">Compact daily totals with expandable work details.</p></div>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="relative block"><span className="sr-only">Search employee</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} className="h-10 w-56 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employee" /></label>
+        <div className="border-b border-zinc-800 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div><p className="text-lg font-semibold text-ink">Daily Employee Summary</p><p className="mt-1 text-sm text-sub">Compact daily totals with expandable work details.</p></div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <label className="relative block"><span className="sr-only">Search employee</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} className="h-10 w-56 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employee" /></label>
+              <button type="button" onClick={exportWorkingDays} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-end justify-end gap-2 border-t border-zinc-800 pt-4">
             <label className="block w-44"><span className="sr-only">Filter by work date</span><DatePickerInput value={dateFilter} onChange={setDateFilter} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as TaskStatusFilter)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="all">All statuses</option><option value="working">Working</option><option value="completed">Completed</option><option value="not-started">Not started</option></select>
             <select value={durationSort} onChange={(event) => setDurationSort(event.target.value as TaskDurationSort)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="recent">Newest first</option><option value="highest">Highest hours</option><option value="lowest">Lowest hours</option></select>
             {hasFilters ? <button type="button" onClick={() => { setEmployeeSearch(''); setDateFilter(''); setStatusFilter('all'); setDurationSort('recent') }} className="h-10 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub hover:text-ink">Clear filters</button> : null}
-            <button type="button" onClick={exportWorkingDays} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export working days</button>
           </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-sm">
             <thead className="border-b border-zinc-700 text-left"><tr><th className="w-12 px-4 py-4"><span className="sr-only">Expand</span></th><th className="px-4 py-4 font-medium text-sub">Employee</th><th className="px-4 py-4 font-medium text-sub">Date</th><th className="px-4 py-4 font-medium text-sub">Status</th><th className="px-4 py-4 font-medium text-sub">Duration</th><th className="px-4 py-4 font-medium text-sub">Summary</th></tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr> : summaries.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{hasFilters ? 'No employee summaries match the selected filters.' : 'No work sessions recorded yet.'}</td></tr> : summaries.map((summary) => {
+              {loading ? <tr><td colSpan={6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr> : summaries.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{hasFilters ? 'No employee summaries match the selected filters.' : 'No work sessions recorded yet.'}</td></tr> : paginatedSummaries.map((summary) => {
                 const expanded = expandedSummary === summary.key
                 const firstNote = summary.sessions.find((session) => session.notes)?.notes
                 return <Fragment key={summary.key}>
@@ -201,6 +211,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
             </tbody>
           </table>
         </div>
+        {!loading && summaries.length > 10 ? <div className="flex items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">Showing {(currentPage - 1) * 10 + 1}–{Math.min(currentPage * 10, summaries.length)} of {summaries.length} records</p><div className="flex items-center gap-2"><button type="button" onClick={() => setPage((value) => Math.max(1, value - 1))} disabled={currentPage === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Previous</button><span className="text-xs text-sub">Page {currentPage} of {totalPages}</span><button type="button" onClick={() => setPage((value) => Math.min(totalPages, value + 1))} disabled={currentPage === totalPages} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Next</button></div></div> : null}
       </div>
     </div>
   )

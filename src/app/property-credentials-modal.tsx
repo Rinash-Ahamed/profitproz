@@ -7,6 +7,7 @@ import type { ClientPlatformCredential } from '@/lib/client-credentials'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import type { PropertyRecord } from '@/lib/firestore'
 import { OTA_PLATFORMS } from '@/lib/onboarding'
+import { ToastMessage } from '@/components/ui/ToastMessage'
 
 export function PropertyCredentialsModal({ property, onClose }: { property: PropertyRecord; onClose: () => void }) {
   const [credentials, setCredentials] = useState<ClientPlatformCredential[]>([])
@@ -123,7 +124,7 @@ export function PropertyCredentialsModal({ property, onClose }: { property: Prop
             </div>
           ) : null}
 
-          {error ? <p className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+          <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
             <button type="button" onClick={addCredential} disabled={loading || credentials.length >= OTA_PLATFORMS.length} className="inline-flex h-10 items-center gap-2 rounded-md border border-zinc-700 px-3 text-sm font-semibold text-sub hover:border-zinc-600 hover:text-ink disabled:opacity-50"><Plus className="h-4 w-4" /> Add platform</button>
             <div className="flex gap-3">

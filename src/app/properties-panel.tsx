@@ -2,7 +2,7 @@
 
 import { FormEvent, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Building2, ChevronDown, ChevronRight, Download, Edit, ExternalLink, FileText, KeyRound, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
+import { Building2, ChevronDown, ChevronRight, Download, Edit, ExternalLink, FileText, Info, KeyRound, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
 import type { PropertyInput, PropertyRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
@@ -10,6 +10,7 @@ import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import { PropertyCredentialsModal } from './property-credentials-modal'
+import { ToastMessage } from '@/components/ui/ToastMessage'
 
 type PropertiesPanelProps = {
   properties: PropertyRecord[]
@@ -46,6 +47,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [expandedPropertyId, setExpandedPropertyId] = useState('')
+  const [page, setPage] = useState(1)
   const visibleProperties = useMemo(() => {
     const query = search.trim().toLowerCase()
     return properties
@@ -58,6 +60,10 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
         return a.name.localeCompare(b.name)
       })
   }, [properties, search])
+  useEffect(() => { setPage(1); setExpandedPropertyId('') }, [search])
+  const totalPages = Math.max(1, Math.ceil(visibleProperties.length / 10))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedProperties = visibleProperties.slice((currentPage - 1) * 10, currentPage * 10)
 
   async function deleteRecord(property: PropertyRecord) {
     if (!window.confirm(`Delete ${property.name}? This permanently removes the property record.`)) return
@@ -78,32 +84,57 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
 
   return (
     <div className="space-y-5">
-      <div className="surface flex flex-wrap items-center justify-between gap-4 rounded-lg p-6">
-        <div>
-          <p className="text-lg font-semibold text-ink">{readOnly ? 'Client Property Directory' : 'Our Clients'}</p>
-          <p className="mt-1 text-sm text-sub">{readOnly ? 'View the hospitality properties served by ProfitPro.' : 'Manage hotels, resorts, stays, and other client properties.'}</p>
+      <div className="surface rounded-lg p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-lg font-semibold text-ink">{readOnly ? 'Client Property Directory' : 'Our Clients'}</p>
+            <p className="mt-1 text-sm text-sub">{readOnly ? 'View the hospitality properties served by ProfitPro.' : 'Manage hotels, resorts, stays, and other client properties.'}</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} className="h-11 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search property name" aria-label="Search revenue management properties" />
+            </label>
+            {!readOnly ? <button type="button" onClick={() => setShowCreate(true)} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white hover:bg-[#73bd66]">
+              <Plus className="h-4 w-4" /> Add property
+            </button> : null}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <a
-            href="https://app-live.axisrooms.com/supplier/home.html"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"
-            aria-label="Open AxisRooms channel manager login"
-          >
-            AxisRooms Login <ExternalLink className="h-4 w-4" />
-          </a>
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} className="h-11 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search property name" aria-label="Search revenue management properties" />
-          </label>
-          {!readOnly ? <button type="button" onClick={() => setShowCreate(true)} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white hover:bg-[#73bd66]">
-            <Plus className="h-4 w-4" /> Add property
-          </button> : null}
+        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-zinc-800 pt-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="https://app-live.axisrooms.com/supplier/home.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"
+              aria-label="Open AxisRooms channel manager login"
+            >
+              AxisRooms Login <ExternalLink className="h-4 w-4" />
+            </a>
+            <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs" aria-label="AxisRooms supplier admin access">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-300" />
+              <div><p className="font-semibold text-blue-200">Supplier Admin access</p><p className="mt-1 text-sub">Username: <span className="font-medium text-ink">support@profitproz.com</span> <span className="mx-1 text-ghost">|</span> Password: <span className="font-medium text-ink">Profit@2026</span></p></div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href="https://web.emsigner.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"
+              aria-label="Open emSigner login"
+            >
+              emSigner Login <ExternalLink className="h-4 w-4" />
+            </a>
+            <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs" aria-label="emSigner admin access">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-300" />
+              <div><p className="font-semibold text-blue-200">emSigner Admin access</p><p className="mt-1 text-sub">Username: <span className="font-medium text-ink">admin@profitproz.com</span> <span className="mx-1 text-ghost">|</span> Password: <span className="font-medium text-ink">ProfitPro@2026</span></p></div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {error ? <p className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+      <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
 
       <div className="surface rounded-lg">
         <div className="overflow-x-auto">
@@ -122,7 +153,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
                 <tr><td colSpan={readOnly ? 4 : 5} className="py-12 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
               ) : visibleProperties.length === 0 ? (
                 <tr><td colSpan={readOnly ? 4 : 5} className="px-6 py-12 text-center"><Building2 className="mx-auto h-8 w-8 text-zinc-600" /><p className="mt-3 font-medium text-ink">{search ? 'No matching properties' : 'No client properties yet'}</p>{!readOnly && !search ? <p className="mt-1 text-sm text-sub">Add your first property to start the client register.</p> : null}</td></tr>
-              ) : visibleProperties.map((property) => {
+              ) : paginatedProperties.map((property) => {
                 const isExpanded = expandedPropertyId === property.id
                 const detailsId = `revenue-property-details-${property.id}`
                 return (
@@ -198,6 +229,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
             </tbody>
           </table>
         </div>
+        {!loading && visibleProperties.length > 10 ? <div className="flex flex-wrap items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">Showing {(currentPage - 1) * 10 + 1}–{Math.min(currentPage * 10, visibleProperties.length)} of {visibleProperties.length} records</p><div className="flex items-center gap-2"><button type="button" onClick={() => { setPage((value) => Math.max(1, value - 1)); setExpandedPropertyId('') }} disabled={currentPage === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Previous</button><span className="text-xs text-sub">Page {currentPage} of {totalPages}</span><button type="button" onClick={() => { setPage((value) => Math.min(totalPages, value + 1)); setExpandedPropertyId('') }} disabled={currentPage === totalPages} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Next</button></div></div> : null}
       </div>
 
       {showCreate ? <PropertyModal title="Add Client Property" initial={emptyProperty} editorOnly={editorOnly} onClose={() => setShowCreate(false)} onSaved={(property) => { onChange([...properties, property].sort((a, b) => a.name.localeCompare(b.name))); setShowCreate(false); if (!editorOnly) setContractProperty(property) }} /> : null}
@@ -311,7 +343,7 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
   }
 
   const inputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
-  return createPortal(<div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Generate revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {sequence ? invoiceNumber : 'Number assigned on download'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Billing period</span><input value={billingPeriod} onChange={(event) => setBillingPeriod(event.target.value)} maxLength={80} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="border-b border-zinc-800 p-5"><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} /></label>{error ? <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}</div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
+  return createPortal(<div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Generate revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {sequence ? invoiceNumber : 'Number assigned on download'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Billing period</span><input value={billingPeriod} onChange={(event) => setBillingPeriod(event.target.value)} maxLength={80} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="border-b border-zinc-800 p-5"><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} /></label><ToastMessage message={error} tone="error" onDismiss={() => setError('')} /></div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
 }
 
 function PropertyModal({ title, initial, propertyId, editorOnly = false, onClose, onSaved }: { title: string; initial: PropertyInput; propertyId?: string; editorOnly?: boolean; onClose: () => void; onSaved: (property: PropertyRecord) => void }) {
@@ -362,7 +394,7 @@ function PropertyModal({ title, initial, propertyId, editorOnly = false, onClose
             <Field label="Address" wide><input value={form.address} onChange={(e) => update('address', e.target.value)} maxLength={500} className={inputClass} /></Field>
             <Field label="Notes" wide><textarea rows={3} value={form.notes} onChange={(e) => update('notes', e.target.value)} maxLength={2000} className={`${inputClass} h-auto resize-y py-3`} placeholder="Contract terms or other client details" /></Field>
           </div>
-          {error ? <p className="mt-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p> : null}
+          <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
           <div className="mt-7 flex justify-end gap-3"><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button><button type="submit" disabled={saving} className="flex h-11 min-w-28 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save property'}</button></div>
         </form>
       </div>
@@ -456,7 +488,7 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
           </div>
         </div>
 
-        {error ? <div className="m-5 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200 sm:m-6">{error}</div> : null}
+        <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
         <div className="max-h-[calc(100vh-9rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">
           {loading ? <div className="flex min-h-96 items-center justify-center gap-3 text-sm text-sub"><Loader2 className="h-5 w-5 animate-spin" /> Generating contract preview…</div> : null}
           {!loading && rendered ? <iframe ref={iframeRef} title={`Contract preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[3441px] w-[842px] max-w-none border-0 bg-transparent" /> : null}

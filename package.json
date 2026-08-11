@@ -5,7 +5,10 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build",
+    "postbuild": "node scripts/app-health-check.mjs",
     "start": "next start",
+    "health-check": "node scripts/app-health-check.mjs",
+    "verify": "npm run type-check && npm run lint -- --quiet && npm run build",
     "lint": "eslint .",
     "type-check": "tsc --noEmit"
   },
