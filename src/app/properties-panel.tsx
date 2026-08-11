@@ -47,6 +47,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [expandedPropertyId, setExpandedPropertyId] = useState('')
+  const [page, setPage] = useState(1)
   const visibleProperties = useMemo(() => {
     const query = search.trim().toLowerCase()
     return properties
@@ -59,6 +60,10 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
         return a.name.localeCompare(b.name)
       })
   }, [properties, search])
+  useEffect(() => { setPage(1); setExpandedPropertyId('') }, [search])
+  const totalPages = Math.max(1, Math.ceil(visibleProperties.length / 10))
+  const currentPage = Math.min(page, totalPages)
+  const paginatedProperties = visibleProperties.slice((currentPage - 1) * 10, currentPage * 10)
 
   async function deleteRecord(property: PropertyRecord) {
     if (!window.confirm(`Delete ${property.name}? This permanently removes the property record.`)) return
@@ -79,12 +84,23 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
 
   return (
     <div className="space-y-5">
-      <div className="surface flex flex-wrap items-center justify-between gap-4 rounded-lg p-6">
-        <div>
-          <p className="text-lg font-semibold text-ink">{readOnly ? 'Client Property Directory' : 'Our Clients'}</p>
-          <p className="mt-1 text-sm text-sub">{readOnly ? 'View the hospitality properties served by ProfitPro.' : 'Manage hotels, resorts, stays, and other client properties.'}</p>
+      <div className="surface rounded-lg p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-lg font-semibold text-ink">{readOnly ? 'Client Property Directory' : 'Our Clients'}</p>
+            <p className="mt-1 text-sm text-sub">{readOnly ? 'View the hospitality properties served by ProfitPro.' : 'Manage hotels, resorts, stays, and other client properties.'}</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" />
+              <input value={search} onChange={(event) => setSearch(event.target.value)} className="h-11 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search property name" aria-label="Search revenue management properties" />
+            </label>
+            {!readOnly ? <button type="button" onClick={() => setShowCreate(true)} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white hover:bg-[#73bd66]">
+              <Plus className="h-4 w-4" /> Add property
+            </button> : null}
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-zinc-800 pt-5">
           <div className="flex flex-wrap items-center gap-2">
             <a
               href="https://app-live.axisrooms.com/supplier/home.html"
@@ -115,13 +131,6 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
               <div><p className="font-semibold text-blue-200">emSigner Admin access</p><p className="mt-1 text-sub">Username: <span className="font-medium text-ink">admin@profitproz.com</span> <span className="mx-1 text-ghost">|</span> Password: <span className="font-medium text-ink">ProfitPro@2026</span></p></div>
             </div>
           </div>
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} className="h-11 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search property name" aria-label="Search revenue management properties" />
-          </label>
-          {!readOnly ? <button type="button" onClick={() => setShowCreate(true)} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white hover:bg-[#73bd66]">
-            <Plus className="h-4 w-4" /> Add property
-          </button> : null}
         </div>
       </div>
 
@@ -144,7 +153,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
                 <tr><td colSpan={readOnly ? 4 : 5} className="py-12 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
               ) : visibleProperties.length === 0 ? (
                 <tr><td colSpan={readOnly ? 4 : 5} className="px-6 py-12 text-center"><Building2 className="mx-auto h-8 w-8 text-zinc-600" /><p className="mt-3 font-medium text-ink">{search ? 'No matching properties' : 'No client properties yet'}</p>{!readOnly && !search ? <p className="mt-1 text-sm text-sub">Add your first property to start the client register.</p> : null}</td></tr>
-              ) : visibleProperties.map((property) => {
+              ) : paginatedProperties.map((property) => {
                 const isExpanded = expandedPropertyId === property.id
                 const detailsId = `revenue-property-details-${property.id}`
                 return (
@@ -220,6 +229,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
             </tbody>
           </table>
         </div>
+        {!loading && visibleProperties.length > 10 ? <div className="flex flex-wrap items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">Showing {(currentPage - 1) * 10 + 1}–{Math.min(currentPage * 10, visibleProperties.length)} of {visibleProperties.length} records</p><div className="flex items-center gap-2"><button type="button" onClick={() => { setPage((value) => Math.max(1, value - 1)); setExpandedPropertyId('') }} disabled={currentPage === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Previous</button><span className="text-xs text-sub">Page {currentPage} of {totalPages}</span><button type="button" onClick={() => { setPage((value) => Math.min(totalPages, value + 1)); setExpandedPropertyId('') }} disabled={currentPage === totalPages} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Next</button></div></div> : null}
       </div>
 
       {showCreate ? <PropertyModal title="Add Client Property" initial={emptyProperty} editorOnly={editorOnly} onClose={() => setShowCreate(false)} onSaved={(property) => { onChange([...properties, property].sort((a, b) => a.name.localeCompare(b.name))); setShowCreate(false); if (!editorOnly) setContractProperty(property) }} /> : null}

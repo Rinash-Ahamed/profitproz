@@ -174,15 +174,19 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
         <p><span className="font-semibold">Task history:</span> Only the latest 3 months of task records are available. Older records are automatically deleted from Firestore.</p>
       </div>
       <div className="surface rounded-lg">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6">
-          <div><p className="text-lg font-semibold text-ink">Daily Employee Summary</p><p className="mt-1 text-sm text-sub">Compact daily totals with expandable work details.</p></div>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="relative block"><span className="sr-only">Search employee</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} className="h-10 w-56 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employee" /></label>
+        <div className="border-b border-zinc-800 p-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div><p className="text-lg font-semibold text-ink">Daily Employee Summary</p><p className="mt-1 text-sm text-sub">Compact daily totals with expandable work details.</p></div>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <label className="relative block"><span className="sr-only">Search employee</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} className="h-10 w-56 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employee" /></label>
+              <button type="button" onClick={exportWorkingDays} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap items-end justify-end gap-2 border-t border-zinc-800 pt-4">
             <label className="block w-44"><span className="sr-only">Filter by work date</span><DatePickerInput value={dateFilter} onChange={setDateFilter} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as TaskStatusFilter)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="all">All statuses</option><option value="working">Working</option><option value="completed">Completed</option><option value="not-started">Not started</option></select>
             <select value={durationSort} onChange={(event) => setDurationSort(event.target.value as TaskDurationSort)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="recent">Newest first</option><option value="highest">Highest hours</option><option value="lowest">Lowest hours</option></select>
             {hasFilters ? <button type="button" onClick={() => { setEmployeeSearch(''); setDateFilter(''); setStatusFilter('all'); setDurationSort('recent') }} className="h-10 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub hover:text-ink">Clear filters</button> : null}
-            <button type="button" onClick={exportWorkingDays} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export working days</button>
           </div>
         </div>
         <div className="overflow-x-auto">

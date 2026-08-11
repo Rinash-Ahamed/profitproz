@@ -178,8 +178,6 @@ export function PayrollPanel() {
         </div>
 
         {records.length ? <div className="grid gap-px border-b border-zinc-800 bg-zinc-800 sm:grid-cols-3"><PayrollSummary label="Gross payroll" value={money(grossTotal)} /><PayrollSummary label="LOP deductions" value={money(deductionTotal)} /><PayrollSummary label="Net payroll" value={money(netTotal)} /></div> : null}
-        {records.length ? <p className="border-b border-zinc-800 px-6 py-3 text-xs text-sub">Attendance and leave assessed through {records[0].calculationThroughDate.split('-').reverse().join('-')}. Review every missing-attendance date and choose Proceed to LOP or Ignore before confirming payroll.</p> : null}
-
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1650px] text-sm">
             <thead className="border-b border-zinc-700 text-left"><tr><PayrollHeading>Employee</PayrollHeading><PayrollHeading>Working Days</PayrollHeading><PayrollHeading>Days Present</PayrollHeading><PayrollHeading>CL Available</PayrollHeading><PayrollHeading>CL Used</PayrollHeading><PayrollHeading>CL Balance</PayrollHeading><PayrollHeading>Missing Attendance</PayrollHeading><PayrollHeading>LOP Days</PayrollHeading><PayrollHeading>Payable Days</PayrollHeading><PayrollHeading>Gross Salary</PayrollHeading><PayrollHeading>LOP Deduction</PayrollHeading><PayrollHeading>Net Salary</PayrollHeading><PayrollHeading>Status</PayrollHeading><PayrollHeading>Action</PayrollHeading></tr></thead>
