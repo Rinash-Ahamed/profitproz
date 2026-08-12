@@ -30,13 +30,6 @@ export function formatDateOnlyDisplay(value: string) {
   return parseDateOnly(value) ? value.split('-').reverse().join('-') : ''
 }
 
-export function countDateOnlyDaysInclusive(startValue: string, endValue: string) {
-  const start = parseDateOnly(startValue)
-  const end = parseDateOnly(endValue)
-  if (!start || !end || end < start) return 0
-  return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1
-}
-
 export function countNonSundayDaysInclusive(startValue: string, endValue: string) {
   const start = parseDateOnly(startValue)
   const end = parseDateOnly(endValue)
