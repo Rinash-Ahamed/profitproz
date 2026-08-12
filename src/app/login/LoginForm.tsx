@@ -83,7 +83,7 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
           </div>
         </div>
 
-        <div className="flex min-h-screen items-center justify-center bg-zinc-1000 px-6 py-10 sm:px-10">
+        <div className="pwa-safe-screen flex min-h-screen items-center justify-center bg-zinc-1000">
           <div className="w-full max-w-md">
             <div className="mb-10 flex items-center justify-between gap-4 lg:hidden">
               <div className="inline-flex items-center">
