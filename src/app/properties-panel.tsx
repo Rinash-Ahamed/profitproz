@@ -101,34 +101,34 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
           </div>
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-zinc-800 pt-5">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <a
               href="https://app-live.axisrooms.com/supplier/home.html"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"
+              className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20 sm:justify-start"
               aria-label="Open AxisRooms channel manager login"
             >
               AxisRooms Login <ExternalLink className="h-4 w-4" />
             </a>
-            <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs" aria-label="AxisRooms supplier admin access">
+            <div className="flex min-w-0 items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs" aria-label="AxisRooms supplier admin access">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-300" />
-              <div><p className="font-semibold text-blue-200">Supplier Admin access</p><p className="mt-1 text-sub">Username: <span className="font-medium text-ink">support@profitproz.com</span> <span className="mx-1 text-ghost">|</span> Password: <span className="font-medium text-ink">Profit@2026</span></p></div>
+              <div className="min-w-0"><p className="font-semibold text-blue-200">Supplier Admin access</p><p className="mt-1 break-all text-sub">Username: <span className="font-medium text-ink">support@profitproz.com</span> <span className="mx-1 text-ghost">|</span> Password: <span className="font-medium text-ink">Profit@2026</span></p></div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full min-w-0 flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <a
               href="https://web.emsigner.com/"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20"
+              className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/20 sm:justify-start"
               aria-label="Open emSigner login"
             >
               emSigner Login <ExternalLink className="h-4 w-4" />
             </a>
-            <div className="flex items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs" aria-label="emSigner admin access">
+            <div className="flex min-w-0 items-start gap-2 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2 text-xs" aria-label="emSigner admin access">
               <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-300" />
-              <div><p className="font-semibold text-blue-200">emSigner Admin access</p><p className="mt-1 text-sub">Username: <span className="font-medium text-ink">admin@profitproz.com</span> <span className="mx-1 text-ghost">|</span> Password: <span className="font-medium text-ink">ProfitPro@2026</span></p></div>
+              <div className="min-w-0"><p className="font-semibold text-blue-200">emSigner Admin access</p><p className="mt-1 break-all text-sub">Username: <span className="font-medium text-ink">admin@profitproz.com</span> <span className="mx-1 text-ghost">|</span> Password: <span className="font-medium text-ink">ProfitPro@2026</span></p></div>
             </div>
           </div>
         </div>
@@ -343,7 +343,7 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
   }
 
   const inputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
-  return createPortal(<div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Generate revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {sequence ? invoiceNumber : 'Number assigned on download'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Billing period</span><input value={billingPeriod} onChange={(event) => setBillingPeriod(event.target.value)} maxLength={80} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="border-b border-zinc-800 p-5"><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} /></label><ToastMessage message={error} tone="error" onDismiss={() => setError('')} /></div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
+  return createPortal(<div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Generate revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {sequence ? invoiceNumber : 'Number assigned on download'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Billing period</span><input value={billingPeriod} onChange={(event) => setBillingPeriod(event.target.value)} maxLength={80} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="border-b border-zinc-800 p-5"><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} /></label><ToastMessage message={error} tone="error" onDismiss={() => setError('')} /></div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
 }
 
 function PropertyModal({ title, initial, propertyId, editorOnly = false, onClose, onSaved }: { title: string; initial: PropertyInput; propertyId?: string; editorOnly?: boolean; onClose: () => void; onSaved: (property: PropertyRecord) => void }) {
@@ -374,7 +374,7 @@ function PropertyModal({ title, initial, propertyId, editorOnly = false, onClose
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm">
+    <div className="pwa-safe-modal fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm">
       <div className="surface w-full max-w-3xl rounded-xl p-6 shadow-2xl sm:p-7">
         <div className="mb-6"><p className="text-lg font-semibold text-ink">{title}</p><p className="mt-1 text-sm text-sub">Store the client and commercial agreement details.</p></div>
         <form onSubmit={submit}>
@@ -472,7 +472,7 @@ function ContractPreviewModal({ property, onClose }: { property: PropertyRecord;
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[110] flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm sm:px-6" onClick={onClose}>
+    <div className="pwa-safe-modal fixed inset-0 z-[110] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm" onClick={onClose}>
       <div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl" onClick={(event) => event.stopPropagation()}>
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-700 px-5 py-4 sm:px-6">
           <div>

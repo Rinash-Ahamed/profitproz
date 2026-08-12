@@ -80,7 +80,7 @@ export function PropertyCredentialsModal({ property, onClose }: { property: Prop
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 px-4 py-6 backdrop-blur-sm">
+    <div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm">
       <div className="surface w-full max-w-4xl rounded-xl shadow-2xl">
         <div className="flex items-start justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6">
           <div>

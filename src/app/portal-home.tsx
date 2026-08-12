@@ -69,6 +69,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [onboardingList, setOnboardingList] = useState<OnboardingRecord[]>([])
   // Daily task and work-session state
   const [workSessionList, setWorkSessionList] = useState<WorkSessionRecord[]>([])
+  const [adminTaskRefreshToken, setAdminTaskRefreshToken] = useState(0)
   const [correctingWorkSession, setCorrectingWorkSession] = useState<WorkSessionRecord | null>(null)
   const [workNotes, setWorkNotes] = useState('')
   const [workActionLoading, setWorkActionLoading] = useState(false)
@@ -256,25 +257,20 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }
 
     if (activeTab === 'tasks') {
-      setLoading(true)
-      Promise.all([
-        tabFetch('/api/admin/tasks'),
-        staffListLoadedRef.current ? Promise.resolve(null) : tabFetch('/api/admin/staff'),
-      ])
-        .then(async ([taskRes, staffRes]) => {
-          const taskData = await taskRes.json()
-          if (controller.signal.aborted) return
-          if (taskData.workSessions) setWorkSessionList(taskData.workSessions)
-          if (staffRes) {
-            const staffData = await staffRes.json()
-            if (staffData.staff) {
-              setStaffList(staffData.staff)
+      if (!staffListLoadedRef.current) {
+        setLoading(true)
+        tabFetch('/api/admin/staff')
+          .then((response) => response.json())
+          .then((data) => {
+            if (controller.signal.aborted) return
+            if (data.staff) {
+              setStaffList(data.staff)
               staffListLoadedRef.current = true
             }
-          }
-        })
-        .catch(reportError('Could not load employee task logs.'))
-        .finally(finishLoading)
+          })
+          .catch(reportError('Could not load employee list.'))
+          .finally(finishLoading)
+      }
     }
 
     if (activeTab === 'expenses') {
@@ -931,7 +927,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     .slice(0, 5)
 
   return (
-    <main className={`portal-app ${user.role === 'admin' ? 'admin-workspace' : ''} relative flex min-h-screen flex-col overflow-hidden bg-[#0a0b0c] px-6 py-8 text-ink sm:px-10`}>
+    <main className={`portal-app pwa-safe-screen ${user.role === 'admin' ? 'admin-workspace' : ''} relative flex min-h-screen flex-col overflow-hidden bg-[#0a0b0c] text-ink`}>
       <ToastMessage message={error || message} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setMessage('') }} />
       <video className="portal-video" autoPlay loop muted playsInline preload="metadata" aria-hidden="true">
         <source src="/portal/background.mp4" type="video/mp4" />
@@ -1080,7 +1076,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
             <span className="h-1.5 w-1.5 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-ink/80">{user.role} portal</span>
           </div>
-          <h1 className={`${user.role === 'admin' ? 'max-w-none whitespace-nowrap text-xl sm:text-4xl lg:text-6xl' : 'max-w-3xl text-4xl sm:text-6xl'} font-bold leading-tight tracking-tight text-ink`}>
+          <h1 className={`${user.role === 'admin' ? 'max-w-none text-2xl sm:text-4xl lg:whitespace-nowrap lg:text-6xl' : 'max-w-3xl text-4xl sm:text-6xl'} break-words font-bold leading-tight tracking-tight text-ink`}>
             {user.role === 'admin' ? <>Admin Workspace <span className="text-[#66B159]">· {ADMIN_TAB_LABELS[activeTab] || 'Dashboard'}</span></> : title.endsWith(' Workspace') ? <>{title.slice(0, -10)}{' '}<span className="text-[#66B159]"> Workspace</span></> : title}
           </h1>
           {description ? <p className="mt-5 max-w-2xl text-base leading-7 text-sub">{description}</p> : null}
@@ -1413,8 +1409,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       )}
                     </div>
                   ),
-                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} />,
-                  tasks: <AdminTasksPanel staff={staffList} sessions={workSessionList} loading={loading} now={workClock} onCorrect={setCorrectingWorkSession} onError={setError} />,
+                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} showServiceCounts />,
+                  tasks: <AdminTasksPanel staff={staffList} sessions={workSessionList} loading={loading} now={workClock} serverPagination refreshToken={adminTaskRefreshToken} onCorrect={setCorrectingWorkSession} onError={setError} />,
                   finance: <FinancePanel />,
                   expenses: (
                     <div className="space-y-6">
@@ -1896,6 +1892,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           onClose={() => setCorrectingWorkSession(null)}
           onSaved={(updatedSession) => {
             setWorkSessionList((current) => current.map((session) => session.id === updatedSession.id ? updatedSession : session))
+            setAdminTaskRefreshToken((current) => current + 1)
             setCorrectingWorkSession(null)
             setMessage('Work-session time corrected and added to the audit log.')
           }}
@@ -2022,7 +2019,7 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
 
   const inputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
   return (
-    <div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm sm:px-6">
+    <div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm">
       <div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6">
           <div><p className="text-lg font-semibold text-ink">Generate offer letter</p><p className="mt-1 text-sm text-sub">{staff.name} · {staff.role} · {staff.department}</p></div>
@@ -2116,8 +2113,8 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={onClose}>
-      <div className="surface w-full max-w-lg rounded-xl p-7 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div className="pwa-safe-modal fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <div className="surface my-auto w-full max-w-lg rounded-xl p-5 shadow-2xl sm:p-7" onClick={(e) => e.stopPropagation()}>
         <form onSubmit={handleSubmit}>
           <div className="mb-6">
             <p className="text-lg font-semibold text-ink">Edit Employee</p>
@@ -2225,7 +2222,7 @@ function WorkSessionCorrectionModal({ session, employeeName, onClose, onSaved }:
 
   const modalInputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+    <div className="pwa-safe-modal fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 sm:items-center">
       <form onSubmit={submit} className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-950 p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -2301,7 +2298,7 @@ function ExpenseCorrectionModal({ expense, onClose, onSaved }: {
 
   const modalInputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4">
+    <div className="pwa-safe-modal fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 sm:items-center">
       <form onSubmit={submit} className="my-auto w-full max-w-2xl rounded-xl border border-zinc-700 bg-zinc-950 p-6 shadow-2xl">
         <div className="flex items-start justify-between gap-4">
           <div>

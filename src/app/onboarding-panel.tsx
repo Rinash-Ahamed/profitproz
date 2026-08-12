@@ -322,7 +322,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
   const inputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
 
   return createPortal(
-    <div className="fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 px-3 py-5 backdrop-blur-sm sm:px-6">
+    <div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm">
       <div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6">
           <div>
@@ -464,7 +464,7 @@ function OnboardingDetailsModal({ initial, onClose, onSaved }: { initial?: Onboa
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 px-4 py-6 backdrop-blur-sm">
+    <div className="pwa-safe-modal fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm">
       <div className="surface w-full max-w-3xl rounded-xl p-6 shadow-2xl sm:p-7">
         <div className="mb-6">
           <p className="text-lg font-semibold text-ink">{initial ? 'Edit' : 'Add'} onboarding property</p>

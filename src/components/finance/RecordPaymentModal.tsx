@@ -35,7 +35,7 @@ export function RecordPaymentModal({ invoice, onClose, onRecorded }: { invoice: 
   }
 
   return createPortal(
-    <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/75 px-4 py-6 backdrop-blur-sm">
+    <div className="pwa-safe-modal fixed inset-0 z-[140] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm sm:items-center">
       <form onSubmit={submit} className="surface w-full max-w-xl rounded-xl p-6 shadow-2xl sm:p-7">
         <div><p className="text-lg font-semibold text-ink">Record payment</p><p className="mt-1 text-sm text-sub">{invoice.invoiceNumber} · {invoice.propertyName}</p></div>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
