@@ -1396,6 +1396,22 @@ export async function listWorkSessionsPage(page: PaginationRequest, staffEmail?:
   return paginateQuery(query, mapDocToWorkSession, page)
 }
 
+export async function listRecentWorkSessionsPage(page: number, limit: number) {
+  const db = ensureDb()
+  pruneOldWorkSessions().catch((error) => console.error('Failed to prune old work sessions:', error))
+  const cutoffDate = addUtcMonths(new Date(), -WORK_SESSION_RETENTION_MONTHS).toISOString().slice(0, 10)
+  const retained = db.collection(COLLECTIONS.WORK_SESSIONS).where('workDate', '>=', cutoffDate)
+  const offset = Math.max(0, (page - 1) * limit)
+  const [snapshot, countSnapshot] = await Promise.all([
+    retained.orderBy('workDate', 'desc').offset(offset).limit(limit).get(),
+    retained.count().get(),
+  ])
+  return {
+    items: snapshot.docs.map(mapDocToWorkSession),
+    total: countSnapshot.data().count,
+  }
+}
+
 function addUtcMonths(date: Date, months: number) {
   const result = new Date(date)
   const originalDay = result.getUTCDate()
@@ -1458,7 +1474,6 @@ export async function startWorkSession(staffEmail: string, workDate: string): Pr
       durationMinutes: 0,
       notes: '',
       status: 'active',
-      expiresAt: Timestamp.fromDate(addUtcMonths(now.toDate(), WORK_SESSION_RETENTION_MONTHS)),
       createdAt: now,
       updatedAt: now,
     })

@@ -30,7 +30,7 @@
     {
       "collectionGroup": "work_sessions",
       "fieldPath": "expiresAt",
-      "ttl": true,
+      "ttl": false,
       "indexes": []
     }
   ]
