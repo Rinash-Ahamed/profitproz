@@ -99,3 +99,14 @@ export function filterAdminTaskExport(sessions: WorkSessionRecord[], staff: Publ
     .filter((session) => !dateFilter || session.workDate === dateFilter)
     .filter((session) => !query || (staffNameByEmail.get(session.staffEmail) || '').toLowerCase().includes(query) || session.staffEmail.toLowerCase().includes(query))
 }
+
+export function buildAdminTodayTaskSummary(sessions: WorkSessionRecord[], staff: PublicStaffRecord[]) {
+  const today = todayInTimeZone('Asia/Kolkata')
+  const todaySessions = sessions.filter((session) => session.workDate === today)
+  const employeesWithSessions = new Set(todaySessions.map((session) => session.staffEmail))
+  return {
+    working: todaySessions.filter((session) => session.status === 'active').length,
+    completed: todaySessions.filter((session) => session.status === 'completed').length,
+    notStarted: staff.filter((employee) => employee.active && !employeesWithSessions.has(employee.email)).length,
+  }
+}

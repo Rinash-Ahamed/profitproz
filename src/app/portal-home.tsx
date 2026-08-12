@@ -24,6 +24,7 @@ const ClientServicesPanel = dynamic(() => import('@/app/client-services-panel').
 const FinancePanel = dynamic(() => import('@/app/finance-panel').then((module) => module.FinancePanel))
 const AdminTasksPanel = dynamic(() => import('@/app/admin-tasks-panel').then((module) => module.AdminTasksPanel))
 const PayrollPanel = dynamic(() => import('@/app/payroll-panel').then((module) => module.PayrollPanel))
+const AuditPanel = dynamic(() => import('@/app/audit-panel').then((module) => module.AuditPanel))
 
 type PortalHomeProps = {
   user: SessionUser
@@ -41,6 +42,7 @@ const ADMIN_TAB_LABELS: Record<string, string> = {
   leaves: 'Leaves',
   payroll: 'Payroll',
   finance: 'Finance',
+  audit: 'Audit',
   settings: 'Settings',
 }
 
@@ -941,7 +943,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         </div>
 
         {user.role === 'admin' && (
-          <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm xl:flex">
+          <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm 2xl:flex">
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -1006,6 +1008,15 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                 }`}
               >
                 Finance
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('audit')}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                  activeTab === 'audit' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
+                }`}
+              >
+                Audit
               </button>
               <button
                 type="button"
@@ -1083,7 +1094,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
           {/* Mobile nav tabs */}
           {user.role === 'admin' && (
-            <div className="mt-10 overflow-x-auto border-b border-zinc-800 xl:hidden">
+            <div className="mt-10 overflow-x-auto border-b border-zinc-800 2xl:hidden">
               <div className="-mb-px flex items-center gap-4">
                 <button
                   type="button"
@@ -1149,6 +1160,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   Payroll
                 </button>
                 <button type="button" onClick={() => setActiveTab('finance')} className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${activeTab === 'finance' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'}`}>Finance</button>
+                <button type="button" onClick={() => setActiveTab('audit')} className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${activeTab === 'audit' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'}`}>Audit</button>
                 <button
                   type="button"
                   onClick={() => setActiveTab('settings')}
@@ -1516,6 +1528,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   ),
                   payroll: (
                     <PayrollPanel />
+                  ),
+                  audit: (
+                    <AuditPanel />
                   ),
                   settings: (
                     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
