@@ -65,6 +65,7 @@ export type PayrollCalculationInput = {
   monthlySalary: number
   openingCasualLeaveBalance?: number
   calculationThroughDate?: string
+  missingAttendanceThroughDate?: string
   completedWorkDates: Iterable<string>
   approvedLeaves: Array<{ id: string; startDate: string; endDate: string }>
   missingAttendanceDecisions?: Record<string, MissingAttendanceDecision>
@@ -157,6 +158,10 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
     ? input.calculationThroughDate
     : calendarDates.at(-1)!
   const assessedWorkingDates = workingDates.filter((date) => date <= calculationThroughDate)
+  const missingAttendanceThroughDate = input.missingAttendanceThroughDate && input.missingAttendanceThroughDate < calculationThroughDate
+    ? input.missingAttendanceThroughDate
+    : calculationThroughDate
+  const assessedMissingAttendanceDates = assessedWorkingDates.filter((date) => date <= missingAttendanceThroughDate)
   const workingDateSet = new Set(workingDates)
   const attendanceDates = [...new Set(input.completedWorkDates)]
     .filter((date) => workingDateSet.has(date))
@@ -178,7 +183,7 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
   const casualLeaveUsed = Math.min(casualLeaveAvailable, approvedLeaveDates.length)
   const closingCasualLeaveBalance = casualLeaveAvailable - casualLeaveUsed
   const approvedLeaveDatesSet = new Set(approvedLeaveDates)
-  const missingAttendanceDates = assessedWorkingDates
+  const missingAttendanceDates = assessedMissingAttendanceDates
     .filter((date) => !attendanceDateSet.has(date) && !approvedLeaveDatesSet.has(date))
   const missingDateSet = new Set(missingAttendanceDates)
   const missingAttendanceDecisions = Object.fromEntries(

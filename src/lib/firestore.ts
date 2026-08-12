@@ -1684,11 +1684,15 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
     const monthlySalary = salary?.baseSalary ?? (employee.annualCtc || 0) / 12
     const openingCasualLeaveBalance = latestPriorPayrollByStaff.get(employee.id)?.closingCasualLeaveBalance || 0
     const calculationThroughDate = month === currentPayrollMonth() ? todayInTimeZone('Asia/Kolkata') : payrollMonthEndDate(month)
+    const missingAttendanceThroughDate = month === currentPayrollMonth()
+      ? new Date(Date.parse(`${calculationThroughDate}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+      : calculationThroughDate
     const calculation = calculatePayroll({
       month,
       monthlySalary,
       openingCasualLeaveBalance,
       calculationThroughDate,
+      missingAttendanceThroughDate,
       completedWorkDates: workSessions
         .filter((session) => session.staffEmail === employee.email && session.status === 'completed')
         .map((session) => session.workDate),

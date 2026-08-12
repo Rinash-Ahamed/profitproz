@@ -1409,7 +1409,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       )}
                     </div>
                   ),
-                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} />,
+                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} showServiceCounts />,
                   tasks: <AdminTasksPanel staff={staffList} sessions={workSessionList} loading={loading} now={workClock} serverPagination refreshToken={adminTaskRefreshToken} onCorrect={setCorrectingWorkSession} onError={setError} />,
                   finance: <FinancePanel />,
                   expenses: (
