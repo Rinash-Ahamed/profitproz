@@ -154,11 +154,14 @@ const COLLECTIONS = {
 } as const
 
 const AUDIT_LOG_RETENTION_DAYS = 120
+const AUDIT_LOG_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000
 const WORK_SESSION_RETENTION_MONTHS = 3
 const WORK_SESSION_PRUNE_INTERVAL_MS = 6 * 60 * 60 * 1000
 
 let lastWorkSessionPruneAt = 0
 let workSessionPrunePromise: Promise<number> | null = null
+let lastAuditLogPruneAt = 0
+let auditLogPrunePromise: Promise<number> | null = null
 
 function createDocumentId() {
   return crypto.randomUUID()
@@ -1305,7 +1308,7 @@ export async function correctExpense(
     })
   })
 
-  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  requestAuditLogPrune()
   return mapDocToExpense(await expenseRef.get())
 }
 
@@ -1549,7 +1552,7 @@ export async function correctWorkSessionTimes(
   })
 
   if (!previous) throw new Error('WORK_SESSION_NOT_FOUND')
-  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  requestAuditLogPrune()
   return { previous, session: mapDocToWorkSession(await docRef.get()) }
 }
 
@@ -1758,7 +1761,7 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
     })
   }))
 
-  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  requestAuditLogPrune()
   return listPayrollRecords(month)
 }
 
@@ -1804,7 +1807,7 @@ export async function decideMissingAttendance(id: string, date: string, decision
     })
   })
 
-  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  requestAuditLogPrune()
   return mapDocToPayroll(await docRef.get())
 }
 
@@ -1849,7 +1852,7 @@ export async function transitionPayrollStatus(id: string, requestedStatus: Payro
     })
   })
 
-  pruneOldAuditLogs().catch((error) => console.error('Failed to prune old audit logs:', error))
+  requestAuditLogPrune()
   return mapDocToPayroll(await docRef.get())
 }
 
@@ -1905,6 +1908,59 @@ export async function clearAuditLogs() {
   return deleted
 }
 
+function mapDocToAuditLog(doc: DocumentSnapshot): AuditLogRecord {
+  const data = doc.data() || {}
+  return {
+    id: doc.id,
+    timestamp: mapTimestamp(data.timestamp) || '',
+    actorEmail: typeof data.actorEmail === 'string' ? data.actorEmail : '',
+    action: typeof data.action === 'string' ? data.action : '',
+    targetId: typeof data.targetId === 'string' ? data.targetId : '',
+    details: typeof data.details === 'string' ? data.details : '',
+    changes: data.changes && typeof data.changes === 'object' ? data.changes : undefined,
+  }
+}
+
+export async function listAuditLogsPage(input: { cursor?: string; limit?: number }): Promise<PageResult<AuditLogRecord>> {
+  if (!db) return { items: [], nextCursor: null }
+
+  const limit = Math.min(25, Math.max(1, Math.trunc(input.limit || 10)))
+  let query = db.collection(COLLECTIONS.AUDIT_LOG)
+    .orderBy('timestamp', 'desc')
+    .orderBy(FieldPath.documentId(), 'desc')
+
+  if (input.cursor) {
+    const match = /^(\d{1,16})_(.+)$/.exec(input.cursor)
+    if (!match) throw new Error('INVALID_AUDIT_CURSOR')
+    query = query.startAfter(Timestamp.fromMillis(Number(match[1])), match[2])
+  }
+
+  const snapshot = await query.limit(limit + 1).get()
+  const hasMore = snapshot.docs.length > limit
+  const documents = hasMore ? snapshot.docs.slice(0, limit) : snapshot.docs
+  const lastDocument = documents.at(-1)
+  const lastTimestamp = lastDocument?.data()?.timestamp
+  const nextCursor = hasMore && lastDocument && lastTimestamp instanceof Timestamp
+    ? `${lastTimestamp.toMillis()}_${lastDocument.id}`
+    : null
+
+  return { items: documents.map(mapDocToAuditLog), nextCursor }
+}
+
+function requestAuditLogPrune() {
+  const now = Date.now()
+  if (auditLogPrunePromise || now - lastAuditLogPruneAt < AUDIT_LOG_PRUNE_INTERVAL_MS) return
+  lastAuditLogPruneAt = now
+  auditLogPrunePromise = pruneOldAuditLogs()
+    .catch((error) => {
+      console.error('Failed to prune old audit logs:', error)
+      return 0
+    })
+    .finally(() => {
+      auditLogPrunePromise = null
+    })
+}
+
 export async function logAdminAction(input: {
   actorEmail: string
   action: string
@@ -1934,9 +1990,7 @@ export async function logAdminAction(input: {
 
   try {
     await docRef.set(logData)
-    pruneOldAuditLogs().catch((error) => {
-      console.error('Failed to prune old audit logs:', error)
-    })
+    requestAuditLogPrune()
   } catch (error) {
     // Log an error but don't throw, as the primary action succeeded.
     console.error('Failed to write to audit log:', error)
