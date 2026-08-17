@@ -11,6 +11,7 @@ import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import { PropertyCredentialsModal } from './property-credentials-modal'
 import { ToastMessage } from '@/components/ui/ToastMessage'
+import { useAppDialog } from '@/components/ui/AppDialogProvider'
 
 type PropertiesPanelProps = {
   properties: PropertyRecord[]
@@ -38,6 +39,7 @@ const emptyProperty: PropertyInput = {
 }
 
 export function PropertiesPanel({ properties, loading, onChange, readOnly = false, editorOnly = false }: PropertiesPanelProps) {
+  const { confirmAction } = useAppDialog()
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<PropertyRecord | null>(null)
   const [contractProperty, setContractProperty] = useState<PropertyRecord | null>(null)
@@ -66,7 +68,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
   const paginatedProperties = visibleProperties.slice((currentPage - 1) * 10, currentPage * 10)
 
   async function deleteRecord(property: PropertyRecord) {
-    if (!window.confirm(`Delete ${property.name}? This permanently removes the property record.`)) return
+    if (!await confirmAction({ title: 'Delete property?', message: `Delete ${property.name}? This permanently removes the property record.`, confirmLabel: 'Delete property', tone: 'danger' })) return
     setDeletingId(property.id)
     setError('')
     try {
