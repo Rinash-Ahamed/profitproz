@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
 import { Instrument_Serif, Inter } from 'next/font/google'
 import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration'
+import { AppDialogProvider } from '@/components/ui/AppDialogProvider'
 import './globals.css'
 
 const inter = Inter({
@@ -64,7 +65,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body className="bg-zinc-1000 text-ink font-sans antialiased overflow-x-hidden">
-        {children}
+        <AppDialogProvider>{children}</AppDialogProvider>
         <ServiceWorkerRegistration />
         <Analytics />
       </body>

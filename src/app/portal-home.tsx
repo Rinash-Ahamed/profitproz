@@ -11,6 +11,7 @@ import type { OnboardingRecord } from '@/lib/onboarding'
 import { getVersionLabel, type AppVersion } from '@/lib/version'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { ToastMessage } from '@/components/ui/ToastMessage'
+import { useAppDialog } from '@/components/ui/AppDialogProvider'
 import { LeaveDateSummary } from '@/components/ui/LeaveDateSummary'
 import { countNonSundayDaysInclusive, formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
@@ -47,6 +48,7 @@ const ADMIN_TAB_LABELS: Record<string, string> = {
 }
 
 export function PortalHome({ user, version, title, description }: PortalHomeProps) {
+  const { confirmAction, promptAction } = useAppDialog()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [staffSubTab, setStaffSubTab] = useState('all')
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -416,7 +418,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
       setStaffOnboardingAccess(false)
       setMessage('Employee added successfully.')
       if (data.initialPassword) {
-        window.prompt('Copy this one-time temporary password and share it through a secure channel:', data.initialPassword)
+        await promptAction({ title: 'Employee created', message: 'Copy this one-time temporary password and share it through a secure channel.', label: 'Temporary password', initialValue: data.initialPassword, readOnly: true, copyable: true, confirmLabel: 'Done', cancelLabel: null })
       }
       // Refresh staff list with the new record from the API response
       setStaffList((prev) => [...prev, data.staff].sort((a, b) => (a.name || '').localeCompare(b.name || '')))
@@ -430,7 +432,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function handleDeleteStaff(staffId: string, staffName: string, staffEmail: string) {
-    if (!window.confirm(`Delete ${staffName} and all of their tasks, leave requests, and salary records? Expense and receipt history will be preserved. This action cannot be undone.`)) {
+    if (!await confirmAction({ title: 'Delete employee records?', message: `Delete ${staffName} and all of their tasks, leave requests, and salary records? Expense and receipt history will be preserved. This action cannot be undone.`, confirmLabel: 'Delete employee', tone: 'danger' })) {
       return
     }
 
@@ -467,7 +469,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function handleResetPassword(staffId: string, staffName: string) {
-    if (!window.confirm(`Reset the password for ${staffName}? A new one-time temporary password will be generated and all existing sessions will be revoked.`)) {
+    if (!await confirmAction({ title: 'Reset employee password?', message: `Reset the password for ${staffName}? A new one-time temporary password will be generated and all existing sessions will be revoked.`, confirmLabel: 'Reset password', tone: 'warning' })) {
       return
     }
 
@@ -488,7 +490,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
       setMessage(`Password for ${staffName} has been reset and existing sessions were revoked.`)
       if (typeof data.initialPassword === 'string') {
-        window.prompt('Copy this one-time temporary password and share it through a secure channel:', data.initialPassword)
+        await promptAction({ title: 'Password reset complete', message: 'Copy this one-time temporary password and share it through a secure channel.', label: 'Temporary password', initialValue: data.initialPassword, readOnly: true, copyable: true, confirmLabel: 'Done', cancelLabel: null })
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unknown error occurred.')
@@ -498,7 +500,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function activateAcknowledgedStaff(staff: PublicStaffRecord) {
-    if (!window.confirm(`Confirm that ${staff.name} acknowledged the offer by email and activate their employee access?`)) return
+    if (!await confirmAction({ title: 'Activate employee access?', message: `Confirm that ${staff.name} acknowledged the offer by email and activate their employee access?`, confirmLabel: 'Activate employee' })) return
     setLoading(true)
     setError('')
     try {
@@ -520,7 +522,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function handleExpenseStatusUpdate(expenseId: string, status: 'approved' | 'rejected') {
-    const decisionNote = status === 'rejected' ? window.prompt('Rejection reason (shown to the employee):') : ''
+    const decisionNote = status === 'rejected' ? await promptAction({ title: 'Reject expense?', message: 'Add the rejection reason that will be shown to the employee.', label: 'Rejection reason', confirmLabel: 'Reject expense', tone: 'danger' }) : ''
     if (status === 'rejected' && decisionNote === null) return
     const originalExpenses = [...expenseList]
     setExpenseList((prev) => prev.map((expense) => (expense.id === expenseId ? { ...expense, status } : expense)))
@@ -545,7 +547,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   async function markExpenseReimbursed(expense: ExpenseRecord) {
     if (expense.status !== 'approved' || expense.paymentStatus === 'paid') return
-    if (!window.confirm(`Confirm that ${expense.staffName || expense.staffEmail} has been reimbursed?`)) return
+    if (!await confirmAction({ title: 'Mark reimbursement paid?', message: `Confirm that ${expense.staffName || expense.staffEmail} has been reimbursed.`, confirmLabel: 'Mark as paid', tone: 'warning' })) return
     setDeletingExpenseId(expense.id)
     setError('')
     try {
@@ -601,7 +603,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function withdrawExpense(expense: ExpenseRecord) {
-    if (expense.status !== 'pending' || !window.confirm('Withdraw this Pending expense?')) return
+    if (expense.status !== 'pending' || !await confirmAction({ title: 'Withdraw expense?', message: 'Withdraw this pending expense request?', confirmLabel: 'Withdraw expense', tone: 'danger' })) return
     setDeletingExpenseId(expense.id)
     setError('')
     try {
@@ -618,7 +620,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function withdrawAdminExpense(expense: ExpenseRecord) {
-    if (expense.submittedByRole !== 'admin' || expense.staffEmail.toLowerCase() !== user.email.toLowerCase() || !window.confirm('Withdraw this Admin expense?')) return
+    if (expense.submittedByRole !== 'admin' || expense.staffEmail.toLowerCase() !== user.email.toLowerCase() || !await confirmAction({ title: 'Withdraw Admin expense?', message: 'Withdraw this Admin expense record?', confirmLabel: 'Withdraw expense', tone: 'danger' })) return
     setDeletingExpenseId(expense.id)
     setError('')
     try {
@@ -692,7 +694,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function updateLeaveStatus(id: string, status: 'approved' | 'rejected') {
-    const decisionNote = status === 'rejected' ? window.prompt('Rejection reason (shown to the employee):') : ''
+    const decisionNote = status === 'rejected' ? await promptAction({ title: 'Reject leave request?', message: 'Add the rejection reason that will be shown to the employee.', label: 'Rejection reason', confirmLabel: 'Reject leave', tone: 'danger' }) : ''
     if (decisionNote === null) return
     const response = await fetch(`/api/admin/leaves/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, decisionNote }) })
     const data = await response.json() as { leave?: LeaveRequestRecord; message?: string }
@@ -700,8 +702,27 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     setLeaveList((current) => current.map((leave) => leave.id === id ? data.leave! : leave))
   }
 
+  async function deleteAdminLeaveRequest(leave: LeaveRequestRecord) {
+    const approvedWarning = leave.status === 'approved' ? ' A refreshed Draft payroll will no longer include this approved leave.' : ''
+    if (!await confirmAction({ title: 'Delete leave request?', message: `Delete this ${leave.status} leave request for ${leave.staffEmail}?${approvedWarning} This action cannot be undone.`, confirmLabel: 'Delete leave', tone: 'danger' })) return
+    setDeletingLeaveId(leave.id)
+    setError('')
+    setMessage('')
+    try {
+      const response = await fetch(`/api/admin/leaves/${encodeURIComponent(leave.id)}`, { method: 'DELETE' })
+      const data = await response.json() as { message?: string }
+      if (!response.ok) throw new Error(data.message || 'Unable to delete leave request.')
+      setLeaveList((current) => current.filter((item) => item.id !== leave.id))
+      setMessage('Leave request deleted.')
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to delete leave request.')
+    } finally {
+      setDeletingLeaveId('')
+    }
+  }
+
   async function withdrawLeaveRequest(leave: LeaveRequestRecord) {
-    if (leave.status !== 'pending' || !window.confirm('Withdraw this Pending leave request?')) return
+    if (leave.status !== 'pending' || !await confirmAction({ title: 'Withdraw leave request?', message: 'Withdraw this pending leave request?', confirmLabel: 'Withdraw leave', tone: 'danger' })) return
     setDeletingLeaveId(leave.id)
     setError('')
     try {
@@ -718,7 +739,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function clearAuditLogs() {
-    if (!window.confirm('Clear all audit logs? This keeps a new record that the logs were cleared.')) {
+    if (!await confirmAction({ title: 'Clear audit logs?', message: 'Clear all audit logs? A new record of this action will be retained.', confirmLabel: 'Clear audit logs', tone: 'danger' })) {
       return
     }
 
@@ -1523,7 +1544,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   leaves: (
                     <div className="surface rounded-lg">
                       <div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">Leave Requests</p><p className="mt-1 text-sm text-sub">Review employee leave requests.</p></div>
-                      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="px-6 py-4 text-sub"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <div className="flex gap-2"><button onClick={() => updateLeaveStatus(leave.id, 'approved')} className="text-sm text-green-400">Approve</button><button onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="text-sm text-red-400">Reject</button></div> : null}</td></tr>)}</tbody></table></div>
+                      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="px-6 py-4 text-sub"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4"><div className="flex flex-wrap items-center gap-3">{leave.status === 'pending' ? <><button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved')} className="text-sm text-green-400 disabled:opacity-50">Approve</button><button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="text-sm text-red-400 disabled:opacity-50">Reject</button></> : null}<button type="button" disabled={deletingLeaveId === leave.id} onClick={() => void deleteAdminLeaveRequest(leave)} className="inline-flex items-center gap-1.5 text-sm text-red-400 transition-colors hover:text-red-300 disabled:opacity-50">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}Delete</button></div></td></tr>)}</tbody></table></div>
                     </div>
                   ),
                   payroll: (

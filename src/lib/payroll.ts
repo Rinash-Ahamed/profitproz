@@ -49,6 +49,7 @@ export type PayrollRecord = {
   snapshotVersion: 1
   statusHistory: PayrollStatusHistoryEntry[]
   calculationThroughDate: string
+  completedThroughDate: string
   generatedAt: string
   generatedBy: string
   calculatedAt?: string
@@ -99,6 +100,16 @@ const MONTH_PATTERN = /^(\d{4})-(\d{2})$/
 
 function roundMoney(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
+export type PayrollPeriodAmounts = {
+  isIncomplete: boolean
+  completedThroughDate: string
+  completedWorkingDays: number
+  payableDays: number
+  lopDays: number
+  lopDeduction: number
+  netSalary: number
 }
 
 export function parsePayrollMonth(value: string) {
@@ -219,6 +230,54 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
     attendanceDates,
     approvedLeaveDates,
     approvedLeaveIds: [...approvedLeaveIds].sort(),
+  }
+}
+
+export function calculatePayrollPeriodAmounts(record: PayrollRecord): PayrollPeriodAmounts {
+  const monthEndDate = payrollMonthEndDate(record.month)
+  const completedThroughDate = record.completedThroughDate && record.completedThroughDate < monthEndDate
+    ? record.completedThroughDate
+    : monthEndDate
+  const isIncomplete = completedThroughDate < monthEndDate
+
+  if (!isIncomplete) {
+    return {
+      isIncomplete: false,
+      completedThroughDate: monthEndDate,
+      completedWorkingDays: record.totalWorkingDays,
+      payableDays: record.payableDays,
+      lopDays: record.lopDays,
+      lopDeduction: record.lopDeduction,
+      netSalary: record.netSalary,
+    }
+  }
+
+  const completedWorkingDays = payrollMonthDates(record.month)
+    .filter((date) => date <= completedThroughDate && parseDateOnly(date)?.getUTCDay() !== 0)
+    .length
+  const leaveLopDays = [...record.approvedLeaveDates]
+    .sort()
+    .slice(record.casualLeaveUsed)
+    .filter((date) => date <= completedThroughDate)
+    .length
+  const missingAttendanceLopDays = Object.entries(record.missingAttendanceDecisions)
+    .filter(([date, decision]) => date <= completedThroughDate && decision === 'lop')
+    .length
+  const pendingMissingAttendanceDays = record.missingAttendanceDates
+    .filter((date) => date <= completedThroughDate && !record.missingAttendanceDecisions[date])
+    .length
+  const lopDays = leaveLopDays + missingAttendanceLopDays
+  const payableDays = Math.max(0, completedWorkingDays - lopDays - pendingMissingAttendanceDays)
+  const dailySalary = record.totalWorkingDays ? record.grossSalary / record.totalWorkingDays : 0
+
+  return {
+    isIncomplete: true,
+    completedThroughDate,
+    completedWorkingDays,
+    payableDays,
+    lopDays,
+    lopDeduction: roundMoney(dailySalary * lopDays),
+    netSalary: roundMoney(dailySalary * payableDays),
   }
 }
 

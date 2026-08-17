@@ -12,6 +12,7 @@ import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/cli
 import type { FinanceInvoiceRecord } from '@/lib/finance'
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
 import { ToastMessage } from '@/components/ui/ToastMessage'
+import { useAppDialog } from '@/components/ui/AppDialogProvider'
 
 type OnboardingPanelProps = {
   onboardings: OnboardingRecord[]
@@ -22,6 +23,7 @@ type OnboardingPanelProps = {
 }
 
 export function OnboardingPanel({ onboardings, loading, onChange, readOnly = false, editorOnly = false }: OnboardingPanelProps) {
+  const { confirmAction } = useAppDialog()
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<OnboardingRecord | null>(null)
   const [invoiceRecord, setInvoiceRecord] = useState<OnboardingRecord | null>(null)
@@ -45,7 +47,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
   }, [onboardings, search])
 
   async function deleteRecord(record: OnboardingRecord) {
-    if (!window.confirm(`Delete the OTA onboarding tracker for ${record.propertyName}?`)) return
+    if (!await confirmAction({ title: 'Delete onboarding tracker?', message: `Delete the OTA onboarding tracker for ${record.propertyName}?`, confirmLabel: 'Delete tracker', tone: 'danger' })) return
     setDeletingId(record.id)
     setError('')
     try {

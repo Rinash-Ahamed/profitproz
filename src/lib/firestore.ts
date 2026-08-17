@@ -675,6 +675,11 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
   const history = Array.isArray(data.statusHistory) ? data.statusHistory : []
   const storedMonth = typeof data.month === 'string' ? data.month : ''
   const month = parsePayrollMonth(storedMonth) ? storedMonth : PAYROLL_START_MONTH
+  const monthEndDate = payrollMonthEndDate(month)
+  const calculationThroughDate = typeof data.calculationThroughDate === 'string' ? data.calculationThroughDate : monthEndDate
+  const inferredCompletedThroughDate = calculationThroughDate < monthEndDate
+    ? new Date(Date.parse(`${calculationThroughDate}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
+    : monthEndDate
   return {
     id: doc.id,
     month,
@@ -726,7 +731,8 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
         at: typeof value.at === 'string' ? value.at : '',
       }]
     }),
-    calculationThroughDate: typeof data.calculationThroughDate === 'string' ? data.calculationThroughDate : payrollMonthEndDate(month),
+    calculationThroughDate,
+    completedThroughDate: typeof data.completedThroughDate === 'string' ? data.completedThroughDate : inferredCompletedThroughDate,
     generatedAt: mapTimestamp(data.generatedAt) || (typeof data.generatedAt === 'string' ? data.generatedAt : ''),
     generatedBy: typeof data.generatedBy === 'string' ? data.generatedBy : '',
     calculatedAt: mapTimestamp(data.calculatedAt),
@@ -1736,6 +1742,7 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
         annualCtc: employee.annualCtc || monthlySalary * 12,
         ...calculation,
         calculationThroughDate,
+        completedThroughDate: missingAttendanceThroughDate,
         refreshedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       }
@@ -1779,6 +1786,7 @@ export async function decideMissingAttendance(id: string, date: string, decision
     if (!payroll.missingAttendanceDates.includes(date)) throw new Error('MISSING_ATTENDANCE_DATE_NOT_FOUND')
 
     const previousDecision = payroll.missingAttendanceDecisions[date]
+    if (previousDecision) throw new Error('MISSING_ATTENDANCE_ALREADY_DECIDED')
     const decisions = { ...payroll.missingAttendanceDecisions, [date]: decision }
     const missingAttendanceLopDays = payroll.missingAttendanceDates.filter((missingDate) => decisions[missingDate] === 'lop').length
     const leaveLopDays = Math.max(0, payroll.lopDays - payroll.missingAttendanceLopDays)
@@ -1823,6 +1831,9 @@ export async function transitionPayrollStatus(id: string, requestedStatus: Payro
     const payroll = mapDocToPayroll(snapshot)
     const expectedStatus = nextPayrollStatus(payroll.status)
     if (requestedStatus !== expectedStatus) throw new Error('INVALID_PAYROLL_TRANSITION')
+    if ((requestedStatus === 'approved' || requestedStatus === 'paid') && payroll.completedThroughDate < payrollMonthEndDate(payroll.month)) {
+      throw new Error('PAYROLL_MONTH_INCOMPLETE')
+    }
     if (payroll.status === 'draft' && payroll.missingAttendanceDates.some((date) => !payroll.missingAttendanceDecisions[date])) {
       throw new Error('PENDING_MISSING_ATTENDANCE_DECISIONS')
     }
@@ -2063,6 +2074,18 @@ export async function deletePendingLeaveRequest(id: string, staffEmail: string) 
     if (String(data.staffEmail || '').trim().toLowerCase() !== staffEmail.trim().toLowerCase()) throw new Error('LEAVE_NOT_FOUND')
     if (data.status === 'approved' || data.status === 'rejected') throw new Error('LEAVE_NOT_PENDING')
     transaction.delete(docRef)
+  })
+}
+
+export async function deleteLeaveRequestAsAdmin(id: string): Promise<LeaveRequestRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc(id)
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('LEAVE_NOT_FOUND')
+    const leave = mapDocToLeaveRequest(snapshot)
+    transaction.delete(docRef)
+    return leave
   })
 }
 

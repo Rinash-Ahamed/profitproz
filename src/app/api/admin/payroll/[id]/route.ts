@@ -20,6 +20,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
       if (error instanceof Error && error.message === 'PAYROLL_NOT_FOUND') return NextResponse.json({ message: 'Payroll record was not found.' }, { status: 404 })
       if (error instanceof Error && error.message === 'PAYROLL_DECISION_LOCKED') return NextResponse.json({ message: 'Missing attendance can only be decided while payroll is in Draft.' }, { status: 409 })
       if (error instanceof Error && error.message === 'MISSING_ATTENDANCE_DATE_NOT_FOUND') return NextResponse.json({ message: 'This date is no longer missing attendance. Refresh the Draft.' }, { status: 409 })
+      if (error instanceof Error && error.message === 'MISSING_ATTENDANCE_ALREADY_DECIDED') return NextResponse.json({ message: 'This missing-attendance date has already been reviewed.' }, { status: 409 })
       console.error(`Failed to decide missing attendance for payroll ${id}:`, error)
       return NextResponse.json({ message: 'Unable to save the missing-attendance decision.' }, { status: 500 })
     }
@@ -34,6 +35,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (error instanceof Error && error.message === 'PAYROLL_NOT_FOUND') return NextResponse.json({ message: 'Payroll record was not found.' }, { status: 404 })
     if (error instanceof Error && error.message === 'INVALID_PAYROLL_TRANSITION') return NextResponse.json({ message: 'Payroll status must follow Draft → Calculated → Approved → Paid.' }, { status: 409 })
     if (error instanceof Error && error.message === 'PENDING_MISSING_ATTENDANCE_DECISIONS') return NextResponse.json({ message: 'Review all missing-attendance dates before confirming payroll.' }, { status: 409 })
+    if (error instanceof Error && error.message === 'PAYROLL_MONTH_INCOMPLETE') return NextResponse.json({ message: 'Payroll can be approved only after the complete month has been calculated.' }, { status: 409 })
     console.error(`Failed to update payroll ${id}:`, error)
     return NextResponse.json({ message: 'Unable to update payroll status.' }, { status: 500 })
   }
