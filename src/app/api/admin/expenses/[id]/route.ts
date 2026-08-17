@@ -112,6 +112,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     await logAdminAction({ actorEmail: user.email, action: 'EXPENSE_DECISION', targetId: id, details: `Expense marked ${status}.` })
     return NextResponse.json({ expense })
   } catch (error) {
+    if (error instanceof Error && error.message === 'EXPENSE_NOT_FOUND') return NextResponse.json({ message: 'Expense was not found.' }, { status: 404 })
+    if (error instanceof Error && error.message === 'EXPENSE_DECISION_LOCKED') return NextResponse.json({ message: 'This expense request has already been reviewed.' }, { status: 409 })
     console.error(`Failed to update expense ${id}:`, error)
     return NextResponse.json({ message: 'Failed to update expense.' }, { status: 500 })
   }

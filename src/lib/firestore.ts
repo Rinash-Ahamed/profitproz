@@ -4,7 +4,7 @@ import crypto from 'crypto'
 import 'server-only'
 import type { OnboardingDetailsInput, OnboardingRecord, OnboardingPlatformProgress, OtaPlatform } from './onboarding'
 import type { PaginationRequest } from './pagination'
-import { countNonSundayDaysInclusive, todayInTimeZone } from './date-only'
+import { countNonSundayDaysInclusive, parseDateOnly, todayInTimeZone } from './date-only'
 import type { HistoricalLeaveType } from './leave'
 import { calculatePayroll, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthEndDate, type MissingAttendanceDecision, type PayrollRecord, type PayrollStatus } from './payroll'
 import type { FinanceInvoiceRecord, FinanceOverview, FinancePaymentRecord, FinanceService, PaymentMethod } from './finance'
@@ -676,10 +676,14 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
   const storedMonth = typeof data.month === 'string' ? data.month : ''
   const month = parsePayrollMonth(storedMonth) ? storedMonth : PAYROLL_START_MONTH
   const monthEndDate = payrollMonthEndDate(month)
-  const calculationThroughDate = typeof data.calculationThroughDate === 'string' ? data.calculationThroughDate : monthEndDate
+  const storedCalculationThroughDate = typeof data.calculationThroughDate === 'string' ? data.calculationThroughDate : ''
+  const calculationThroughDate = parseDateOnly(storedCalculationThroughDate) && storedCalculationThroughDate.startsWith(`${month}-`) && storedCalculationThroughDate <= monthEndDate
+    ? storedCalculationThroughDate
+    : monthEndDate
   const inferredCompletedThroughDate = calculationThroughDate < monthEndDate
     ? new Date(Date.parse(`${calculationThroughDate}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
     : monthEndDate
+  const storedCompletedThroughDate = typeof data.completedThroughDate === 'string' ? data.completedThroughDate : ''
   return {
     id: doc.id,
     month,
@@ -732,7 +736,9 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
       }]
     }),
     calculationThroughDate,
-    completedThroughDate: typeof data.completedThroughDate === 'string' ? data.completedThroughDate : inferredCompletedThroughDate,
+    completedThroughDate: parseDateOnly(storedCompletedThroughDate) && storedCompletedThroughDate <= calculationThroughDate
+      ? storedCompletedThroughDate
+      : inferredCompletedThroughDate,
     generatedAt: mapTimestamp(data.generatedAt) || (typeof data.generatedAt === 'string' ? data.generatedAt : ''),
     generatedBy: typeof data.generatedBy === 'string' ? data.generatedBy : '',
     calculatedAt: mapTimestamp(data.calculatedAt),
@@ -1351,18 +1357,19 @@ export async function deleteAdminExpense(id: string, adminEmail: string) {
 export async function updateExpenseStatus(id: string, status: 'approved' | 'rejected', decisionNote = ''): Promise<ExpenseRecord> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.EXPENSES).doc(id)
-  await docRef.update({
-    status: status,
-    decisionNote: decisionNote.trim(),
-    approvedAt: status === 'approved' ? FieldValue.serverTimestamp() : null,
-    rejectedAt: status === 'rejected' ? FieldValue.serverTimestamp() : null,
-    updatedAt: FieldValue.serverTimestamp(),
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('EXPENSE_NOT_FOUND')
+    if (snapshot.data()?.status !== 'pending') throw new Error('EXPENSE_DECISION_LOCKED')
+    transaction.update(docRef, {
+      status,
+      decisionNote: decisionNote.trim(),
+      approvedAt: status === 'approved' ? FieldValue.serverTimestamp() : null,
+      rejectedAt: status === 'rejected' ? FieldValue.serverTimestamp() : null,
+      updatedAt: FieldValue.serverTimestamp(),
+    })
   })
-  const updatedDoc = await docRef.get()
-  if (!updatedDoc.exists) {
-    throw new Error('Document not found after update.')
-  }
-  return mapDocToExpense(updatedDoc)
+  return mapDocToExpense(await docRef.get())
 }
 
 export async function markExpensePaid(id: string): Promise<ExpenseRecord> {
@@ -1943,7 +1950,12 @@ export async function listAuditLogsPage(input: { cursor?: string; limit?: number
   if (input.cursor) {
     const match = /^(\d{1,16})_(.+)$/.exec(input.cursor)
     if (!match) throw new Error('INVALID_AUDIT_CURSOR')
-    query = query.startAfter(Timestamp.fromMillis(Number(match[1])), match[2])
+    const millis = Number(match[1])
+    const documentId = match[2]
+    if (!Number.isSafeInteger(millis) || millis < 0 || millis > 253_402_300_799_999 || !documentId || documentId.length > 150 || documentId.includes('/')) {
+      throw new Error('INVALID_AUDIT_CURSOR')
+    }
+    query = query.startAfter(Timestamp.fromMillis(millis), documentId)
   }
 
   const snapshot = await query.limit(limit + 1).get()
@@ -2092,7 +2104,11 @@ export async function deleteLeaveRequestAsAdmin(id: string): Promise<LeaveReques
 export async function updateLeaveRequestStatus(id: string, status: 'approved' | 'rejected', decisionNote = '') {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc(id)
-  await docRef.update({ status, decisionNote: decisionNote.trim(), updatedAt: FieldValue.serverTimestamp() })
-  const doc = await docRef.get()
-  return mapDocToLeaveRequest(doc)
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('LEAVE_NOT_FOUND')
+    if (snapshot.data()?.status !== 'pending') throw new Error('LEAVE_DECISION_LOCKED')
+    transaction.update(docRef, { status, decisionNote: decisionNote.trim(), updatedAt: FieldValue.serverTimestamp() })
+  })
+  return mapDocToLeaveRequest(await docRef.get())
 }

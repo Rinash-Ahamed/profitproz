@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { AlertTriangle, Check, Copy, ShieldAlert, X } from 'lucide-react'
 
 type DialogTone = 'default' | 'warning' | 'danger'
@@ -30,26 +30,43 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
   const [inputValue, setInputValue] = useState('')
   const [copied, setCopied] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const activeDialogRef = useRef<ActiveDialog | null>(null)
+
+  const cancelActiveDialog = useCallback(() => {
+    const active = activeDialogRef.current
+    if (!active) return
+    activeDialogRef.current = null
+    if (active.mode === 'confirm') active.resolve(false)
+    else active.resolve(null)
+  }, [])
 
   const confirmAction = useCallback((options: DialogOptions) => new Promise<boolean>((resolve) => {
+    cancelActiveDialog()
     setCopied(false)
-    setDialog({ ...options, mode: 'confirm', resolve })
-  }), [])
+    const nextDialog: ActiveDialog = { ...options, mode: 'confirm', resolve }
+    activeDialogRef.current = nextDialog
+    setDialog(nextDialog)
+  }), [cancelActiveDialog])
 
   const promptAction = useCallback((options: PromptOptions) => new Promise<string | null>((resolve) => {
+    cancelActiveDialog()
     setInputValue(options.initialValue || '')
     setCopied(false)
-    setDialog({ ...options, mode: 'prompt', resolve })
-  }), [])
+    const nextDialog: ActiveDialog = { ...options, mode: 'prompt', resolve }
+    activeDialogRef.current = nextDialog
+    setDialog(nextDialog)
+  }), [cancelActiveDialog])
 
   const closeDialog = useCallback((confirmed: boolean) => {
-    setDialog((current) => {
-      if (!current) return null
-      if (current.mode === 'confirm') current.resolve(confirmed)
-      else current.resolve(confirmed ? inputValue : null)
-      return null
-    })
+    const active = activeDialogRef.current
+    if (!active) return
+    activeDialogRef.current = null
+    setDialog(null)
+    if (active.mode === 'confirm') active.resolve(confirmed)
+    else active.resolve(confirmed ? inputValue : null)
   }, [inputValue])
+
+  useEffect(() => () => cancelActiveDialog(), [cancelActiveDialog])
 
   useEffect(() => {
     if (!dialog) return
@@ -67,10 +84,21 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
   }, [closeDialog, dialog])
 
   async function copyValue() {
-    if (!navigator.clipboard || !inputValue) return
-    await navigator.clipboard.writeText(inputValue)
-    setCopied(true)
+    if (!inputValue) return
+    if (navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(inputValue)
+        setCopied(true)
+        return
+      } catch {
+        // Fall back to selecting the value so it can be copied manually.
+      }
+    }
+    inputRef.current?.focus()
+    inputRef.current?.select()
   }
+
+  const contextValue = useMemo(() => ({ confirmAction, promptAction }), [confirmAction, promptAction])
 
   const tone = dialog?.tone || 'default'
   const confirmClass = tone === 'danger'
@@ -80,7 +108,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
       : 'bg-[#66B159] text-white hover:bg-[#73bd66]'
 
   return (
-    <AppDialogContext.Provider value={{ confirmAction, promptAction }}>
+    <AppDialogContext.Provider value={contextValue}>
       {children}
       {dialog ? (
         <div className="pwa-safe-modal fixed inset-0 z-[300] flex items-start justify-center overflow-y-auto bg-black/75 px-4 sm:items-center" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeDialog(false) }}>

@@ -522,8 +522,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function handleExpenseStatusUpdate(expenseId: string, status: 'approved' | 'rejected') {
-    const decisionNote = status === 'rejected' ? await promptAction({ title: 'Reject expense?', message: 'Add the rejection reason that will be shown to the employee.', label: 'Rejection reason', confirmLabel: 'Reject expense', tone: 'danger' }) : ''
-    if (status === 'rejected' && decisionNote === null) return
+    const decisionNote = status === 'rejected'
+      ? await promptAction({ title: 'Reject expense?', message: 'Add the rejection reason that will be shown to the employee.', label: 'Rejection reason', confirmLabel: 'Reject expense', tone: 'danger' })
+      : await confirmAction({ title: 'Approve expense?', message: 'Approve this expense request for reimbursement?', confirmLabel: 'Approve expense' }) ? '' : null
+    if (decisionNote === null) return
     const originalExpenses = [...expenseList]
     setExpenseList((prev) => prev.map((expense) => (expense.id === expenseId ? { ...expense, status } : expense)))
 
@@ -694,7 +696,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function updateLeaveStatus(id: string, status: 'approved' | 'rejected') {
-    const decisionNote = status === 'rejected' ? await promptAction({ title: 'Reject leave request?', message: 'Add the rejection reason that will be shown to the employee.', label: 'Rejection reason', confirmLabel: 'Reject leave', tone: 'danger' }) : ''
+    const decisionNote = status === 'rejected'
+      ? await promptAction({ title: 'Reject leave request?', message: 'Add the rejection reason that will be shown to the employee.', label: 'Rejection reason', confirmLabel: 'Reject leave', tone: 'danger' })
+      : await confirmAction({ title: 'Approve leave request?', message: 'Approve this leave request? It will be included when Draft payroll is refreshed.', confirmLabel: 'Approve leave' }) ? '' : null
     if (decisionNote === null) return
     const response = await fetch(`/api/admin/leaves/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, decisionNote }) })
     const data = await response.json() as { leave?: LeaveRequestRecord; message?: string }

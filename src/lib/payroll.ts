@@ -175,7 +175,7 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
   const assessedMissingAttendanceDates = assessedWorkingDates.filter((date) => date <= missingAttendanceThroughDate)
   const workingDateSet = new Set(workingDates)
   const attendanceDates = [...new Set(input.completedWorkDates)]
-    .filter((date) => workingDateSet.has(date))
+    .filter((date) => workingDateSet.has(date) && date <= calculationThroughDate)
     .sort()
   const attendanceDateSet = new Set(attendanceDates)
 
