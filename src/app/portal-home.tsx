@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 
 import Image from 'next/image'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { Building2, CheckCircle2, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, Loader2, LogOut, Play, ReceiptText, RefreshCw, Search, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
+import { Building2, CheckCircle2, ChevronDown, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, LayoutDashboard, Loader2, LogOut, Menu, Play, ReceiptText, RefreshCw, Search, Settings2, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
 import type { SessionUser } from '@/lib/auth'
 import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SecuritySettings, WorkSessionRecord } from '@/lib/firestore'
 import type { OnboardingRecord } from '@/lib/onboarding'
@@ -47,11 +47,25 @@ const ADMIN_TAB_LABELS: Record<string, string> = {
   settings: 'Settings',
 }
 
+type AdminNavMenuId = 'team' | 'finance' | 'system'
+const ADMIN_TEAM_TABS = [{ tab: 'staff', label: 'Employees' }, { tab: 'tasks', label: 'Tasks' }, { tab: 'leaves', label: 'Leaves' }, { tab: 'payroll', label: 'Payroll' }] as const
+const ADMIN_FINANCE_TABS = [{ tab: 'expenses', label: 'Expenses' }, { tab: 'finance', label: 'Finance Overview' }] as const
+const ADMIN_SYSTEM_TABS = [{ tab: 'audit', label: 'Audit' }, { tab: 'settings', label: 'Settings' }] as const
+const ADMIN_MOBILE_GROUPS = [
+  { label: 'Overview', items: [{ tab: 'dashboard', label: 'Dashboard' }] },
+  { label: 'Team', items: ADMIN_TEAM_TABS },
+  { label: 'Clients', items: [{ tab: 'properties', label: 'Clients' }] },
+  { label: 'Finance', items: ADMIN_FINANCE_TABS },
+  { label: 'System', items: ADMIN_SYSTEM_TABS },
+] as const
+
 export function PortalHome({ user, version, title, description }: PortalHomeProps) {
   const { confirmAction, promptAction } = useAppDialog()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [staffSubTab, setStaffSubTab] = useState('all')
   const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const [adminNavMenu, setAdminNavMenu] = useState<AdminNavMenuId | null>(null)
+  const [isAdminMobileMenuOpen, setIsAdminMobileMenuOpen] = useState(false)
 
   // Staff creation state
   const [staffFirstName, setStaffFirstName] = useState('')
@@ -953,6 +967,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime())
     .slice(0, 5)
 
+  function openAdminTab(tab: string) {
+    setActiveTab(tab)
+    setAdminNavMenu(null)
+    setIsAdminMobileMenuOpen(false)
+  }
+
   return (
     <main className={`portal-app pwa-safe-screen ${user.role === 'admin' ? 'admin-workspace' : ''} relative flex min-h-screen flex-col overflow-hidden bg-[#0a0b0c] text-ink`}>
       <ToastMessage message={error || message} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setMessage('') }} />
@@ -968,91 +988,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         </div>
 
         {user.role === 'admin' && (
-          <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm xl:flex">
-            <div className="flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => setActiveTab('dashboard')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'dashboard' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
-                }`}
-              >
-                Dashboard
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('staff')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'staff' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
-                }`}
-              >
-                Employees
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('properties')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'properties' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
-                }`}
-              >
-                Clients
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('tasks')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'tasks' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
-                }`}
-              >
-                Tasks
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('expenses')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'expenses' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
-                }`}
-              >
-                Expenses
-              </button>
-              <button type="button" onClick={() => setActiveTab('leaves')} className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === 'leaves' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'}`}>Leaves</button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('payroll')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'payroll' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
-                }`}
-              >
-                Payroll
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('finance')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'finance' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
-                }`}
-              >
-                Finance
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('audit')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'audit' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
-                }`}
-              >
-                Audit
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('settings')}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                  activeTab === 'settings' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
-                }`}
-              >
-                Settings
-              </button>
-            </div>
+          <nav className="hidden items-center gap-1 rounded-full border border-white/10 bg-zinc-950/85 p-1.5 shadow-2xl shadow-black/30 backdrop-blur-xl xl:flex" onMouseLeave={() => setAdminNavMenu(null)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setAdminNavMenu(null) }}>
+            <button type="button" onClick={() => openAdminTab('dashboard')} className={`inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-sm font-medium transition-all ${activeTab === 'dashboard' ? 'bg-[#66B159] text-white shadow-lg shadow-[#66B159]/20' : 'text-sub hover:bg-white/5 hover:text-ink'}`}><LayoutDashboard className="h-4 w-4" />Dashboard</button>
+            <AdminNavDropdown id="team" label="Team" icon={<Users className="h-4 w-4" />} items={ADMIN_TEAM_TABS} activeTab={activeTab} openMenu={adminNavMenu} onOpen={setAdminNavMenu} onSelect={openAdminTab} />
+            <button type="button" onClick={() => openAdminTab('properties')} className={`inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-sm font-medium transition-all ${activeTab === 'properties' ? 'bg-[#66B159] text-white shadow-lg shadow-[#66B159]/20' : 'text-sub hover:bg-white/5 hover:text-ink'}`}><Building2 className="h-4 w-4" />Clients</button>
+            <AdminNavDropdown id="finance" label="Finance" icon={<WalletCards className="h-4 w-4" />} items={ADMIN_FINANCE_TABS} activeTab={activeTab} openMenu={adminNavMenu} onOpen={setAdminNavMenu} onSelect={openAdminTab} />
+            <AdminNavDropdown id="system" label="System" icon={<Settings2 className="h-4 w-4" />} items={ADMIN_SYSTEM_TABS} activeTab={activeTab} openMenu={adminNavMenu} onOpen={setAdminNavMenu} onSelect={openAdminTab} />
           </nav>
         )}
 
@@ -1119,83 +1060,19 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
           {/* Mobile nav tabs */}
           {user.role === 'admin' && (
-            <div className="mt-10 overflow-x-auto border-b border-zinc-800 xl:hidden">
-              <div className="-mb-px flex items-center gap-4">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('dashboard')}
-                  className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                    activeTab === 'dashboard'
-                      ? 'border-[#66B159] text-ink'
-                      : 'border-transparent text-sub hover:border-zinc-700'
-                  }`}
-                >
-                  Dashboard
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('staff')}
-                  className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                    activeTab === 'staff'
-                      ? 'border-[#66B159] text-ink'
-                      : 'border-transparent text-sub hover:border-zinc-700'
-                  }`}
-                >
-                  Employees
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('properties')}
-                  className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                    activeTab === 'properties' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'
-                  }`}
-                >
-                  Clients
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('tasks')}
-                  className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                    activeTab === 'tasks'
-                      ? 'border-[#66B159] text-ink'
-                      : 'border-transparent text-sub hover:border-zinc-700'
-                  }`}
-                >
-                  Tasks
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('expenses')}
-                  className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                    activeTab === 'expenses'
-                      ? 'border-[#66B159] text-ink'
-                      : 'border-transparent text-sub hover:border-zinc-700'
-                  }`}
-                >
-                  Expenses
-                </button>
-                <button type="button" onClick={() => setActiveTab('leaves')} className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${activeTab === 'leaves' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'}`}>Leaves</button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('payroll')}
-                  className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                    activeTab === 'payroll' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'
-                  }`}
-                >
-                  Payroll
-                </button>
-                <button type="button" onClick={() => setActiveTab('finance')} className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${activeTab === 'finance' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'}`}>Finance</button>
-                <button type="button" onClick={() => setActiveTab('audit')} className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${activeTab === 'audit' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'}`}>Audit</button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('settings')}
-                  className={`border-b-2 px-1 py-3 text-sm font-medium transition-colors ${
-                    activeTab === 'settings' ? 'border-[#66B159] text-ink' : 'border-transparent text-sub hover:border-zinc-700'
-                  }`}
-                >
-                  Settings
-                </button>
-              </div>
+            <div className="relative mt-8 xl:hidden" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setIsAdminMobileMenuOpen(false) }}>
+              <button type="button" onClick={() => setIsAdminMobileMenuOpen((open) => !open)} aria-expanded={isAdminMobileMenuOpen} aria-haspopup="menu" className="surface flex h-12 w-full items-center justify-between rounded-xl border border-zinc-700 px-4 text-left shadow-lg shadow-black/20">
+                <span className="inline-flex items-center gap-2.5 text-sm font-semibold text-ink"><Menu className="h-4 w-4 text-[#66B159]" />Admin Menu <span className="text-sub">· {ADMIN_TAB_LABELS[activeTab] || 'Dashboard'}</span></span>
+                <ChevronDown className={`h-4 w-4 text-sub transition-transform ${isAdminMobileMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {isAdminMobileMenuOpen ? <div className="surface absolute left-0 right-0 top-full z-40 mt-2 max-h-[65vh] overflow-y-auto rounded-xl border border-zinc-700 p-3 shadow-2xl shadow-black/50" role="menu">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {ADMIN_MOBILE_GROUPS.map((group) => <div key={group.label} className="rounded-lg border border-zinc-800 bg-zinc-950/45 p-2">
+                    <p className="px-2 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-ghost">{group.label}</p>
+                    <div className="grid gap-1">{group.items.map((item) => <button key={item.tab} type="button" role="menuitem" onClick={() => openAdminTab(item.tab)} className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${activeTab === item.tab ? 'bg-[#66B159]/15 text-[#66B159]' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}><span>{item.label}</span>{activeTab === item.tab ? <span className="h-1.5 w-1.5 rounded-full bg-[#66B159]" /> : null}</button>)}</div>
+                  </div>)}
+                </div>
+              </div> : null}
             </div>
           )}
 
@@ -2366,6 +2243,29 @@ function ExpenseCorrectionModal({ expense, onClose, onSaved }: {
       </form>
     </div>
   )
+}
+
+function AdminNavDropdown({ id, label, icon, items, activeTab, openMenu, onOpen, onSelect }: {
+  id: AdminNavMenuId
+  label: string
+  icon: ReactNode
+  items: readonly { tab: string; label: string }[]
+  activeTab: string
+  openMenu: AdminNavMenuId | null
+  onOpen: (menu: AdminNavMenuId | null) => void
+  onSelect: (tab: string) => void
+}) {
+  const isActive = items.some((item) => item.tab === activeTab)
+  const isOpen = openMenu === id
+  return <div className="relative" onMouseEnter={() => onOpen(id)}>
+    <button type="button" onClick={() => onOpen(isOpen ? null : id)} onFocus={() => onOpen(id)} aria-expanded={isOpen} aria-haspopup="menu" className={`inline-flex h-9 items-center gap-2 rounded-full px-3.5 text-sm font-medium transition-all ${isActive ? 'bg-[#66B159] text-white shadow-lg shadow-[#66B159]/20' : isOpen ? 'bg-white/10 text-ink' : 'text-sub hover:bg-white/5 hover:text-ink'}`}>{icon}{label}<ChevronDown className={`h-3.5 w-3.5 transition-transform ${isOpen ? 'rotate-180' : ''}`} /></button>
+    {isOpen ? <div className={`absolute top-full z-50 pt-3 ${id === 'system' ? 'right-0' : 'left-1/2 -translate-x-1/2'}`} role="menu">
+      <div className="w-56 rounded-xl border border-white/10 bg-zinc-950/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-xl">
+        <p className="px-3 pb-2 pt-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-ghost">{label}</p>
+        <div className="grid gap-1">{items.map((item) => <button key={item.tab} type="button" role="menuitem" onClick={() => onSelect(item.tab)} className={`flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${activeTab === item.tab ? 'bg-[#66B159]/15 text-[#66B159]' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}><span>{item.label}</span>{activeTab === item.tab ? <span className="h-1.5 w-1.5 rounded-full bg-[#66B159]" /> : null}</button>)}</div>
+      </div>
+    </div> : null}
+  </div>
 }
 
 function DashboardMetric({ icon, label, value, detail }: { icon: ReactNode; label: string; value: string | number; detail: string }) {
