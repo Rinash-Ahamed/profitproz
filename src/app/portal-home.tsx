@@ -968,12 +968,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         </div>
 
         {user.role === 'admin' && (
-          <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm 2xl:flex">
-            <div className="flex items-center gap-1">
+          <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm xl:flex">
+            <div className="flex items-center gap-0.5">
               <button
                 type="button"
                 onClick={() => setActiveTab('dashboard')}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'dashboard' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
@@ -982,7 +982,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               <button
                 type="button"
                 onClick={() => setActiveTab('staff')}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'staff' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
@@ -991,7 +991,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               <button
                 type="button"
                 onClick={() => setActiveTab('properties')}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'properties' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
@@ -1000,7 +1000,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               <button
                 type="button"
                 onClick={() => setActiveTab('tasks')}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'tasks' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
@@ -1009,17 +1009,17 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               <button
                 type="button"
                 onClick={() => setActiveTab('expenses')}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'expenses' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
                 Expenses
               </button>
-              <button type="button" onClick={() => setActiveTab('leaves')} className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${activeTab === 'leaves' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'}`}>Leaves</button>
+              <button type="button" onClick={() => setActiveTab('leaves')} className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${activeTab === 'leaves' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'}`}>Leaves</button>
               <button
                 type="button"
                 onClick={() => setActiveTab('payroll')}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'payroll' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
@@ -1028,7 +1028,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               <button
                 type="button"
                 onClick={() => setActiveTab('finance')}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'finance' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
@@ -1037,7 +1037,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               <button
                 type="button"
                 onClick={() => setActiveTab('audit')}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'audit' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
@@ -1046,7 +1046,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               <button
                 type="button"
                 onClick={() => setActiveTab('settings')}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   activeTab === 'settings' ? 'bg-zinc-700 text-ink' : 'text-sub hover:text-ink/80'
                 }`}
               >
@@ -1119,7 +1119,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
           {/* Mobile nav tabs */}
           {user.role === 'admin' && (
-            <div className="mt-10 overflow-x-auto border-b border-zinc-800 2xl:hidden">
+            <div className="mt-10 overflow-x-auto border-b border-zinc-800 xl:hidden">
               <div className="-mb-px flex items-center gap-4">
                 <button
                   type="button"
