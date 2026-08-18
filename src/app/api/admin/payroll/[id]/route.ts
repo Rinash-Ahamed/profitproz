@@ -1,17 +1,30 @@
 import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/api-auth'
-import { decideMissingAttendance, transitionPayrollStatus } from '@/lib/firestore'
+import { decideMissingAttendance, revertMissingAttendanceDecision, transitionPayrollStatus } from '@/lib/firestore'
 import type { MissingAttendanceDecision, PayrollStatus } from '@/lib/payroll'
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await requireAdminSession()
   if (!user) return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
   const { id } = await context.params
-  let body: { status?: unknown; missingAttendanceDate?: unknown; decision?: unknown }
+  let body: { status?: unknown; missingAttendanceDate?: unknown; decision?: unknown; action?: unknown }
   try { body = await request.json() } catch { return NextResponse.json({ message: 'Invalid payroll status request.' }, { status: 400 }) }
   if (!id || id.length > 200) return NextResponse.json({ message: 'A valid payroll record is required.' }, { status: 400 })
   const missingAttendanceDate = body.missingAttendanceDate
   const decision = body.decision
+  if (typeof missingAttendanceDate === 'string' && body.action === 'revert_missing_attendance') {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(missingAttendanceDate)) return NextResponse.json({ message: 'A valid missing-attendance date is required.' }, { status: 400 })
+    try {
+      return NextResponse.json({ payroll: await revertMissingAttendanceDecision(id, missingAttendanceDate, user.email) })
+    } catch (error) {
+      if (error instanceof Error && error.message === 'PAYROLL_NOT_FOUND') return NextResponse.json({ message: 'Payroll record was not found.' }, { status: 404 })
+      if (error instanceof Error && error.message === 'PAYROLL_DECISION_LOCKED') return NextResponse.json({ message: 'Missing attendance can only be reverted while payroll is in Draft.' }, { status: 409 })
+      if (error instanceof Error && error.message === 'MISSING_ATTENDANCE_DATE_NOT_FOUND') return NextResponse.json({ message: 'This date is no longer missing attendance. Refresh the Draft.' }, { status: 409 })
+      if (error instanceof Error && error.message === 'MISSING_ATTENDANCE_NOT_DECIDED') return NextResponse.json({ message: 'This missing-attendance date is already pending review.' }, { status: 409 })
+      console.error(`Failed to revert missing attendance for payroll ${id}:`, error)
+      return NextResponse.json({ message: 'Unable to revert the missing-attendance decision.' }, { status: 500 })
+    }
+  }
   if (typeof missingAttendanceDate === 'string' && (decision === 'lop' || decision === 'ignored')) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(missingAttendanceDate)) return NextResponse.json({ message: 'A valid missing-attendance date is required.' }, { status: 400 })
     try {

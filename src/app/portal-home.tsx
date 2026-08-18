@@ -513,23 +513,39 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }
   }
 
-  async function activateAcknowledgedStaff(staff: PublicStaffRecord) {
-    if (!await confirmAction({ title: 'Activate employee access?', message: `Confirm that ${staff.name} acknowledged the offer by email and activate their employee access?`, confirmLabel: 'Activate employee' })) return
+  async function setStaffActive(staff: PublicStaffRecord, active: boolean) {
+    const pendingActivation = !staff.active && !staff.activatedAt
+    const confirmed = await confirmAction(active
+      ? {
+          title: 'Activate employee access?',
+          message: pendingActivation
+            ? `Confirm that ${staff.name} acknowledged the offer by email and activate their employee access?`
+            : `Reactivate ${staff.name}? They will be able to sign in again and will appear in payroll.`,
+          confirmLabel: pendingActivation ? 'Activate employee' : 'Reactivate employee',
+        }
+      : {
+          title: 'Make employee inactive?',
+          message: `Make ${staff.name} inactive? Their existing sessions will be revoked, login will be blocked, and they will no longer appear in payroll. Historical records will be preserved.`,
+          confirmLabel: 'Make inactive',
+          tone: 'danger',
+        })
+    if (!confirmed) return
     setLoading(true)
     setError('')
+    setMessage('')
     try {
       const response = await fetch(`/api/admin/staff/${staff.id}`, {
         method: 'PATCH',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: true }),
+        body: JSON.stringify({ active }),
       })
       const data = await response.json() as { staff?: PublicStaffRecord; message?: string }
-      if (!response.ok || !data.staff) throw new Error(data.message || 'Failed to activate employee.')
+      if (!response.ok || !data.staff) throw new Error(data.message || `Failed to ${active ? 'activate' : 'deactivate'} employee.`)
       setStaffList((current) => current.map((item) => item.id === data.staff!.id ? data.staff! : item))
-      setMessage(`${staff.name} is now active.`)
+      setMessage(`${staff.name} is now ${active ? 'active' : 'inactive'}.`)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Failed to activate employee.')
+      setError(caught instanceof Error ? caught.message : `Failed to ${active ? 'activate' : 'deactivate'} employee.`)
     } finally {
       setLoading(false)
     }
@@ -1303,11 +1319,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                            {!staff.clientAccess?.revenueManagement && !staff.clientAccess?.otaOnboarding ? <span className="text-[10px] text-ghost">Client view only</span> : null}
                                          </div>
                                        </td>
-                                      <td className="px-6 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${staff.active ? 'border-green-500/20 bg-green-500/10 text-green-400' : 'border-amber-500/20 bg-amber-500/10 text-amber-400'}`}>{staff.active ? 'Active' : 'Pending'}</span></td>
+                                      <td className="px-6 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${staff.active ? 'border-green-500/20 bg-green-500/10 text-green-400' : !staff.activatedAt ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' : 'border-zinc-600 bg-zinc-800 text-sub'}`}>{staff.active ? 'Active' : !staff.activatedAt ? 'Pending' : 'Inactive'}</span></td>
                                       <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                          {!staff.active ? <button type="button" onClick={() => setOfferStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`Generate offer letter for ${staff.name}`} title="Generate offer letter"><FileText className="h-4 w-4" /></button> : null}
-                                          {!staff.active ? <button type="button" onClick={() => activateAcknowledgedStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-green-500/20 hover:text-green-400 transition-colors" aria-label={`Acknowledge offer and activate ${staff.name}`} title="Acknowledge & activate"><CheckCircle2 className="h-4 w-4" /></button> : null}
+                                          {!staff.active && !staff.activatedAt ? <button type="button" onClick={() => setOfferStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`Generate offer letter for ${staff.name}`} title="Generate offer letter"><FileText className="h-4 w-4" /></button> : null}
+                                          {!staff.active ? <button type="button" onClick={() => void setStaffActive(staff, true)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-green-500/20 hover:text-green-400 transition-colors" aria-label={`${!staff.activatedAt ? 'Acknowledge offer and activate' : 'Reactivate'} ${staff.name}`} title={!staff.activatedAt ? 'Acknowledge & activate' : 'Reactivate employee'}><CheckCircle2 className="h-4 w-4" /></button> : null}
+                                          {staff.active ? <button type="button" onClick={() => void setStaffActive(staff, false)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Make ${staff.name} inactive`} title="Make employee inactive"><XCircle className="h-4 w-4" /></button> : null}
                                           <button type="button" onClick={() => setEditingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors" aria-label={`Edit ${staff.name}`} title="Edit employee"><Edit className="h-4 w-4" /></button>
                                           <button type="button" onClick={() => handleResetPassword(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-amber-500/20 hover:text-amber-400 transition-colors" aria-label={`Reset password for ${staff.name}`} title="Reset password"><RefreshCw className="h-4 w-4" /></button>
                                           <button type="button" onClick={() => handleDeleteStaff(staff.id, staff.name, staff.email)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Delete ${staff.name}`} title="Delete employee and records"><Trash2 className="h-4 w-4" /></button>

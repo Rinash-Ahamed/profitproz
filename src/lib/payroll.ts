@@ -99,7 +99,7 @@ export type PayrollCalculation = Pick<PayrollRecord,
 const MONTH_PATTERN = /^(\d{4})-(\d{2})$/
 
 function roundMoney(value: number) {
-  return Math.round((value + Number.EPSILON) * 100) / 100
+  return Math.round(value + Number.EPSILON)
 }
 
 export type PayrollPeriodAmounts = {
@@ -107,6 +107,7 @@ export type PayrollPeriodAmounts = {
   completedThroughDate: string
   completedWorkingDays: number
   payableDays: number
+  paidSalaryDays: number
   lopDays: number
   lopDeduction: number
   netSalary: number
@@ -206,10 +207,11 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
   const totalWorkingDays = workingDates.length
   const monthlySalary = Math.max(0, input.monthlySalary)
   const grossSalary = roundMoney(monthlySalary)
-  const lopDeduction = totalWorkingDays ? roundMoney((grossSalary / totalWorkingDays) * lopDays) : 0
+  const totalCalendarDays = calendarDates.length
+  const lopDeduction = totalCalendarDays ? roundMoney((grossSalary / totalCalendarDays) * lopDays) : 0
 
   return {
-    totalCalendarDays: calendarDates.length,
+    totalCalendarDays,
     sundayHolidays: calendarDates.length - totalWorkingDays,
     totalWorkingDays,
     daysPresent: attendanceDates.length,
@@ -241,14 +243,20 @@ export function calculatePayrollPeriodAmounts(record: PayrollRecord): PayrollPer
   const isIncomplete = completedThroughDate < monthEndDate
 
   if (!isIncomplete) {
+    const pendingMissingAttendanceDays = record.missingAttendanceDates
+      .filter((date) => !record.missingAttendanceDecisions[date])
+      .length
+    const paidSalaryDays = Math.max(0, record.totalCalendarDays - record.lopDays - pendingMissingAttendanceDays)
+    const dailySalary = record.totalCalendarDays ? record.grossSalary / record.totalCalendarDays : 0
     return {
       isIncomplete: false,
       completedThroughDate: monthEndDate,
       completedWorkingDays: record.totalWorkingDays,
-      payableDays: record.payableDays,
+      payableDays: Math.max(0, record.payableDays - pendingMissingAttendanceDays),
+      paidSalaryDays,
       lopDays: record.lopDays,
       lopDeduction: record.lopDeduction,
-      netSalary: record.netSalary,
+      netSalary: pendingMissingAttendanceDays ? roundMoney(dailySalary * paidSalaryDays) : record.netSalary,
     }
   }
 
@@ -268,16 +276,21 @@ export function calculatePayrollPeriodAmounts(record: PayrollRecord): PayrollPer
     .length
   const lopDays = leaveLopDays + missingAttendanceLopDays
   const payableDays = Math.max(0, completedWorkingDays - lopDays - pendingMissingAttendanceDays)
-  const dailySalary = record.totalWorkingDays ? record.grossSalary / record.totalWorkingDays : 0
+  const completedCalendarDays = payrollMonthDates(record.month)
+    .filter((date) => date <= completedThroughDate)
+    .length
+  const dailySalary = record.totalCalendarDays ? record.grossSalary / record.totalCalendarDays : 0
+  const paidSalaryDays = Math.max(0, completedCalendarDays - lopDays - pendingMissingAttendanceDays)
 
   return {
     isIncomplete: true,
     completedThroughDate,
     completedWorkingDays,
     payableDays,
+    paidSalaryDays,
     lopDays,
     lopDeduction: roundMoney(dailySalary * lopDays),
-    netSalary: roundMoney(dailySalary * payableDays),
+    netSalary: roundMoney(dailySalary * paidSalaryDays),
   }
 }
 

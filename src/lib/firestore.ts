@@ -31,6 +31,7 @@ export type StaffRecord = {
     otaOnboarding: boolean
   }
   annualCtc?: number
+  activatedAt?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -210,6 +211,7 @@ function mapDocToStaff(doc: DocumentSnapshot): StaffRecord {
       otaOnboarding: data.clientAccess?.otaOnboarding === true,
     },
     annualCtc: typeof data.annualCtc === 'number' ? data.annualCtc : 0,
+    activatedAt: mapTimestamp(data.activatedAt),
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
@@ -459,6 +461,10 @@ export async function updateStaffAccount(id: string, updates: Partial<Omit<Staff
     const existing = await transaction.get(docRef)
     if (!existing.exists) throw new Error('STAFF_NOT_FOUND')
     const existingData = existing.data() || {}
+
+    if (typeof updates.active === 'boolean' && !existingData.activatedAt && (updates.active || existingData.active === true)) {
+      dataToUpdate.activatedAt = FieldValue.serverTimestamp()
+    }
 
     if (typeof dataToUpdate.email === 'string' && dataToUpdate.email !== existingData.email) {
       const duplicate = await transaction.get(db.collection(COLLECTIONS.STAFF).where('email', '==', dataToUpdate.email).limit(1))
@@ -1681,8 +1687,15 @@ export async function saveSalary(staffId: string, input: { staffEmail: string; b
 
 export async function listPayrollRecords(month: string): Promise<PayrollRecord[]> {
   if (!db) return []
-  const snapshot = await db.collection(COLLECTIONS.PAYROLL).where('month', '==', month).get()
-  return snapshot.docs.map(mapDocToPayroll).sort((a, b) => a.employeeName.localeCompare(b.employeeName))
+  const [snapshot, activeStaffSnapshot] = await Promise.all([
+    db.collection(COLLECTIONS.PAYROLL).where('month', '==', month).get(),
+    db.collection(COLLECTIONS.STAFF).where('active', '==', true).select().get(),
+  ])
+  const activeStaffIds = new Set(activeStaffSnapshot.docs.map((document) => document.id))
+  return snapshot.docs
+    .map(mapDocToPayroll)
+    .filter((record) => activeStaffIds.has(record.staffId))
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName))
 }
 
 export async function generatePayrollRecords(month: string, actorEmail: string): Promise<PayrollRecord[]> {
@@ -1779,6 +1792,25 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
   return listPayrollRecords(month)
 }
 
+function missingAttendancePayrollUpdates(payroll: PayrollRecord, decisions: PayrollRecord['missingAttendanceDecisions']) {
+  const missingAttendanceLopDays = payroll.missingAttendanceDates.filter((missingDate) => decisions[missingDate] === 'lop').length
+  const leaveLopDays = Math.max(0, payroll.lopDays - payroll.missingAttendanceLopDays)
+  const lopDays = leaveLopDays + missingAttendanceLopDays
+  const lopDeduction = payroll.totalCalendarDays
+    ? Math.round((payroll.grossSalary / payroll.totalCalendarDays) * lopDays + Number.EPSILON)
+    : 0
+  const netSalary = Math.round(Math.max(0, payroll.grossSalary - lopDeduction) + Number.EPSILON)
+  return {
+    missingAttendanceDecisions: decisions,
+    missingAttendanceLopDays,
+    lopDays,
+    payableDays: payroll.totalWorkingDays - lopDays,
+    lopDeduction,
+    netSalary,
+    updatedAt: FieldValue.serverTimestamp(),
+  }
+}
+
 export async function decideMissingAttendance(id: string, date: string, decision: MissingAttendanceDecision, actorEmail: string): Promise<PayrollRecord> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.PAYROLL).doc(id)
@@ -1795,23 +1827,7 @@ export async function decideMissingAttendance(id: string, date: string, decision
     const previousDecision = payroll.missingAttendanceDecisions[date]
     if (previousDecision) throw new Error('MISSING_ATTENDANCE_ALREADY_DECIDED')
     const decisions = { ...payroll.missingAttendanceDecisions, [date]: decision }
-    const missingAttendanceLopDays = payroll.missingAttendanceDates.filter((missingDate) => decisions[missingDate] === 'lop').length
-    const leaveLopDays = Math.max(0, payroll.lopDays - payroll.missingAttendanceLopDays)
-    const lopDays = leaveLopDays + missingAttendanceLopDays
-    const lopDeduction = payroll.totalWorkingDays
-      ? Math.round(((payroll.grossSalary / payroll.totalWorkingDays) * lopDays + Number.EPSILON) * 100) / 100
-      : 0
-    const netSalary = Math.round((Math.max(0, payroll.grossSalary - lopDeduction) + Number.EPSILON) * 100) / 100
-
-    transaction.update(docRef, {
-      missingAttendanceDecisions: decisions,
-      missingAttendanceLopDays,
-      lopDays,
-      payableDays: payroll.totalWorkingDays - lopDays,
-      lopDeduction,
-      netSalary,
-      updatedAt: FieldValue.serverTimestamp(),
-    })
+    transaction.update(docRef, missingAttendancePayrollUpdates(payroll, decisions))
     transaction.set(auditRef, {
       timestamp: FieldValue.serverTimestamp(),
       actorEmail: normalizedActor,
@@ -1819,6 +1835,38 @@ export async function decideMissingAttendance(id: string, date: string, decision
       targetId: id,
       details: `${date} missing attendance for ${payroll.employeeName} marked as ${decision === 'lop' ? 'LOP' : 'ignored'}.`,
       changes: { [`missingAttendanceDecisions.${date}`]: { from: previousDecision || null, to: decision } },
+    })
+  })
+
+  requestAuditLogPrune()
+  return mapDocToPayroll(await docRef.get())
+}
+
+export async function revertMissingAttendanceDecision(id: string, date: string, actorEmail: string): Promise<PayrollRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.PAYROLL).doc(id)
+  const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
+  const normalizedActor = actorEmail.trim().toLowerCase()
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('PAYROLL_NOT_FOUND')
+    const payroll = mapDocToPayroll(snapshot)
+    if (payroll.status !== 'draft') throw new Error('PAYROLL_DECISION_LOCKED')
+    if (!payroll.missingAttendanceDates.includes(date)) throw new Error('MISSING_ATTENDANCE_DATE_NOT_FOUND')
+    const previousDecision = payroll.missingAttendanceDecisions[date]
+    if (!previousDecision) throw new Error('MISSING_ATTENDANCE_NOT_DECIDED')
+
+    const decisions = { ...payroll.missingAttendanceDecisions }
+    delete decisions[date]
+    transaction.update(docRef, missingAttendancePayrollUpdates(payroll, decisions))
+    transaction.set(auditRef, {
+      timestamp: FieldValue.serverTimestamp(),
+      actorEmail: normalizedActor,
+      action: 'PAYROLL_MISSING_ATTENDANCE_REVERT',
+      targetId: id,
+      details: `${date} missing-attendance decision for ${payroll.employeeName} reverted to pending.`,
+      changes: { [`missingAttendanceDecisions.${date}`]: { from: previousDecision, to: null } },
     })
   })
 
