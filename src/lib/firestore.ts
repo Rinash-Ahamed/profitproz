@@ -1575,6 +1575,39 @@ export async function correctWorkSessionTimes(
   return { previous, session: mapDocToWorkSession(await docRef.get()) }
 }
 
+export async function deleteCompletedWorkSession(id: string, actorEmail: string): Promise<WorkSessionRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.WORK_SESSIONS).doc(id)
+  const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
+  let deletedSession: WorkSessionRecord | null = null
+
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) throw new Error('WORK_SESSION_NOT_FOUND')
+    const session = mapDocToWorkSession(snapshot)
+    if (session.status !== 'completed') throw new Error('WORK_SESSION_NOT_COMPLETED')
+    deletedSession = session
+
+    transaction.delete(docRef)
+    transaction.set(auditRef, {
+      timestamp: FieldValue.serverTimestamp(),
+      actorEmail: actorEmail.trim().toLowerCase(),
+      action: 'WORK_SESSION_DELETE',
+      targetId: id,
+      details: `Admin deleted the completed work session for ${session.staffEmail} on ${session.workDate}.`,
+      changes: {
+        status: { from: 'completed', to: 'deleted' },
+        workDate: { from: session.workDate, to: null },
+        durationMinutes: { from: session.durationMinutes, to: null },
+      },
+    })
+  })
+
+  if (!deletedSession) throw new Error('WORK_SESSION_NOT_FOUND')
+  requestAuditLogPrune()
+  return deletedSession
+}
+
 export type LeaveRequestRecord = {
   id: string
   staffEmail: string

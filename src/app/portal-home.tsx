@@ -1131,12 +1131,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <div className="flex flex-wrap items-start justify-between gap-4">
                             <div>
                               <p className="text-lg font-semibold text-ink">Operational overview</p>
-                              <p className="mt-1 text-sm text-sub">Monitor active work and pending expense decisions.</p>
+                              <p className="mt-1 text-sm text-sub">Monitor payroll, finance, and pending expense decisions.</p>
                             </div>
-                            <button type="button" onClick={() => setActiveTab('tasks')} className="text-sm font-semibold text-[#4d9144] hover:text-[#36722f]">Open Tasks</button>
+                            <button type="button" onClick={() => setActiveTab('finance')} className="text-sm font-semibold text-[#4d9144] hover:text-[#36722f]">View finance overview</button>
                           </div>
                           <div className="mt-6 divide-y divide-zinc-200">
-                            <DashboardQueueRow label="Employees working now" count={dashboardActiveWorkSessions} action="View tasks" detail={dashboardActiveWorkSessions === 0 ? 'No active work sessions' : `${dashboardActiveWorkSessions} currently working`} onClick={() => setActiveTab('tasks')} />
+                            <DashboardQueueRow label="Payroll employees" count={staffList.filter((employee) => employee.active).length} action="Open payroll" detail="Active employees eligible for payroll" onClick={() => setActiveTab('payroll')} />
                             <DashboardQueueRow label="Expense claims" count={dashboardPendingExpenses} action="Open queue" onClick={() => setActiveTab('expenses')} />
                           </div>
                         </div>
@@ -1155,7 +1155,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   ),
                   staff: (
                     <div>
-                      <div className="mb-6 flex items-center gap-4 border-b border-zinc-800">
+                      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-3">
                         <button
                           type="button"
                           onClick={() => setStaffSubTab('all')}
@@ -1170,13 +1170,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         <button
                           type="button"
                           onClick={() => setStaffSubTab('add')}
-                          className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
-                            staffSubTab === 'add'
-                              ? 'border-[#66B159] text-ink'
-                              : 'border-transparent text-sub hover:border-zinc-700 hover:text-ink'
-                          }`}
+                          className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]"
                         >
-                          Add New
+                          <UserPlus className="h-4 w-4" /> Add employee
                         </button>
                       </div>
 
@@ -1341,7 +1337,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     </div>
                   ),
                   properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} showServiceCounts />,
-                  tasks: <AdminTasksPanel staff={staffList} sessions={workSessionList} loading={loading} now={workClock} serverPagination refreshToken={adminTaskRefreshToken} onCorrect={setCorrectingWorkSession} onError={setError} />,
+                  tasks: <AdminTasksPanel staff={staffList} sessions={workSessionList} loading={loading} now={workClock} serverPagination refreshToken={adminTaskRefreshToken} onCorrect={setCorrectingWorkSession} onDeleted={(deletedSession) => { setWorkSessionList((current) => current.filter((session) => session.id !== deletedSession.id)); setAdminTaskRefreshToken((current) => current + 1); setMessage(`Completed task for ${deletedSession.staffEmail} on ${formatDateOnlyDisplay(deletedSession.workDate)} was deleted.`) }} onError={setError} />,
                   finance: <FinancePanel />,
                   expenses: (
                     <div className="space-y-6">

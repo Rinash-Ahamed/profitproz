@@ -1,12 +1,13 @@
 'use client'
 
 import { Fragment, useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Edit, FileDown, Info, Loader2, Search } from 'lucide-react'
+import { ChevronDown, ChevronRight, Edit, FileDown, Info, Loader2, Search, Trash2 } from 'lucide-react'
 import type { PublicStaffRecord, WorkSessionRecord } from '@/lib/firestore'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { formatWorkDuration, formatWorkTime, workSessionDurationMinutes } from '@/lib/work-session-format'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
+import { useAppDialog } from '@/components/ui/AppDialogProvider'
 
 type TaskStatusFilter = 'all' | 'working' | 'completed' | 'not-started'
 type TaskDurationSort = 'recent' | 'highest' | 'lowest'
@@ -20,12 +21,13 @@ type DailyWorkSummary = {
   employeeName?: string
 }
 
-export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onError, serverPagination = false, refreshToken = 0 }: {
+export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDeleted, onError, serverPagination = false, refreshToken = 0 }: {
   staff: PublicStaffRecord[]
   sessions: WorkSessionRecord[]
   loading: boolean
   now: number
   onCorrect: (session: WorkSessionRecord) => void
+  onDeleted: (session: WorkSessionRecord) => void
   onError: (message: string) => void
   serverPagination?: boolean
   refreshToken?: number
@@ -40,6 +42,8 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
   const [serverTotal, setServerTotal] = useState(0)
   const [serverTodaySummary, setServerTodaySummary] = useState({ working: 0, completed: 0, notStarted: 0 })
   const [serverLoading, setServerLoading] = useState(serverPagination)
+  const [deletingSessionId, setDeletingSessionId] = useState('')
+  const { confirmAction } = useAppDialog()
   const staffNameByEmail = useMemo(() => new Map(staff.map((employee) => [employee.email, employee.name])), [staff])
 
   const clientSummaries = useMemo(() => {
@@ -124,6 +128,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
     const timeout = window.setTimeout(async () => {
       setServerLoading(true)
       const params = new URLSearchParams({ view: 'summary', page: String(page), employeeSearch, status: statusFilter, sort: durationSort })
+      if (refreshToken) params.set('refresh', String(refreshToken))
       if (dateFilter) params.set('date', dateFilter)
       try {
         const response = await fetch(`/api/admin/tasks?${params.toString()}`, { signal: controller.signal })
@@ -210,6 +215,30 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
     URL.revokeObjectURL(url)
   }
 
+  async function deleteCompletedTask(session: WorkSessionRecord) {
+    if (session.status !== 'completed') return
+    const employeeName = staffNameByEmail.get(session.staffEmail) || session.staffEmail
+    const confirmed = await confirmAction({
+      title: 'Delete completed task?',
+      message: `Delete ${employeeName}'s completed task for ${formatDateOnlyDisplay(session.workDate)}? If the Draft payroll is refreshed, this date may become missing attendance. Approved and paid payroll snapshots will not change. This action cannot be undone.`,
+      confirmLabel: 'Delete task',
+      tone: 'danger',
+    })
+    if (!confirmed) return
+
+    setDeletingSessionId(session.id)
+    try {
+      const response = await fetch(`/api/admin/tasks/${encodeURIComponent(session.id)}`, { method: 'DELETE' })
+      const data = await response.json() as { workSession?: WorkSessionRecord; message?: string }
+      if (!response.ok || !data.workSession) throw new Error(data.message || 'Unable to delete the completed task.')
+      onDeleted(data.workSession)
+    } catch (caught) {
+      onError(caught instanceof Error ? caught.message : 'Unable to delete the completed task.')
+    } finally {
+      setDeletingSessionId('')
+    }
+  }
+
   const hasFilters = employeeSearch || dateFilter || statusFilter !== 'all' || durationSort !== 'recent'
   return (
     <div className="space-y-5">
@@ -255,7 +284,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onEr
                     <td className="whitespace-nowrap px-4 py-4 font-medium text-ink">{formatWorkDuration(displayedDuration)}</td>
                     <td className="max-w-sm px-4 py-4 text-sub"><p className="truncate">{firstNote || (summary.status === 'active' ? 'Work currently in progress.' : summary.status === 'not-started' ? 'Work has not been started.' : 'No summary recorded.')}</p></td>
                   </tr>
-                  {expanded ? <tr className="border-b border-zinc-800 bg-zinc-950/35"><td colSpan={6} className="px-6 py-5"><div className="space-y-3">{summary.sessions.map((session) => <div key={session.id} className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub"><span>Start: <strong className="font-medium text-ink">{formatWorkTime(session.startedAt)}</strong></span><span>End: <strong className="font-medium text-ink">{session.endedAt ? formatWorkTime(session.endedAt) : 'In progress'}</strong></span><span>Duration: <strong className="font-medium text-ink">{formatWorkDuration(workSessionDurationMinutes(session, now))}</strong></span></div><button type="button" onClick={() => onCorrect(session)} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub hover:border-[#66B159]/50 hover:text-ink"><Edit className="h-3.5 w-3.5" /> Correct time</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-sub">{session.notes || (session.status === 'active' ? 'Work currently in progress.' : 'No work summary recorded.')}</p></div>)}</div></td></tr> : null}
+                  {expanded ? <tr className="border-b border-zinc-800 bg-zinc-950/35"><td colSpan={6} className="px-6 py-5"><div className="space-y-3">{summary.sessions.map((session) => <div key={session.id} className="rounded-lg border border-zinc-800 bg-zinc-900/70 p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-sub"><span>Start: <strong className="font-medium text-ink">{formatWorkTime(session.startedAt)}</strong></span><span>End: <strong className="font-medium text-ink">{session.endedAt ? formatWorkTime(session.endedAt) : 'In progress'}</strong></span><span>Duration: <strong className="font-medium text-ink">{formatWorkDuration(workSessionDurationMinutes(session, now))}</strong></span></div><div className="flex items-center gap-2"><button type="button" onClick={() => onCorrect(session)} disabled={!!deletingSessionId} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub hover:border-[#66B159]/50 hover:text-ink disabled:opacity-50"><Edit className="h-3.5 w-3.5" /> Correct time</button>{session.status === 'completed' ? <button type="button" onClick={() => void deleteCompletedTask(session)} disabled={!!deletingSessionId} className="flex h-8 items-center gap-1.5 rounded-md border border-red-500/25 bg-red-500/10 px-2.5 text-xs font-medium text-red-300 hover:bg-red-500/20 disabled:opacity-50">{deletingSessionId === session.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Delete</button> : null}</div></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-sub">{session.notes || (session.status === 'active' ? 'Work currently in progress.' : 'No work summary recorded.')}</p></div>)}</div></td></tr> : null}
                 </Fragment>
               })}
             </tbody>
