@@ -9,8 +9,8 @@ import { todayInTimeZone } from '@/lib/date-only'
 
 let retainedTaskCache: { sessions: Awaited<ReturnType<typeof listWorkSessions>>; expiresAt: number } | null = null
 
-async function listCachedRetainedWorkSessions() {
-  if (retainedTaskCache && retainedTaskCache.expiresAt > Date.now()) return retainedTaskCache.sessions
+async function listCachedRetainedWorkSessions(forceRefresh = false) {
+  if (!forceRefresh && retainedTaskCache && retainedTaskCache.expiresAt > Date.now()) return retainedTaskCache.sessions
   const sessions = await listWorkSessions()
   retainedTaskCache = { sessions, expiresAt: Date.now() + 10_000 }
   return sessions
@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     try {
       const url = new URL(request.url)
       const view = url.searchParams.get('view')
+      const forceRefresh = url.searchParams.has('refresh')
       if (view === 'summary' || view === 'export') {
         const employeeSearch = url.searchParams.get('employeeSearch')?.slice(0, 120) || ''
         const dateFilter = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('date') || '') ? url.searchParams.get('date') || '' : ''
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
         }
 
         const [workSessions, staff] = await Promise.all([
-          dateFilter ? listWorkSessions(undefined, { from: dateFilter, to: dateFilter }) : listCachedRetainedWorkSessions(),
+          dateFilter ? listWorkSessions(undefined, { from: dateFilter, to: dateFilter }) : listCachedRetainedWorkSessions(forceRefresh),
           listStaffAccounts(),
         ])
         const publicStaff = staff.map(({ passwordHash: _passwordHash, ...employee }) => employee)

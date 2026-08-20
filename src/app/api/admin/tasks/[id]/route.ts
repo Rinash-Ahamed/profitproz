@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { correctWorkSessionTimes } from '@/lib/firestore'
+import { correctWorkSessionTimes, deleteCompletedWorkSession } from '@/lib/firestore'
 import { requireAdminSession } from '@/lib/api-auth'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -47,5 +47,26 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
     console.error(`Failed to correct work session ${id}:`, error)
     return NextResponse.json({ message: 'Unable to correct work-session times.' }, { status: 500 })
+  }
+}
+
+export async function DELETE(_request: Request, context: RouteContext) {
+  const user = await requireAdminSession()
+  if (!user) return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
+
+  const { id } = await context.params
+  if (!id || id.length > 200) return NextResponse.json({ message: 'A valid work session is required.' }, { status: 400 })
+
+  try {
+    return NextResponse.json({ workSession: await deleteCompletedWorkSession(id, user.email) })
+  } catch (error) {
+    if (error instanceof Error && error.message === 'WORK_SESSION_NOT_FOUND') {
+      return NextResponse.json({ message: 'Work session was not found.' }, { status: 404 })
+    }
+    if (error instanceof Error && error.message === 'WORK_SESSION_NOT_COMPLETED') {
+      return NextResponse.json({ message: 'Only completed employee tasks can be deleted.' }, { status: 409 })
+    }
+    console.error(`Failed to delete work session ${id}:`, error)
+    return NextResponse.json({ message: 'Unable to delete the completed task.' }, { status: 500 })
   }
 }
