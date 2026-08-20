@@ -47,21 +47,19 @@ export function Nav() {
       transition={{ duration: 0.7, ease: ease.out, delay: 0.1 }}
     >
       <div
-        className={`flex items-center justify-between h-20 md:h-24 px-6 md:px-10 transition-colors duration-300 ${
+        className={`flex h-20 items-center justify-between px-6 transition-colors duration-300 md:h-24 md:px-10 lg:grid lg:grid-cols-[1fr_auto_1fr] ${
           scrolled
             ? `bg-zinc-950/90 border-b ${!open ? 'border-zinc-800' : 'border-transparent'}`
             : 'bg-transparent border-b border-transparent'
         }`}
       >
         {/* Logo */}
-        <Link href="/" className="flex items-center group flex-shrink-0">
+        <Link href="/" className="group flex flex-shrink-0 items-center lg:justify-self-start">
           <Image src="/profitpro.png" alt="ProfitPro logo" width={320} height={320} className="h-14 md:h-20 w-auto object-contain" />
         </Link>
 
-        {/* Right side items */}
-        <div className="flex items-center gap-4">
-          {/* Desktop links */}
-          <nav className="hidden lg:flex items-center gap-1">
+        {/* Desktop links */}
+          <nav className="hidden items-center gap-1 lg:flex lg:justify-self-center">
             {links.map((l) => {
               const isExternal = l.href.startsWith('http')
               let isActive = path === l.href
@@ -97,7 +95,7 @@ export function Nav() {
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 lg:justify-self-end">
             {/* Login */}
             <Link
               href="/login"
@@ -126,7 +124,6 @@ export function Nav() {
                 transition={{ duration: 0.22 }}
               />
             </button>
-          </div>
         </div>
       </div>
 

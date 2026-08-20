@@ -1155,7 +1155,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   ),
                   staff: (
                     <div>
-                      <div className="mb-6 flex items-center gap-4 border-b border-zinc-800">
+                      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-3">
                         <button
                           type="button"
                           onClick={() => setStaffSubTab('all')}
@@ -1170,13 +1170,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         <button
                           type="button"
                           onClick={() => setStaffSubTab('add')}
-                          className={`border-b-2 px-1 py-2 text-sm font-medium transition-colors ${
-                            staffSubTab === 'add'
-                              ? 'border-[#66B159] text-ink'
-                              : 'border-transparent text-sub hover:border-zinc-700 hover:text-ink'
-                          }`}
+                          className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]"
                         >
-                          Add New
+                          <UserPlus className="h-4 w-4" /> Add employee
                         </button>
                       </div>
 
