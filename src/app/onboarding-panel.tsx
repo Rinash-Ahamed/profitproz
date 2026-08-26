@@ -140,7 +140,8 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
                     <ChevronDown className={`h-4 w-4 shrink-0 text-sub transition-transform ${expanded ? 'rotate-180' : ''}`} />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold text-ink">{record.propertyName}</span>
-                      <span className="mt-0.5 block text-xs text-sub">{liveCount}/{record.platforms.length} live · {record.platforms.length - liveCount} pending</span>
+                      <span className="mt-0.5 block text-xs text-sub">{record.clientName} · {record.emailAddress}</span>
+                      <span className="mt-0.5 block text-xs text-ghost">{liveCount}/{record.platforms.length} live · {record.platforms.length - liveCount} pending</span>
                     </span>
                   </button>
                   <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
@@ -158,16 +159,37 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
                   </div>
                 </div>
 
-                {expanded ? <div className="grid gap-4 border-t border-zinc-800 bg-zinc-950/20 p-4 md:grid-cols-2 xl:grid-cols-3">
-                  {record.platforms.map((progress) => (
-                    <PlatformProgressCard
-                      key={progress.platform}
-                      onboardingId={record.id}
-                      progress={progress}
-                      readOnly={readOnly}
-                      onSaved={(updated) => onChange(onboardings.map((item) => item.id === updated.id ? updated : item))}
-                    />
-                  ))}
+                {expanded ? <div className="border-t border-zinc-800 bg-zinc-950/20 p-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <OnboardingDetailGroup title="Property details" items={[
+                      { label: 'Property', value: record.propertyName },
+                      { label: 'Address', value: record.propertyAddress || 'Not provided' },
+                    ]} />
+                    <OnboardingDetailGroup title="Client contact" items={[
+                      { label: 'Name', value: record.clientName || 'Not provided' },
+                      { label: 'Email', value: record.emailAddress || 'Not provided' },
+                      { label: 'Phone', value: record.phone || 'Not provided' },
+                    ]} />
+                    <OnboardingDetailGroup title="Onboarding commercial" items={[
+                      { label: 'Platforms', value: record.platforms.length.toLocaleString('en-IN') },
+                      { label: 'Rate / platform', value: `INR ${record.ratePerPlatform.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`, accent: true },
+                      { label: 'Total value', value: `INR ${(record.ratePerPlatform * record.platforms.length).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` },
+                      { label: 'Payment', value: paymentStatus === 'complete' ? 'Complete' : paymentStatus === 'pending' ? 'Pending' : 'Not invoiced' },
+                    ]} />
+                  </div>
+                  {record.invoiceNotes ? <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-900/50 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-ghost">Invoice notes</p><p className="mt-2 whitespace-pre-wrap text-sm text-sub">{record.invoiceNotes}</p></div> : null}
+                  <p className="mb-3 mt-5 text-xs font-semibold uppercase tracking-wide text-ghost">Platform progress</p>
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {record.platforms.map((progress) => (
+                      <PlatformProgressCard
+                        key={progress.platform}
+                        onboardingId={record.id}
+                        progress={progress}
+                        readOnly={readOnly}
+                        onSaved={(updated) => onChange(onboardings.map((item) => item.id === updated.id ? updated : item))}
+                      />
+                    ))}
+                  </div>
                 </div> : null}
               </section>
             )
@@ -180,6 +202,28 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
       {invoiceRecord ? <InvoiceModal record={invoiceRecord} onGenerated={(updated) => { onChange(onboardings.map((item) => item.id === updated.id ? updated : item)); setInvoiceRecord(updated) }} onClose={() => setInvoiceRecord(null)} /> : null}
       {paymentInvoice ? <RecordPaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} onRecorded={(updated) => { setPaymentInvoice(null); onChange(onboardings.map((item) => item.id === updated.sourceId ? { ...item, paymentStatus: 'complete', financePaymentRecordedAt: new Date().toISOString() } : item)) }} /> : null}
     </div>
+  )
+}
+
+type OnboardingDetailItem = {
+  label: string
+  value: string
+  accent?: boolean
+}
+
+function OnboardingDetailGroup({ title, items }: { title: string; items: OnboardingDetailItem[] }) {
+  return (
+    <section className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-ghost">{title}</h3>
+      <dl className="mt-3 space-y-2">
+        {items.map((item) => (
+          <div key={item.label} className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 text-sm">
+            <dt className="text-sub">{item.label}</dt>
+            <dd className={`${item.accent ? 'font-semibold text-[#66B159]' : 'text-ink'} break-words`}>{item.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   )
 }
 
