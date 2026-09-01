@@ -2,8 +2,9 @@
 
 import { FormEvent, Fragment, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Building2, ChevronDown, ChevronRight, Download, Edit, ExternalLink, FileText, Info, KeyRound, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
+import { Building2, CheckCircle2, ChevronDown, ChevronRight, CreditCard, Download, Edit, ExternalLink, FileText, Info, KeyRound, Loader2, Plus, Search, Trash2, X } from 'lucide-react'
 import type { PropertyInput, PropertyRecord } from '@/lib/firestore'
+import type { FinanceInvoiceRecord, FinancePaymentRecord } from '@/lib/finance'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
@@ -12,6 +13,7 @@ import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/cli
 import { PropertyCredentialsModal } from './property-credentials-modal'
 import { ToastMessage } from '@/components/ui/ToastMessage'
 import { useAppDialog } from '@/components/ui/AppDialogProvider'
+import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
 
 type PropertiesPanelProps = {
   properties: PropertyRecord[]
@@ -44,6 +46,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
   const [editing, setEditing] = useState<PropertyRecord | null>(null)
   const [contractProperty, setContractProperty] = useState<PropertyRecord | null>(null)
   const [invoiceProperty, setInvoiceProperty] = useState<PropertyRecord | null>(null)
+  const [paymentsProperty, setPaymentsProperty] = useState<PropertyRecord | null>(null)
   const [credentialsProperty, setCredentialsProperty] = useState<PropertyRecord | null>(null)
   const [deletingId, setDeletingId] = useState('')
   const [error, setError] = useState('')
@@ -189,6 +192,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
                         <td className="px-6 py-4">
                           <div className="flex gap-2">
                             {!editorOnly ? <button type="button" onClick={() => setCredentialsProperty(property)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159]" aria-label={`Manage platform credentials for ${property.name}`} title="Platform credentials"><KeyRound className="h-4 w-4" /></button> : null}
+                            {!editorOnly ? <button type="button" onClick={() => setPaymentsProperty(property)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159]" aria-label={`Manage Revenue payments for ${property.name}`} title="Manage Revenue payments"><CreditCard className="h-4 w-4" /></button> : null}
                             {!editorOnly && property.status === 'active' ? <button type="button" onClick={() => setInvoiceProperty(property)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159]" aria-label={`Generate revenue invoice for ${property.name}`} title="Generate revenue invoice"><FileText className="h-4 w-4" /></button> : null}
                             <button type="button" onClick={() => setEditing(property)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink" aria-label={`Edit ${property.name}`} title="Edit property"><Edit className="h-4 w-4" /></button>
                             {!editorOnly ? <button type="button" disabled={deletingId === property.id} onClick={() => deleteRecord(property)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete ${property.name}`} title="Delete property">{deletingId === property.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button> : null}
@@ -238,6 +242,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
       {editing ? <PropertyModal title="Edit Client Property" initial={editing} propertyId={editing.id} editorOnly={editorOnly} onClose={() => setEditing(null)} onSaved={(property) => { onChange(properties.map((item) => item.id === property.id ? property : item).sort((a, b) => a.name.localeCompare(b.name))); setEditing(null) }} /> : null}
       {contractProperty ? <ContractPreviewModal property={contractProperty} onClose={() => setContractProperty(null)} /> : null}
       {invoiceProperty ? <RevenueInvoiceModal property={invoiceProperty} onClose={() => setInvoiceProperty(null)} /> : null}
+      {paymentsProperty ? <RevenuePaymentsModal property={paymentsProperty} onClose={() => setPaymentsProperty(null)} /> : null}
       {credentialsProperty ? <PropertyCredentialsModal property={credentialsProperty} onClose={() => setCredentialsProperty(null)} /> : null}
     </div>
   )
@@ -269,7 +274,52 @@ function PropertyDetailGroup({ title, items, children }: { title: string; items:
 
 type InvoiceSettings = { accountName: string; bankName: string; accountNumber: string; ifscCode: string; upiVpa: string; upiNumber: string; companyAddress: string }
 const emptyInvoiceSettings: InvoiceSettings = { accountName: '', bankName: '', accountNumber: '', ifscCode: '', upiVpa: '', upiNumber: '', companyAddress: '' }
+
+function RevenuePaymentsModal({ property, onClose }: { property: PropertyRecord; onClose: () => void }) {
+  const [invoices, setInvoices] = useState<FinanceInvoiceRecord[]>([])
+  const [selectedInvoice, setSelectedInvoice] = useState<FinanceInvoiceRecord | null>(null)
+  const [selectedPayment, setSelectedPayment] = useState<FinancePaymentRecord | null>(null)
+  const [openingInvoiceId, setOpeningInvoiceId] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    const controller = new AbortController()
+    apiFetch<{ invoices: FinanceInvoiceRecord[] }>(`/api/admin/properties/${encodeURIComponent(property.id)}/finance-invoices`, { signal: controller.signal })
+      .then((data) => setInvoices(data.invoices || []))
+      .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Failed to load Revenue invoices.') })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false) })
+    return () => controller.abort()
+  }, [property.id])
+
+  async function correctPayment(invoice: FinanceInvoiceRecord) {
+    setOpeningInvoiceId(invoice.id); setError('')
+    try {
+      const data = await apiFetch<{ invoice: FinanceInvoiceRecord; payment: FinancePaymentRecord | null }>(`/api/admin/finance/invoices/${encodeURIComponent(invoice.id)}/payments`)
+      if (!data.payment) throw new Error('The confirmed payment details are unavailable.')
+      setSelectedInvoice(data.invoice)
+      setSelectedPayment(data.payment)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Failed to open the payment correction.')
+    } finally {
+      setOpeningInvoiceId('')
+    }
+  }
+
+  function paymentSaved(updated: FinanceInvoiceRecord) {
+    setInvoices((current) => current.map((invoice) => invoice.id === updated.id ? updated : invoice))
+    setSelectedInvoice(null)
+    setSelectedPayment(null)
+  }
+
+  return <>
+    {createPortal(<div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm sm:items-center"><div className="surface w-full max-w-4xl rounded-xl shadow-2xl"><div className="flex items-center justify-between gap-4 border-b border-zinc-800 p-6"><div><p className="text-lg font-semibold text-ink">Revenue payments</p><p className="mt-1 text-sm text-sub">{property.name} · Select the month-wise invoice to record or correct its payment.</p></div><button type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Close</button></div><ToastMessage message={error} tone="error" onDismiss={() => setError('')} /><div className="max-h-[70vh] overflow-auto"><table className="w-full min-w-[760px] text-sm"><thead className="sticky top-0 border-b border-zinc-700 bg-zinc-950 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Billing period</th><th className="px-5 py-4 font-medium text-sub">Amount</th><th className="px-5 py-4 font-medium text-sub">Status</th><th className="px-5 py-4 font-medium text-sub">Action</th></tr></thead><tbody>{loading ? <tr><td colSpan={5} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : invoices.length === 0 ? <tr><td colSpan={5} className="py-12 text-center text-sub">No issued Revenue invoices are available for this property.</td></tr> : invoices.map((invoice) => <tr key={invoice.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4"><p className="font-medium text-ink">{invoice.invoiceNumber}</p><p className="mt-1 text-xs text-sub">{formatDateOnlyDisplay(invoice.invoiceDate)}</p></td><td className="px-5 py-4 text-sub">{invoice.billingPeriod || 'Not provided'}</td><td className="px-5 py-4 font-semibold text-ink">₹{invoice.amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</td><td className="px-5 py-4"><span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${invoice.status === 'paid' ? 'border-green-500/25 bg-green-500/10 text-green-300' : 'border-amber-500/25 bg-amber-500/10 text-amber-300'}`}>{invoice.status === 'paid' ? 'Paid' : 'Pending'}</span></td><td className="px-5 py-4">{invoice.status === 'paid' ? <button type="button" disabled={openingInvoiceId === invoice.id} onClick={() => void correctPayment(invoice)} className="inline-flex h-9 items-center gap-2 rounded-md border border-[#66B159]/30 bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20 disabled:opacity-50">{openingInvoiceId === invoice.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Edit className="h-4 w-4" />} Correct payment</button> : <button type="button" onClick={() => { setSelectedPayment(null); setSelectedInvoice(invoice) }} className="inline-flex h-9 items-center gap-2 rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Record payment</button>}</td></tr>)}</tbody></table></div></div></div>, document.body)}
+    {selectedInvoice ? <RecordPaymentModal invoice={selectedInvoice} payment={selectedPayment} onClose={() => { setSelectedInvoice(null); setSelectedPayment(null) }} onRecorded={paymentSaved} /> : null}
+  </>
+}
+
 function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; onClose: () => void }) {
+  const { confirmAction } = useAppDialog()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [invoiceDate, setInvoiceDate] = useState(todayLocalDateOnly())
   const [dueDate, setDueDate] = useState(todayLocalDateOnly())
@@ -281,13 +331,15 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
   const [template, setTemplate] = useState('')
   const [settings, setSettings] = useState<InvoiceSettings>(emptyInvoiceSettings)
   const [sequence, setSequence] = useState(0)
+  const [issuedInvoice, setIssuedInvoice] = useState<FinanceInvoiceRecord | null>(null)
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
+  const [issuing, setIssuing] = useState(false)
   const [error, setError] = useState('')
   const [year, month] = invoiceDate.split('-')
-  const invoiceNumber = sequence
+  const invoiceNumber = issuedInvoice?.invoiceNumber || (sequence
     ? `PP-RMS-${month}-${year.slice(-2)}-${String(sequence).padStart(3, '0')}`
-    : `PP-RMS-${month}-${year.slice(-2)}-PREVIEW`
+    : `PP-RMS-${month}-${year.slice(-2)}-PREVIEW`)
   const subtotal = Number(managedRevenue || 0) * property.commissionPercent / 100
   const billingPeriod = billingStartDate && billingEndDate
     ? `${formatDateOnlyDisplay(billingStartDate)} to ${formatDateOnlyDisplay(billingEndDate)}`
@@ -308,7 +360,7 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
     if (!template) return ''
     const values: Record<string, string | number> = {
       invoice_number: invoiceNumber, invoice_date: formatDateOnlyDisplay(invoiceDate), due_date: formatDateOnlyDisplay(dueDate),
-      billing_period: billingPeriod, client_name: property.contactName || property.name, property_name: property.name,
+      billing_period: billingPeriod, billing_start: formatDateOnlyDisplay(billingStartDate), billing_end: formatDateOnlyDisplay(billingEndDate), client_name: property.contactName || property.name, property_name: property.name,
       property_address: [property.address, property.city].filter(Boolean).join(', '), email_address: property.contactEmail,
       phone: property.contactPhone, managed_revenue: Number(managedRevenue || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 }),
       commission_percent: property.commissionPercent.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
@@ -318,31 +370,43 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
       ifsc_code: settings.ifscCode, upi_vpa: settings.upiVpa, upi_number: settings.upiNumber, company_address: settings.companyAddress,
     }
     return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeHtml(value)), template)
-  }, [billingPeriod, dueDate, invoiceDate, invoiceNumber, managedRevenue, notes, property, reportUrl, settings, subtotal, template])
+  }, [billingEndDate, billingPeriod, billingStartDate, dueDate, invoiceDate, invoiceNumber, managedRevenue, notes, property, reportUrl, settings, subtotal, template])
 
-  async function downloadPdf() {
-    if (!billingStartDate || !billingEndDate || billingEndDate < billingStartDate || managedRevenue === '' || !(Number(managedRevenue) >= 0)) { setError('Enter a valid billing date range and managed revenue.'); return }
+  function validateInvoiceDetails() {
+    if (!billingStartDate || !billingEndDate || billingEndDate < billingStartDate || managedRevenue === '' || !(Number(managedRevenue) >= 0)) { setError('Enter a valid billing date range and managed revenue.'); return false }
     if (reportUrl.trim()) {
       try {
         const parsedReportUrl = new URL(reportUrl)
         if (parsedReportUrl.protocol !== 'https:' || parsedReportUrl.username || parsedReportUrl.password) throw new Error('INVALID_REPORT_URL')
-      } catch { setError('Enter a valid HTTPS link to the revenue report.'); return }
+      } catch { setError('Enter a valid HTTPS link to the revenue report.'); return false }
     }
-    if (!dueDate || dueDate < invoiceDate) { setError('Due date cannot be earlier than the invoice date.'); return }
+    if (!dueDate || dueDate < invoiceDate) { setError('Due date cannot be earlier than the invoice date.'); return false }
+    if (!(subtotal > 0)) { setError('The invoice amount must be greater than zero.'); return false }
+    return true
+  }
+
+  async function issueInvoice() {
+    if (issuedInvoice || !validateInvoiceDetails()) return
+    if (!await confirmAction({ title: 'Issue revenue invoice?', message: `Issue this invoice for ${property.name}, billing period ${billingPeriod}, for ₹${subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}? This creates the Finance record and locks these invoice details.`, confirmLabel: 'Issue invoice', tone: 'warning' })) return
+    setIssuing(true); setError('')
+    try {
+      const numbering = await apiFetch<{ sequence: number; invoice: FinanceInvoiceRecord; created: boolean }>(`/api/admin/properties/${encodeURIComponent(property.id)}/invoice-number`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceDate, dueDate, billingPeriod, reportUrl: reportUrl.trim(), amount: subtotal }),
+      })
+      setSequence(numbering.sequence)
+      setIssuedInvoice(numbering.invoice)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Failed to issue the revenue invoice.')
+    } finally {
+      setIssuing(false)
+    }
+  }
+
+  async function downloadPdf() {
+    if (!validateInvoiceDetails()) return
     setDownloading(true); setError('')
     try {
-      let issuedSequence = sequence
-      if (!issuedSequence) {
-        const numbering = await apiFetch<{ sequence: number }>(`/api/admin/properties/${encodeURIComponent(property.id)}/invoice-number`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ invoiceDate, dueDate, billingPeriod, reportUrl: reportUrl.trim(), amount: subtotal }),
-        })
-        issuedSequence = numbering.sequence
-        const frame = iframeRef.current
-        const invoiceRendered = new Promise<void>((resolve) => frame?.addEventListener('load', () => resolve(), { once: true }))
-        setSequence(issuedSequence)
-        await Promise.race([invoiceRendered, new Promise<void>((resolve) => setTimeout(resolve, 2_000))])
-      }
       const page = iframeRef.current?.contentDocument?.querySelector('.invoice-page') as HTMLElement | null
       if (!page) throw new Error('Revenue invoice preview is not ready.')
       await waitForPdfAssets(page)
@@ -359,13 +423,26 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
         pdf.link((linkBounds.left - pageBounds.left) * scaleX, (linkBounds.top - pageBounds.top) * scaleY, linkBounds.width * scaleX, linkBounds.height * scaleY, { url: reportUrl.trim() })
       }
       releasePdfCanvas(canvas)
-      const issuedInvoiceNumber = `PP-RMS-${month}-${year.slice(-2)}-${String(issuedSequence).padStart(3, '0')}`
-      pdf.save(`${issuedInvoiceNumber}.pdf`)
+      pdf.save(`${issuedInvoice ? issuedInvoice.invoiceNumber : `PP-RMS-${month}-${year.slice(-2)}-PREVIEW`}.pdf`)
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Failed to download revenue invoice.') } finally { setDownloading(false) }
   }
 
   const inputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
-  return createPortal(<div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Generate revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {sequence ? invoiceNumber : 'Number assigned on download'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Billing from</span><DatePickerInput value={billingStartDate} onChange={(value) => { setBillingStartDate(value); if (billingEndDate && billingEndDate < value) setBillingEndDate('') }} max={billingEndDate || undefined} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Billing to</span><DatePickerInput value={billingEndDate} onChange={setBillingEndDate} min={billingStartDate || undefined} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="grid gap-4 border-b border-zinc-800 p-5 lg:grid-cols-2"><label className="block"><span className="label-upper mb-2 block text-ghost">Revenue report link (optional)</span><input type="url" inputMode="url" value={reportUrl} onChange={(event) => setReportUrl(event.target.value)} maxLength={2048} placeholder="https://drive.google.com/..." className={inputClass} /><span className="mt-1 block text-xs text-sub">When attached, the invoice shows a button to download the report.</span></label><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} /></label><ToastMessage message={error} tone="error" onDismiss={() => setError('')} /></div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
+  return createPortal(<div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {issuedInvoice ? invoiceNumber : 'Preview — not recorded in Finance'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required disabled={Boolean(issuedInvoice)} /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required disabled={Boolean(issuedInvoice)} /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Billing from</span><DatePickerInput value={billingStartDate} onChange={(value) => { setBillingStartDate(value); if (billingEndDate && billingEndDate < value) setBillingEndDate('') }} max={billingEndDate || undefined} className={inputClass} required disabled={Boolean(issuedInvoice)} /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Billing to</span><DatePickerInput value={billingEndDate} onChange={setBillingEndDate} min={billingStartDate || undefined} className={inputClass} required disabled={Boolean(issuedInvoice)} /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required disabled={Boolean(issuedInvoice)} /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || issuing || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {issuedInvoice ? 'Download PDF' : 'Download preview'}</button>{!issuedInvoice ? <button type="button" onClick={() => void issueInvoice()} disabled={loading || issuing || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Issue invoice</button> : <RevenuePaymentAction key={issuedInvoice.id} invoice={issuedInvoice} />}<button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="grid gap-4 border-b border-zinc-800 p-5 lg:grid-cols-2"><label className="block"><span className="label-upper mb-2 block text-ghost">Revenue report link (optional)</span><input type="url" inputMode="url" value={reportUrl} onChange={(event) => setReportUrl(event.target.value)} maxLength={2048} placeholder="https://drive.google.com/..." className={inputClass} disabled={Boolean(issuedInvoice)} /><span className="mt-1 block text-xs text-sub">When attached, the invoice shows a button to view the report.</span></label><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} disabled={Boolean(issuedInvoice)} /></label><ToastMessage message={error} tone="error" onDismiss={() => setError('')} /></div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
+}
+
+function RevenuePaymentAction({ invoice }: { invoice: FinanceInvoiceRecord }) {
+  const [currentInvoice, setCurrentInvoice] = useState(invoice)
+  const [showPayment, setShowPayment] = useState(false)
+
+  if (currentInvoice.status === 'paid') {
+    return <span className="inline-flex h-11 items-center gap-2 rounded-lg border border-green-500/25 bg-green-500/10 px-4 text-sm font-semibold text-green-300"><CheckCircle2 className="h-4 w-4" /> Payment recorded</span>
+  }
+
+  return <>
+    <button type="button" onClick={() => setShowPayment(true)} className="inline-flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Record payment</button>
+    {showPayment ? <RecordPaymentModal invoice={currentInvoice} onClose={() => setShowPayment(false)} onRecorded={(updated) => { setCurrentInvoice(updated); setShowPayment(false) }} /> : null}
+  </>
 }
 
 function PropertyModal({ title, initial, propertyId, editorOnly = false, onClose, onSaved }: { title: string; initial: PropertyInput; propertyId?: string; editorOnly?: boolean; onClose: () => void; onSaved: (property: PropertyRecord) => void }) {

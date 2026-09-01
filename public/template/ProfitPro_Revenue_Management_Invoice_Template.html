@@ -185,10 +185,21 @@
     }
 
     .platforms {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 1.5mm;
       margin: 0;
       font-size: 10px;
       font-weight: 700;
       line-height: 1.55;
+    }
+
+    .billing-separator {
+      color: var(--muted);
+      font-size: 8px;
+      font-weight: 800;
+      text-transform: uppercase;
     }
 
     .items {
@@ -526,7 +537,7 @@
       <div class="panel completion-panel">
         <span class="live-badge">Revenue management · Active</span>
         <p class="panel-title">Billing period</p>
-        <p class="platforms">{{billing_period}}</p>
+        <p class="platforms"><span>{{billing_start}}</span><span class="billing-separator">to</span><span>{{billing_end}}</span></p>
       </div>
     </section>
 

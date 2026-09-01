@@ -1,18 +1,20 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { CreditCard, FileDown, Loader2, RefreshCw, Search } from 'lucide-react'
+import { Ban, CreditCard, FileDown, Loader2, RefreshCw, Search } from 'lucide-react'
 import type { FinanceInvoiceRecord, FinanceOverview, FinanceService } from '@/lib/finance'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay } from '@/lib/date-only'
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { ToastMessage } from '@/components/ui/ToastMessage'
+import { useAppDialog } from '@/components/ui/AppDialogProvider'
 
 const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, paidPayroll: 0, unpaidExpenses: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0, invoicesTruncated: false, paymentsTruncated: false }
 const money = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 
 export function FinancePanel() {
+  const { confirmAction } = useAppDialog()
   const [finance, setFinance] = useState<FinanceOverview>(emptyOverview)
   const [service, setService] = useState<'all' | FinanceService>('all')
   const [status, setStatus] = useState<'all' | 'pending' | 'paid'>('all')
@@ -21,6 +23,7 @@ export function FinancePanel() {
   const [paymentDateFrom, setPaymentDateFrom] = useState('')
   const [paymentDateTo, setPaymentDateTo] = useState('')
   const [paymentInvoice, setPaymentInvoice] = useState<FinanceInvoiceRecord | null>(null)
+  const [cancellingInvoiceId, setCancellingInvoiceId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
@@ -74,6 +77,29 @@ export function FinancePanel() {
     const link = document.createElement('a'); link.href = url; link.download = 'income-payments.csv'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url)
   }
 
+  async function cancelInvoice(invoice: FinanceInvoiceRecord) {
+    const confirmed = await confirmAction({
+      title: 'Cancel revenue invoice?',
+      message: `Cancel ${invoice.invoiceNumber}? It will be removed from active Finance records and totals, while its invoice number remains available in Audit. This cannot be undone.`,
+      confirmLabel: 'Cancel invoice',
+      tone: 'danger',
+    })
+    if (!confirmed) return
+    setCancellingInvoiceId(invoice.id); setError(''); setMessage('')
+    try {
+      const response = await fetch(`/api/admin/finance/invoices/${encodeURIComponent(invoice.id)}/cancel`, { method: 'PATCH' })
+      const data = await response.json() as { invoice?: FinanceInvoiceRecord; message?: string }
+      if (!response.ok || !data.invoice) throw new Error(data.message || 'Failed to cancel the invoice.')
+      setFinance((current) => ({ ...current, invoices: current.invoices.filter((item) => item.id !== invoice.id) }))
+      setMessage(`${invoice.invoiceNumber} cancelled successfully.`)
+      void load()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Failed to cancel the invoice.')
+    } finally {
+      setCancellingInvoiceId('')
+    }
+  }
+
   return <div className="space-y-6">
     <ToastMessage message={error || message} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setMessage('') }} />
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
@@ -90,7 +116,12 @@ export function FinancePanel() {
 
     <section className="surface rounded-lg">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6"><div><p className="text-lg font-semibold text-ink">Client invoices</p><p className="mt-1 text-sm text-sub">Immutable invoice amounts and payment balances by service.</p></div><div className="flex flex-wrap gap-2"><label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search invoice or property" aria-label="Search Finance invoices" /></label><select value={service} onChange={(event) => setService(event.target.value as typeof service)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" aria-label="Filter invoices by service"><option value="all">All services</option><option value="revenue_management">Revenue Management</option><option value="ota_onboarding">OTA Onboarding</option></select><select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" aria-label="Filter invoices by payment status"><option value="all">All payment statuses</option><option value="pending">Payment pending</option><option value="paid">Paid</option></select><button type="button" onClick={() => void load()} className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink"><RefreshCw className="h-4 w-4" /> Refresh</button></div></div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[980px] text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Client</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Dates</th><th className="px-5 py-4 font-medium text-sub">Amount</th><th className="px-5 py-4 font-medium text-sub">Paid / Balance</th><th className="px-5 py-4 font-medium text-sub">Status</th><th className="px-5 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{loading ? <tr><td colSpan={8} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : invoices.length === 0 ? <tr><td colSpan={8} className="py-12 text-center text-sub">No tracked invoices yet. New invoices appear here when generated.</td></tr> : invoices.map((invoice) => <tr key={invoice.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 font-medium text-ink">{invoice.invoiceNumber}</td><td className="px-5 py-4"><p className="text-ink">{invoice.propertyName}</p><p className="text-xs text-sub">{invoice.clientName}</p></td><td className="px-5 py-4 text-sub">{invoice.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management'}</td><td className="px-5 py-4 text-xs text-sub"><p>{formatDateOnlyDisplay(invoice.invoiceDate)}</p><p>Due {formatDateOnlyDisplay(invoice.dueDate)}</p>{invoice.billingPeriod ? <p>{invoice.billingPeriod}</p> : null}</td><td className="px-5 py-4 font-semibold text-ink">{money(invoice.amount)}</td><td className="px-5 py-4 text-sub"><p>{money(invoice.paidAmount)} paid</p><p>{money(invoice.balanceAmount)} due</p></td><td className="px-5 py-4"><FinanceStatus status={invoice.status} /></td><td className="px-5 py-4">{invoice.status === 'pending' ? <button type="button" onClick={() => setPaymentInvoice(invoice)} className="flex h-9 items-center gap-2 rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Record payment</button> : <span className="text-xs text-ghost">Complete</span>}</td></tr>)}</tbody></table></div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1080px] text-sm">
+          <thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Client</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Dates</th><th className="px-5 py-4 font-medium text-sub">Amount</th><th className="px-5 py-4 font-medium text-sub">Paid / Balance</th><th className="px-5 py-4 font-medium text-sub">Status</th><th className="px-5 py-4 font-medium text-sub">Actions</th></tr></thead>
+          <tbody>{loading ? <tr><td colSpan={8} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : invoices.length === 0 ? <tr><td colSpan={8} className="py-12 text-center text-sub">No tracked invoices yet. New invoices appear here when generated.</td></tr> : invoices.map((invoice) => <tr key={invoice.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 font-medium text-ink">{invoice.invoiceNumber}</td><td className="px-5 py-4"><p className="text-ink">{invoice.propertyName}</p><p className="text-xs text-sub">{invoice.clientName}</p></td><td className="px-5 py-4 text-sub">{invoice.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management'}</td><td className="px-5 py-4 text-xs text-sub"><p>{formatDateOnlyDisplay(invoice.invoiceDate)}</p><p>Due {formatDateOnlyDisplay(invoice.dueDate)}</p>{invoice.billingPeriod ? <p>{invoice.billingPeriod}</p> : null}</td><td className="px-5 py-4 font-semibold text-ink">{money(invoice.amount)}</td><td className="px-5 py-4 text-sub"><p>{money(invoice.paidAmount)} paid</p><p>{money(invoice.balanceAmount)} due</p></td><td className="px-5 py-4"><FinanceStatus status={invoice.status} /></td><td className="px-5 py-4">{invoice.status === 'pending' ? <div className="flex items-center gap-2"><button type="button" onClick={() => setPaymentInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Record payment</button>{invoice.service === 'revenue_management' ? <button type="button" disabled={cancellingInvoiceId === invoice.id} onClick={() => void cancelInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-red-500/20 px-3 text-xs font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50">{cancellingInvoiceId === invoice.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />} Cancel</button> : null}</div> : <span className="text-xs text-ghost">Complete</span>}</td></tr>)}</tbody>
+        </table>
+      </div>
     </section>
 
     <section className="surface rounded-lg">

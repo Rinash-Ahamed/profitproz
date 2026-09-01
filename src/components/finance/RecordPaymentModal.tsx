@@ -24,7 +24,10 @@ export function RecordPaymentModal({ invoice, payment, onClose, onRecorded }: { 
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (correcting && !await confirmAction({ title: 'Save payment correction?', message: `Update the confirmed payment details for ${invoice.invoiceNumber}? The invoice and payment totals will be synchronized, and the original values will remain in Audit.`, confirmLabel: 'Save correction', tone: 'warning' })) return
+    const confirmed = correcting
+      ? await confirmAction({ title: 'Save payment correction?', message: `Update the confirmed payment details for ${invoice.invoiceNumber}? The invoice and payment totals will be synchronized, and the original values will remain in Audit.`, confirmLabel: 'Save correction', tone: 'warning' })
+      : await confirmAction({ title: 'Record full payment?', message: `Confirm receipt of ₹${invoice.balanceAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })} for ${invoice.invoiceNumber}. This will mark the invoice as Paid.`, confirmLabel: 'Record payment', tone: 'warning' })
+    if (!confirmed) return
     setSaving(true); setError('')
     try {
       const response = await fetch(`/api/admin/finance/invoices/${encodeURIComponent(invoice.id)}/payments`, {

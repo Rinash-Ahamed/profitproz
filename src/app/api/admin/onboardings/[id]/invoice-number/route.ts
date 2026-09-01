@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { getOrCreateOnboardingInvoiceSequence, logAdminAction } from '@/lib/firestore'
+import { getOrCreateOnboardingInvoiceSequence } from '@/lib/firestore'
 import { parseDateOnly } from '@/lib/date-only'
 
 type RouteContext = { params: Promise<{ id: string }> }
@@ -24,14 +24,8 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const { sequence, onboarding, invoice } = await getOrCreateOnboardingInvoiceSequence(id, { invoiceDate, dueDate, amount })
-    await logAdminAction({
-      actorEmail: user.email,
-      action: 'ONBOARDING_INVOICE_NUMBER_ASSIGN',
-      targetId: id,
-      details: `OTA onboarding invoice sequence ${String(sequence).padStart(3, '0')} assigned.`,
-    })
-    return NextResponse.json({ sequence, onboarding, invoice })
+    const { sequence, onboarding, invoice, created } = await getOrCreateOnboardingInvoiceSequence(id, { invoiceDate, dueDate, amount, actorEmail: user.email })
+    return NextResponse.json({ sequence, onboarding, invoice, created })
   } catch (error) {
     if (error instanceof Error && error.message === 'ONBOARDING_NOT_FOUND') {
       return NextResponse.json({ message: 'Onboarding record was not found.' }, { status: 404 })
