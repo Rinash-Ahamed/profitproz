@@ -69,6 +69,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ ok: true })
   } catch (error) {
     if (error instanceof Error && error.message === 'ONBOARDING_NOT_FOUND') return NextResponse.json({ message: 'Onboarding record was not found.' }, { status: 404 })
+    if (error instanceof Error && error.message === 'SOURCE_HAS_FINANCE_HISTORY') return NextResponse.json({ message: 'This onboarding property has Finance history and cannot be deleted.' }, { status: 409 })
     console.error(`Failed to delete OTA onboarding ${id}:`, error)
     return NextResponse.json({ message: 'Failed to delete OTA onboarding.' }, { status: 500 })
   }

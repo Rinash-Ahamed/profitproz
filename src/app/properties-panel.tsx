@@ -273,9 +273,10 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [invoiceDate, setInvoiceDate] = useState(todayLocalDateOnly())
   const [dueDate, setDueDate] = useState(todayLocalDateOnly())
-  const [billingPeriod, setBillingPeriod] = useState('')
+  const [billingStartDate, setBillingStartDate] = useState('')
+  const [billingEndDate, setBillingEndDate] = useState('')
   const [managedRevenue, setManagedRevenue] = useState('')
-  const [notes, setNotes] = useState('Revenue management services provided for the stated billing period.')
+  const [notes, setNotes] = useState('1. Revenue management services provided for the stated billing period.\n2. If you notice any discrepancies in the mentioned revenue figures, please contact us for clarification.')
   const [template, setTemplate] = useState('')
   const [settings, setSettings] = useState<InvoiceSettings>(emptyInvoiceSettings)
   const [sequence, setSequence] = useState(0)
@@ -287,6 +288,9 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
     ? `PP-RMS-${month}-${year.slice(-2)}-${String(sequence).padStart(3, '0')}`
     : `PP-RMS-${month}-${year.slice(-2)}-PREVIEW`
   const subtotal = Number(managedRevenue || 0) * property.commissionPercent / 100
+  const billingPeriod = billingStartDate && billingEndDate
+    ? `${formatDateOnlyDisplay(billingStartDate)} to ${formatDateOnlyDisplay(billingEndDate)}`
+    : ''
 
   useEffect(() => {
     const controller = new AbortController()
@@ -315,7 +319,7 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
   }, [billingPeriod, dueDate, invoiceDate, invoiceNumber, managedRevenue, notes, property, settings, subtotal, template])
 
   async function downloadPdf() {
-    if (!billingPeriod.trim() || managedRevenue === '' || !(Number(managedRevenue) >= 0)) { setError('Enter the billing period and managed revenue.'); return }
+    if (!billingStartDate || !billingEndDate || billingEndDate < billingStartDate || managedRevenue === '' || !(Number(managedRevenue) >= 0)) { setError('Enter a valid billing date range and managed revenue.'); return }
     if (!dueDate || dueDate < invoiceDate) { setError('Due date cannot be earlier than the invoice date.'); return }
     setDownloading(true); setError('')
     try {
@@ -323,7 +327,7 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
       if (!issuedSequence) {
         const numbering = await apiFetch<{ sequence: number }>(`/api/admin/properties/${encodeURIComponent(property.id)}/invoice-number`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ invoiceDate, dueDate, billingPeriod: billingPeriod.trim(), amount: subtotal }),
+          body: JSON.stringify({ invoiceDate, dueDate, billingPeriod, amount: subtotal }),
         })
         issuedSequence = numbering.sequence
         const frame = iframeRef.current
@@ -345,7 +349,7 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
   }
 
   const inputClass = 'h-11 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none'
-  return createPortal(<div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Generate revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {sequence ? invoiceNumber : 'Number assigned on download'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Billing period</span><input value={billingPeriod} onChange={(event) => setBillingPeriod(event.target.value)} maxLength={80} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="border-b border-zinc-800 p-5"><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} /></label><ToastMessage message={error} tone="error" onDismiss={() => setError('')} /></div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
+  return createPortal(<div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/75 backdrop-blur-sm"><div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl"><div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6"><div><p className="text-lg font-semibold text-ink">Generate revenue invoice</p><p className="mt-1 text-sm text-sub">{property.name} · {sequence ? invoiceNumber : 'Number assigned on download'}</p></div><div className="flex flex-wrap items-end gap-3"><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Invoice date</span><DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Due date</span><DatePickerInput value={dueDate} onChange={setDueDate} min={invoiceDate} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Billing from</span><DatePickerInput value={billingStartDate} onChange={(value) => { setBillingStartDate(value); if (billingEndDate && billingEndDate < value) setBillingEndDate('') }} max={billingEndDate || undefined} className={inputClass} required /></label><label className="block w-40"><span className="label-upper mb-2 block text-ghost">Billing to</span><DatePickerInput value={billingEndDate} onChange={setBillingEndDate} min={billingStartDate || undefined} className={inputClass} required /></label><label className="block w-44"><span className="label-upper mb-2 block text-ghost">Managed revenue</span><input type="number" min="0" step="0.01" value={managedRevenue} onChange={(event) => setManagedRevenue(event.target.value)} className={inputClass} required /></label><button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error) || !billingPeriod || managedRevenue === ''} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub">Close</button></div></div><div className="border-b border-zinc-800 p-5"><label className="block"><span className="label-upper mb-2 block text-ghost">Invoice notes</span><textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto py-2.5`} /></label><ToastMessage message={error} tone="error" onDismiss={() => setError('')} /></div><div className="max-h-[calc(100vh-13rem)] overflow-auto bg-zinc-950/60 p-3 sm:p-6">{loading ? <div className="flex min-h-96 items-center justify-center text-sub"><Loader2 className="h-5 w-5 animate-spin" /></div> : null}{!loading && rendered ? <iframe ref={iframeRef} title={`Revenue invoice preview for ${property.name}`} srcDoc={rendered} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}</div></div></div>, document.body)
 }
 
 function PropertyModal({ title, initial, propertyId, editorOnly = false, onClose, onSaved }: { title: string; initial: PropertyInput; propertyId?: string; editorOnly?: boolean; onClose: () => void; onSaved: (property: PropertyRecord) => void }) {

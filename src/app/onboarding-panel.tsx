@@ -9,7 +9,7 @@ import { authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
-import type { FinanceInvoiceRecord } from '@/lib/finance'
+import type { FinanceInvoiceRecord, FinancePaymentRecord } from '@/lib/finance'
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
 import { ToastMessage } from '@/components/ui/ToastMessage'
 import { useAppDialog } from '@/components/ui/AppDialogProvider'
@@ -28,9 +28,11 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
   const [editing, setEditing] = useState<OnboardingRecord | null>(null)
   const [invoiceRecord, setInvoiceRecord] = useState<OnboardingRecord | null>(null)
   const [paymentInvoice, setPaymentInvoice] = useState<FinanceInvoiceRecord | null>(null)
+  const [paymentRecord, setPaymentRecord] = useState<FinancePaymentRecord | null>(null)
   const [deletingId, setDeletingId] = useState('')
   const [completingPaymentId, setCompletingPaymentId] = useState('')
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [search, setSearch] = useState('')
   const [expandedId, setExpandedId] = useState('')
   const visibleOnboardings = useMemo(() => {
@@ -65,10 +67,11 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
   async function openPaymentRecord(record: OnboardingRecord) {
     setCompletingPaymentId(record.id)
     setError('')
+    setMessage('')
     try {
       const financeUrl = `/api/admin/finance/invoices/${encodeURIComponent(`ota_${record.id}`)}/payments`
       const response = await fetch(financeUrl, { cache: 'no-store' })
-      let data = await response.json() as { invoice?: FinanceInvoiceRecord; message?: string }
+      let data = await response.json() as { invoice?: FinanceInvoiceRecord; payment?: FinancePaymentRecord | null; message?: string }
 
       // Completed onboarding records created before the Finance ledger do not
       // have an invoice snapshot yet. Create that snapshot without changing
@@ -88,8 +91,11 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
 
       if (!data.invoice) throw new Error('The invoice payment record is unavailable.')
       if (data.invoice.status === 'paid') {
-        onChange(onboardings.map((item) => item.id === record.id ? { ...item, paymentStatus: 'complete', financePaymentRecordedAt: new Date().toISOString() } : item))
-        return
+        if (!data.payment) throw new Error('The confirmed payment details are unavailable.')
+        onChange(onboardings.map((item) => item.id === record.id ? { ...item, ratePerPlatform: item.platforms.length ? data.invoice!.amount / item.platforms.length : item.ratePerPlatform, paymentStatus: 'complete', financePaymentRecordedAt: item.financePaymentRecordedAt || new Date().toISOString() } : item))
+        setPaymentRecord(data.payment)
+      } else {
+        setPaymentRecord(null)
       }
       setPaymentInvoice(data.invoice)
     } catch (caught) {
@@ -117,7 +123,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
         </div>
       </div>
 
-      <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
+      <ToastMessage message={error || message} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setMessage('') }} />
 
       {loading ? (
         <div className="surface flex min-h-52 items-center justify-center rounded-lg"><Loader2 className="h-6 w-6 animate-spin text-sub" /></div>
@@ -135,8 +141,8 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
             const paymentStatus = record.paymentStatus || (record.invoiceSequence ? 'pending' : 'not_invoiced')
             return (
               <section key={record.id}>
-                <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-4">
-                  <button type="button" onClick={() => setExpandedId(expanded ? '' : record.id)} className="flex min-w-0 flex-1 items-center gap-3 text-left" aria-label={`${expanded ? 'Collapse' : 'Expand'} platform progress for ${record.propertyName}`} title={`${expanded ? 'Collapse' : 'Expand'} platform progress`}>
+                <div className="flex flex-wrap items-start justify-between gap-4 px-4 py-4 sm:items-center sm:px-5">
+                  <button type="button" onClick={() => setExpandedId(expanded ? '' : record.id)} className="flex w-full min-w-0 items-center gap-3 text-left sm:w-auto sm:flex-1" aria-label={`${expanded ? 'Collapse' : 'Expand'} platform progress for ${record.propertyName}`} title={`${expanded ? 'Collapse' : 'Expand'} platform progress`}>
                     <ChevronDown className={`h-4 w-4 shrink-0 text-sub transition-transform ${expanded ? 'rotate-180' : ''}`} />
                     <span className="min-w-0">
                       <span className="block truncate font-semibold text-ink">{record.propertyName}</span>
@@ -144,17 +150,17 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
                       <span className="mt-0.5 block text-xs text-ghost">{liveCount}/{record.platforms.length} live · {record.platforms.length - liveCount} pending</span>
                     </span>
                   </button>
-                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                  <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:shrink-0 sm:justify-end">
                     <span className={`rounded-full border px-3 py-1 text-xs font-medium ${liveCount === record.platforms.length ? 'border-green-500/25 bg-green-500/10 text-green-300' : 'border-amber-500/25 bg-amber-500/10 text-amber-300'}`}>
                       {liveCount === record.platforms.length ? 'Onboarding complete' : 'Onboarding in progress'}
                     </span>
                     {!readOnly && !editorOnly && paymentStatus === 'pending' ? <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">Payment pending</span> : null}
                     {!readOnly && !editorOnly && paymentStatus === 'complete' ? <span className="rounded-full border border-green-500/25 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-300">Payment complete</span> : null}
-                    {!readOnly ? <div className="ml-1 flex items-center gap-1">
-                      {!editorOnly && liveCount === record.platforms.length && paymentStatus !== 'complete' ? <button type="button" onClick={() => setInvoiceRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159]" aria-label={`${paymentStatus === 'pending' ? 'Open' : 'Generate'} invoice for ${record.propertyName}`} title={paymentStatus === 'pending' ? 'Open invoice PDF' : 'Generate invoice'}><FileText className="h-4 w-4" /></button> : null}
-                      {!editorOnly && record.invoiceSequence && !record.financePaymentRecordedAt ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => openPaymentRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50" aria-label={`Record payment for ${record.propertyName}`} title={paymentStatus === 'complete' ? 'Record completed payment in Finance' : 'Record payment'}>{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}</button> : null}
-                      {!editorOnly ? <button type="button" onClick={() => setEditing(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-zinc-800 hover:text-ink" aria-label={`Edit onboarding details for ${record.propertyName}`} title="Edit onboarding"><Edit className="h-4 w-4" /></button> : null}
-                      {!editorOnly ? <button type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-9 w-9 items-center justify-center rounded-md text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50" aria-label={`Delete onboarding for ${record.propertyName}`} title="Delete onboarding">{deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}</button> : null}
+                    {!readOnly ? <div className="mt-1 flex w-full flex-wrap items-center justify-start gap-2 sm:ml-1 sm:mt-0 sm:w-auto sm:justify-end sm:gap-1">
+                      {!editorOnly && liveCount === record.platforms.length && paymentStatus !== 'complete' ? <button type="button" onClick={() => setInvoiceRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`${paymentStatus === 'pending' ? 'Open' : 'Generate'} invoice for ${record.propertyName}`} title={paymentStatus === 'pending' ? 'Open invoice PDF' : 'Generate invoice'}><FileText className="h-4 w-4" /><span className="ml-2 text-xs font-medium sm:hidden">Invoice</span></button> : null}
+                      {!editorOnly && record.invoiceSequence ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => openPaymentRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50 sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`${paymentStatus === 'complete' ? 'Correct payment' : 'Record payment'} for ${record.propertyName}`} title={paymentStatus === 'complete' ? 'Correct payment' : 'Record payment'}>{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}<span className="ml-2 text-xs font-medium sm:hidden">{paymentStatus === 'complete' ? 'Payment' : 'Pay'}</span></button> : null}
+                      {!editorOnly ? <button type="button" onClick={() => setEditing(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-ink sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`Edit onboarding details for ${record.propertyName}`} title="Edit onboarding"><Edit className="h-4 w-4" /><span className="ml-2 text-xs font-medium sm:hidden">Edit</span></button> : null}
+                      {!editorOnly ? <button type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50 sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`Delete onboarding for ${record.propertyName}`} title="Delete onboarding">{deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}<span className="ml-2 text-xs font-medium sm:hidden">Delete</span></button> : null}
                     </div> : null}
                   </div>
                 </div>
@@ -200,7 +206,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
       {showCreate ? <OnboardingDetailsModal onClose={() => setShowCreate(false)} onSaved={(record) => { onChange([...onboardings, record].sort((a, b) => a.propertyName.localeCompare(b.propertyName))); setExpandedId(record.id); setShowCreate(false) }} /> : null}
       {editing ? <OnboardingDetailsModal initial={editing} onClose={() => setEditing(null)} onSaved={(record) => { onChange(onboardings.map((item) => item.id === record.id ? record : item).sort((a, b) => a.propertyName.localeCompare(b.propertyName))); setEditing(null) }} /> : null}
       {invoiceRecord ? <InvoiceModal record={invoiceRecord} onGenerated={(updated) => { onChange(onboardings.map((item) => item.id === updated.id ? updated : item)); setInvoiceRecord(updated) }} onClose={() => setInvoiceRecord(null)} /> : null}
-      {paymentInvoice ? <RecordPaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} onRecorded={(updated) => { setPaymentInvoice(null); onChange(onboardings.map((item) => item.id === updated.sourceId ? { ...item, paymentStatus: 'complete', financePaymentRecordedAt: new Date().toISOString() } : item)) }} /> : null}
+      {paymentInvoice ? <RecordPaymentModal invoice={paymentInvoice} payment={paymentRecord} onClose={() => { setPaymentInvoice(null); setPaymentRecord(null) }} onRecorded={(updated) => { const wasCorrection = Boolean(paymentRecord); setPaymentInvoice(null); setPaymentRecord(null); onChange(onboardings.map((item) => item.id === updated.sourceId ? { ...item, ratePerPlatform: wasCorrection && item.platforms.length ? updated.amount / item.platforms.length : item.ratePerPlatform, paymentStatus: 'complete', financePaymentRecordedAt: item.financePaymentRecordedAt || new Date().toISOString() } : item)); setMessage(wasCorrection ? 'Payment and onboarding commercial details corrected.' : 'Payment recorded successfully.') }} /> : null}
     </div>
   )
 }
@@ -253,15 +259,19 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
   const [invoiceDate, setInvoiceDate] = useState(todayLocalDateOnly())
   const [template, setTemplate] = useState('')
   const [paymentSettings, setPaymentSettings] = useState<InvoicePaymentSettings>(emptyInvoicePaymentSettings)
+  const [issuedInvoice, setIssuedInvoice] = useState<FinanceInvoiceRecord | null>(null)
   const [invoiceSequence, setInvoiceSequence] = useState(0)
   const [issuedInvoiceNumber, setIssuedInvoiceNumber] = useState('')
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
-  const dueDate = invoiceDate
-  const [year, month] = invoiceDate.split('-')
+  const effectiveInvoiceDate = issuedInvoice?.invoiceDate || invoiceDate
+  const dueDate = issuedInvoice?.dueDate || invoiceDate
+  const [year, month] = effectiveInvoiceDate.split('-')
   const invoiceNumber = issuedInvoiceNumber || `PP-OTA-${month}-${year.slice(-2)}-PREVIEW`
-  const subtotal = record.ratePerPlatform * record.platforms.length
+  const subtotal = issuedInvoice?.amount ?? record.ratePerPlatform * record.platforms.length
+  const invoicePlatforms = issuedInvoice?.otaSnapshot?.platforms || record.platforms.map((progress) => progress.platform)
+  const ratePerPlatform = issuedInvoice && invoicePlatforms.length ? issuedInvoice.amount / invoicePlatforms.length : record.ratePerPlatform
 
   useEffect(() => {
     onGeneratedRef.current = onGenerated
@@ -272,36 +282,50 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
     Promise.all([
       fetch('/template/ProfitPro_OTA_Onboarding_Invoice_Template.html', { signal: controller.signal }),
       fetch('/api/admin/invoice-settings', { signal: controller.signal }),
+      record.invoiceSequence
+        ? fetch(`/api/admin/finance/invoices/${encodeURIComponent(`ota_${record.id}`)}/payments?invoiceOnly=1`, { signal: controller.signal, cache: 'no-store' })
+        : Promise.resolve(null),
     ])
-      .then(async ([templateResponse, settingsResponse]) => {
+      .then(async ([templateResponse, settingsResponse, invoiceResponse]) => {
         if (!templateResponse.ok) throw new Error('Invoice template could not be loaded.')
         if (!settingsResponse.ok) throw new Error('Invoice payment details could not be loaded.')
         const settingsData = await settingsResponse.json() as { settings?: InvoicePaymentSettings }
         setTemplate(await templateResponse.text())
         setPaymentSettings(settingsData.settings || emptyInvoicePaymentSettings)
+        if (invoiceResponse?.ok) {
+          const invoiceData = await invoiceResponse.json() as { invoice?: FinanceInvoiceRecord }
+          if (invoiceData.invoice) {
+            setIssuedInvoice(invoiceData.invoice)
+            setInvoiceSequence(record.invoiceSequence || 0)
+            setIssuedInvoiceNumber(invoiceData.invoice.invoiceNumber)
+            setInvoiceDate(invoiceData.invoice.invoiceDate)
+          }
+        } else if (invoiceResponse && invoiceResponse.status !== 404) {
+          throw new Error('The issued invoice snapshot could not be loaded.')
+        }
       })
       .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Invoice template could not be loaded.') })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [record.id])
+  }, [record.id, record.invoiceSequence])
 
   const renderedInvoice = useMemo(() => {
     if (!template) return ''
     const values: Record<string, string | number> = {
       invoice_number: invoiceNumber,
-      invoice_date: formatDateOnlyDisplay(invoiceDate),
+      invoice_date: formatDateOnlyDisplay(effectiveInvoiceDate),
       due_date: formatDateOnlyDisplay(dueDate),
-      client_name: record.clientName,
-      property_name: record.propertyName,
-      property_address: record.propertyAddress,
-      email_address: record.emailAddress,
-      phone: record.phone,
-      platform_list: record.platforms.map((progress) => getOtaPlatformLabel(progress.platform)).join(', '),
-      platform_count: record.platforms.length,
-      rate_per_platform: record.ratePerPlatform.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
+      client_name: issuedInvoice?.clientName || record.clientName,
+      property_name: issuedInvoice?.propertyName || record.propertyName,
+      property_address: issuedInvoice?.otaSnapshot?.propertyAddress || record.propertyAddress,
+      email_address: issuedInvoice?.otaSnapshot?.emailAddress || record.emailAddress,
+      phone: issuedInvoice?.otaSnapshot?.phone || record.phone,
+      platform_list: invoicePlatforms.map(getOtaPlatformLabel).join(', '),
+      platform_count: invoicePlatforms.length,
+      rate_per_platform: ratePerPlatform.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
       subtotal: subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
       total_amount: subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 }),
-      notes: record.invoiceNotes || 'OTA onboarding completed successfully across all selected platforms.',
+      notes: issuedInvoice?.otaSnapshot?.invoiceNotes || record.invoiceNotes || 'OTA onboarding completed successfully across all selected platforms.',
       account_name: paymentSettings.accountName,
       bank_name: paymentSettings.bankName,
       account_number: paymentSettings.accountNumber,
@@ -311,7 +335,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       company_address: paymentSettings.companyAddress,
     }
     return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeHtml(value)), template)
-  }, [dueDate, invoiceDate, invoiceNumber, paymentSettings, record, subtotal, template])
+  }, [dueDate, effectiveInvoiceDate, invoiceNumber, invoicePlatforms, issuedInvoice, paymentSettings, ratePerPlatform, record, subtotal, template])
 
   async function downloadPdf() {
     setDownloading(true)
@@ -332,6 +356,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
         const rerendered = new Promise<void>((resolve) => frame?.addEventListener('load', () => resolve(), { once: true }))
         setInvoiceSequence(issuedSequence)
         setIssuedInvoiceNumber(data.invoice.invoiceNumber)
+        setIssuedInvoice(data.invoice)
         onGeneratedRef.current(data.onboarding)
         await Promise.race([rerendered, new Promise<void>((resolve) => setTimeout(resolve, 2_000))])
       }
@@ -378,7 +403,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
           <div className="flex flex-wrap items-end gap-3">
             <label className="block w-44">
               <span className="label-upper mb-2 block text-ghost">Invoice date</span>
-              <DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required />
+              {issuedInvoice ? <div className="flex h-11 items-center rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-sub">{formatDateOnlyDisplay(effectiveInvoiceDate)}</div> : <DatePickerInput value={invoiceDate} onChange={setInvoiceDate} className={inputClass} required />}
             </label>
             <div className="w-36">
               <span className="label-upper mb-2 block text-ghost">Due date</span>

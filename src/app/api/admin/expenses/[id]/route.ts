@@ -60,7 +60,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       (expenseType === 'other' && (!customExpenseType || customExpenseType.length > 100)) ||
       (expenseType !== 'other' && customExpenseType.length > 0) ||
       !Number.isFinite(amount) ||
-      amount <= 0 ||
+      amount < 0.01 ||
       amount > 10_000_000 ||
       city.length > 100 ||
       description.length > 2000 ||
@@ -133,6 +133,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     return NextResponse.json({ ok: true })
   } catch (error) {
     if (error instanceof Error && error.message === 'EXPENSE_NOT_FOUND') return NextResponse.json({ message: 'Your Admin expense was not found.' }, { status: 404 })
+    if (error instanceof Error && error.message === 'EXPENSE_DELETE_LOCKED') return NextResponse.json({ message: 'Approved or paid expenses cannot be deleted. Use an audited correction or reversal.' }, { status: 409 })
     console.error(`Failed to withdraw Admin expense ${id}:`, error)
     return NextResponse.json({ message: 'Failed to withdraw Admin expense.' }, { status: 500 })
   }

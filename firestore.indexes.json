@@ -24,6 +24,38 @@
         { "fieldPath": "staffEmail", "order": "ASCENDING" },
         { "fieldPath": "amount", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "finance_invoices",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "amount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "finance_payments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "service", "order": "ASCENDING" },
+        { "fieldPath": "amount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "expenses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "paymentStatus", "order": "ASCENDING" },
+        { "fieldPath": "amount", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "payroll",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "netSalary", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

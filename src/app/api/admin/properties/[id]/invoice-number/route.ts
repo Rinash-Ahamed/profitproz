@@ -17,7 +17,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const dueDate = typeof body.dueDate === 'string' ? body.dueDate : ''
   const billingPeriod = typeof body.billingPeriod === 'string' ? body.billingPeriod.trim() : ''
   const amount = Number(body.amount)
-  if (!parseDateOnly(invoiceDate) || !parseDateOnly(dueDate) || dueDate < invoiceDate || !billingPeriod || billingPeriod.length > 80 || !Number.isFinite(amount) || amount <= 0 || amount > 1_000_000_000) {
+  if (!parseDateOnly(invoiceDate) || !parseDateOnly(dueDate) || dueDate < invoiceDate || !billingPeriod || billingPeriod.length > 80 || !Number.isFinite(amount) || amount < 0.01 || amount > 1_000_000_000) {
     return NextResponse.json({ message: 'Enter valid invoice dates, billing period, and amount.' }, { status: 400 })
   }
 

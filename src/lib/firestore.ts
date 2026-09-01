@@ -7,7 +7,7 @@ import type { PaginationRequest } from './pagination'
 import { countNonSundayDaysInclusive, parseDateOnly, todayInTimeZone } from './date-only'
 import type { HistoricalLeaveType } from './leave'
 import { calculatePayroll, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthEndDate, type MissingAttendanceDecision, type PayrollRecord, type PayrollStatus } from './payroll'
-import type { FinanceInvoiceRecord, FinanceOverview, FinancePaymentRecord, FinanceService, PaymentMethod } from './finance'
+import { roundCurrency, sumCurrency, type FinanceInvoiceRecord, type FinanceOverview, type FinancePaymentRecord, type FinanceService, type PaymentMethod } from './finance'
 
 export type StaffRecord = {
   id: string
@@ -622,7 +622,7 @@ function mapDocToExpense(doc: DocumentSnapshot): ExpenseRecord {
     expenseType: ['travel', 'food', 'fuel', 'other'].includes(data.expenseType) ? data.expenseType : 'other',
     customExpenseType: typeof data.customExpenseType === 'string' ? data.customExpenseType : '',
     description: data.description || data.notes || '',
-    amount: data.amount || 0,
+    amount: typeof data.amount === 'number' && Number.isFinite(data.amount) ? roundCurrency(data.amount) : 0,
     notes: data.notes || '',
     receiptName: data.receiptName || '',
     receiptUrl: data.receiptUrl || '',
@@ -759,8 +759,9 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
 
 function mapDocToFinanceInvoice(doc: DocumentSnapshot): FinanceInvoiceRecord {
   const data = doc.data() || {}
-  const amount = typeof data.amount === 'number' ? data.amount : 0
-  const paidAmount = typeof data.paidAmount === 'number' ? data.paidAmount : 0
+  const otaSnapshot = data.otaSnapshot && typeof data.otaSnapshot === 'object' ? data.otaSnapshot as Record<string, unknown> : null
+  const amount = typeof data.amount === 'number' && Number.isFinite(data.amount) ? roundCurrency(data.amount) : 0
+  const paidAmount = typeof data.paidAmount === 'number' && Number.isFinite(data.paidAmount) ? roundCurrency(data.paidAmount) : 0
   return {
     id: doc.id,
     service: data.service === 'ota_onboarding' ? 'ota_onboarding' : 'revenue_management',
@@ -773,11 +774,19 @@ function mapDocToFinanceInvoice(doc: DocumentSnapshot): FinanceInvoiceRecord {
     billingPeriod: typeof data.billingPeriod === 'string' ? data.billingPeriod : '',
     amount,
     paidAmount,
-    balanceAmount: Math.max(0, amount - paidAmount),
+    balanceAmount: roundCurrency(Math.max(0, amount - paidAmount)),
     status: data.status === 'paid' || data.status === 'cancelled' ? data.status : 'pending',
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
     paidAt: mapTimestamp(data.paidAt),
+    otaSnapshot: otaSnapshot ? {
+      propertyAddress: typeof otaSnapshot.propertyAddress === 'string' ? otaSnapshot.propertyAddress : '',
+      emailAddress: typeof otaSnapshot.emailAddress === 'string' ? otaSnapshot.emailAddress : '',
+      phone: typeof otaSnapshot.phone === 'string' ? otaSnapshot.phone : '',
+      platforms: Array.isArray(otaSnapshot.platforms) ? otaSnapshot.platforms.filter((platform): platform is OtaPlatform => typeof platform === 'string') : [],
+      ratePerPlatform: typeof otaSnapshot.ratePerPlatform === 'number' && Number.isFinite(otaSnapshot.ratePerPlatform) ? otaSnapshot.ratePerPlatform : 0,
+      invoiceNotes: typeof otaSnapshot.invoiceNotes === 'string' ? otaSnapshot.invoiceNotes : '',
+    } : undefined,
   }
 }
 
@@ -788,13 +797,15 @@ function mapDocToFinancePayment(doc: DocumentSnapshot): FinancePaymentRecord {
     invoiceId: typeof data.invoiceId === 'string' ? data.invoiceId : '',
     service: data.service === 'ota_onboarding' ? 'ota_onboarding' : 'revenue_management',
     invoiceNumber: typeof data.invoiceNumber === 'string' ? data.invoiceNumber : '',
-    amount: typeof data.amount === 'number' ? data.amount : 0,
+    amount: typeof data.amount === 'number' && Number.isFinite(data.amount) ? roundCurrency(data.amount) : 0,
     paymentDate: typeof data.paymentDate === 'string' ? data.paymentDate : '',
     method: ['upi', 'neft', 'rtgs', 'bank_transfer', 'other'].includes(data.method) ? data.method as PaymentMethod : 'other',
     reference: typeof data.reference === 'string' ? data.reference : '',
     notes: typeof data.notes === 'string' ? data.notes : '',
     recordedBy: typeof data.recordedBy === 'string' ? data.recordedBy : '',
+    correctedBy: typeof data.correctedBy === 'string' ? data.correctedBy : undefined,
     createdAt: mapTimestamp(data.createdAt),
+    updatedAt: mapTimestamp(data.updatedAt),
   }
 }
 
@@ -936,8 +947,12 @@ export async function updateOnboardingPlatform(id: string, input: OnboardingPlat
 export async function deleteOnboarding(id: string): Promise<void> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
-  const snapshot = await docRef.get()
+  const [snapshot, financeSnapshot] = await Promise.all([
+    docRef.get(),
+    db.collection(COLLECTIONS.FINANCE_INVOICES).doc(`ota_${id}`).get(),
+  ])
   if (!snapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
+  if (financeSnapshot.exists) throw new Error('SOURCE_HAS_FINANCE_HISTORY')
   await docRef.delete()
 }
 
@@ -950,6 +965,7 @@ function serviceInvoiceNumber(service: FinanceService, sequence: number, invoice
 
 export async function getOrCreateOnboardingInvoiceSequence(id: string, input: InvoiceSnapshotInput): Promise<{ sequence: number; onboarding: OnboardingRecord; invoice: FinanceInvoiceRecord }> {
   const db = ensureDb()
+  const invoiceAmount = roundCurrency(input.amount)
   const onboardingRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
   const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('ota-invoice-sequence')
   const financeRef = db.collection(COLLECTIONS.FINANCE_INVOICES).doc(`ota_${id}`)
@@ -958,6 +974,15 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
     const onboardingSnapshot = await transaction.get(onboardingRef)
     if (!onboardingSnapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
     const financeSnapshot = await transaction.get(financeRef)
+    const onboardingData = onboardingSnapshot.data() || {}
+    const otaSnapshot = {
+      propertyAddress: typeof onboardingData.propertyAddress === 'string' ? onboardingData.propertyAddress : '',
+      emailAddress: typeof onboardingData.emailAddress === 'string' ? onboardingData.emailAddress : '',
+      phone: typeof onboardingData.phone === 'string' ? onboardingData.phone : '',
+      platforms: Array.isArray(onboardingData.platforms) ? onboardingData.platforms.flatMap((item: unknown) => item && typeof item === 'object' && typeof (item as { platform?: unknown }).platform === 'string' ? [(item as { platform: string }).platform] : []) : [],
+      ratePerPlatform: typeof onboardingData.ratePerPlatform === 'number' ? onboardingData.ratePerPlatform : 0,
+      invoiceNotes: typeof onboardingData.invoiceNotes === 'string' ? onboardingData.invoiceNotes : '',
+    }
 
     const existingSequence = onboardingSnapshot.data()?.invoiceSequence
     if (Number.isInteger(existingSequence) && existingSequence > 0) {
@@ -972,7 +997,8 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
         transaction.set(financeRef, {
           service: 'ota_onboarding', sourceId: id, invoiceNumber: serviceInvoiceNumber('ota_onboarding', existingSequence as number, input.invoiceDate),
           clientName: onboardingSnapshot.data()?.clientName || '', propertyName: onboardingSnapshot.data()?.propertyName || '',
-          invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: input.amount,
+          invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: invoiceAmount,
+          otaSnapshot,
           paidAmount: 0,
           status: 'pending',
           createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
@@ -997,7 +1023,8 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
     transaction.set(financeRef, {
       service: 'ota_onboarding', sourceId: id, invoiceNumber: serviceInvoiceNumber('ota_onboarding', nextSequence, input.invoiceDate),
       clientName: onboardingSnapshot.data()?.clientName || '', propertyName: onboardingSnapshot.data()?.propertyName || '',
-      invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: input.amount,
+      invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: invoiceAmount,
+      otaSnapshot,
       paidAmount: 0, status: 'pending', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     })
     return nextSequence
@@ -1008,6 +1035,7 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
 
 export async function createRevenueInvoiceSequence(propertyId: string, input: InvoiceSnapshotInput): Promise<{ sequence: number; invoice: FinanceInvoiceRecord }> {
   const db = ensureDb()
+  const invoiceAmount = roundCurrency(input.amount)
   const propertyRef = db.collection(COLLECTIONS.PROPERTIES).doc(propertyId)
   const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('revenue-invoice-sequence')
   const invoiceRef = db.collection(COLLECTIONS.REVENUE_INVOICES).doc(createDocumentId())
@@ -1025,7 +1053,7 @@ export async function createRevenueInvoiceSequence(propertyId: string, input: In
     transaction.set(db.collection(COLLECTIONS.FINANCE_INVOICES).doc(invoiceRef.id), {
       service: 'revenue_management', sourceId: propertyId, invoiceNumber,
       clientName: property.data()?.contactName || property.data()?.name || '', propertyName: property.data()?.name || '',
-      invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: input.amount,
+      invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: invoiceAmount,
       paidAmount: 0, status: 'pending', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     })
     return sequence
@@ -1035,27 +1063,80 @@ export async function createRevenueInvoiceSequence(propertyId: string, input: In
 
 export async function getFinanceOverview(): Promise<FinanceOverview> {
   const db = ensureDb()
-  const [invoiceSnapshot, paymentSnapshot, expenseSnapshot] = await Promise.all([
-    db.collection(COLLECTIONS.FINANCE_INVOICES).get(),
-    db.collection(COLLECTIONS.FINANCE_PAYMENTS).get(),
-    db.collection(COLLECTIONS.EXPENSES).select('amount', 'status', 'paymentStatus').get(),
+  const tableLimit = 100
+  const invoicesQuery = db.collection(COLLECTIONS.FINANCE_INVOICES)
+  const paymentsQuery = db.collection(COLLECTIONS.FINANCE_PAYMENTS)
+  const expensesQuery = db.collection(COLLECTIONS.EXPENSES)
+  const payrollQuery = db.collection(COLLECTIONS.PAYROLL)
+  const aggregateSum = async (query: Query, field: string) => {
+    const result = await query.aggregate({ total: AggregateField.sum(field) }).get()
+    return roundCurrency(Number(result.data().total || 0))
+  }
+  const totalsPromise = (async () => {
+    try {
+      const [totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll] = await Promise.all([
+        aggregateSum(invoicesQuery.where('status', 'in', ['pending', 'paid']), 'amount'),
+        aggregateSum(paymentsQuery, 'amount'),
+        aggregateSum(paymentsQuery.where('service', '==', 'revenue_management'), 'amount'),
+        aggregateSum(paymentsQuery.where('service', '==', 'ota_onboarding'), 'amount'),
+        aggregateSum(expensesQuery.where('status', '==', 'approved'), 'amount'),
+        aggregateSum(expensesQuery.where('paymentStatus', '==', 'paid'), 'amount'),
+        aggregateSum(payrollQuery.where('status', '==', 'paid'), 'netSalary'),
+      ])
+      return { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll }
+    } catch (error) {
+      if (!isMissingIndexError(error)) throw error
+
+      // Keep Finance available while newly declared aggregate indexes build.
+      // Each collection is read once, selecting only fields needed for totals.
+      const [invoiceTotals, paymentTotals, expenseTotals, payrollTotals] = await Promise.all([
+        invoicesQuery.select('amount', 'status').get(),
+        paymentsQuery.select('amount', 'service').get(),
+        expensesQuery.select('amount', 'status', 'paymentStatus').get(),
+        payrollQuery.where('status', '==', 'paid').select('netSalary').get(),
+      ])
+      const amountOf = (data: Record<string, unknown>, field = 'amount') => typeof data[field] === 'number' && Number.isFinite(data[field]) ? data[field] as number : 0
+      const activeInvoices = invoiceTotals.docs.filter((document) => document.data().status !== 'cancelled')
+      const revenuePayments = paymentTotals.docs.filter((document) => document.data().service === 'revenue_management')
+      const onboardingPayments = paymentTotals.docs.filter((document) => document.data().service === 'ota_onboarding')
+      const approvedExpenses = expenseTotals.docs.filter((document) => document.data().status === 'approved')
+      const paidExpenseDocs = expenseTotals.docs.filter((document) => document.data().paymentStatus === 'paid')
+      return {
+        totalInvoiced: sumCurrency(activeInvoices.map((document) => amountOf(document.data()))),
+        incomeReceived: sumCurrency(paymentTotals.docs.map((document) => amountOf(document.data()))),
+        revenueIncome: sumCurrency(revenuePayments.map((document) => amountOf(document.data()))),
+        onboardingIncome: sumCurrency(onboardingPayments.map((document) => amountOf(document.data()))),
+        approvedExpenseTotal: sumCurrency(approvedExpenses.map((document) => amountOf(document.data()))),
+        paidExpenses: sumCurrency(paidExpenseDocs.map((document) => amountOf(document.data()))),
+        paidPayroll: sumCurrency(payrollTotals.docs.map((document) => amountOf(document.data(), 'netSalary'))),
+      }
+    }
+  })()
+  const [invoiceSnapshot, paymentSnapshot, totals] = await Promise.all([
+    invoicesQuery.orderBy('invoiceDate', 'desc').limit(tableLimit + 1).get(),
+    paymentsQuery.orderBy('paymentDate', 'desc').limit(tableLimit + 1).get(),
+    totalsPromise,
   ])
-  const invoices = invoiceSnapshot.docs.map(mapDocToFinanceInvoice).sort((a, b) => (b.invoiceDate || b.createdAt || '').localeCompare(a.invoiceDate || a.createdAt || ''))
-  const payments = paymentSnapshot.docs.map(mapDocToFinancePayment).sort((a, b) => (b.paymentDate || b.createdAt || '').localeCompare(a.paymentDate || a.createdAt || ''))
-  const totalInvoiced = invoices.filter((invoice) => invoice.status !== 'cancelled').reduce((total, invoice) => total + invoice.amount, 0)
-  const incomeReceived = payments.reduce((total, payment) => total + payment.amount, 0)
-  const expenseTotals = expenseSnapshot.docs.reduce((totals, document) => {
-    const data = document.data()
-    const amount = typeof data.amount === 'number' && Number.isFinite(data.amount) ? data.amount : 0
-    if (data.paymentStatus === 'paid') totals.paid += amount
-    else if (data.status === 'approved') totals.unpaid += amount
-    return totals
-  }, { paid: 0, unpaid: 0 })
-  const paidExpenses = expenseTotals.paid
-  const unpaidExpenses = expenseTotals.unpaid
-  const revenueIncome = payments.filter((payment) => payment.service === 'revenue_management').reduce((total, payment) => total + payment.amount, 0)
-  const onboardingIncome = payments.filter((payment) => payment.service === 'ota_onboarding').reduce((total, payment) => total + payment.amount, 0)
-  return { invoices, payments, totalInvoiced, incomeReceived, paidExpenses, unpaidExpenses, netCashBalance: incomeReceived - paidExpenses, revenueIncome, onboardingIncome }
+  const { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll } = totals
+  const invoicesTruncated = invoiceSnapshot.docs.length > tableLimit
+  const paymentsTruncated = paymentSnapshot.docs.length > tableLimit
+  const invoices = invoiceSnapshot.docs.slice(0, tableLimit).map(mapDocToFinanceInvoice)
+  const payments = paymentSnapshot.docs.slice(0, tableLimit).map(mapDocToFinancePayment)
+  const unpaidExpenses = roundCurrency(Math.max(0, approvedExpenseTotal - paidExpenses))
+  return {
+    invoices,
+    payments,
+    totalInvoiced,
+    incomeReceived,
+    paidExpenses,
+    paidPayroll,
+    unpaidExpenses,
+    netCashBalance: sumCurrency([incomeReceived, -paidExpenses, -paidPayroll]),
+    revenueIncome,
+    onboardingIncome,
+    invoicesTruncated,
+    paymentsTruncated,
+  }
 }
 
 export async function getFinanceInvoiceById(id: string): Promise<FinanceInvoiceRecord | null> {
@@ -1063,14 +1144,25 @@ export async function getFinanceInvoiceById(id: string): Promise<FinanceInvoiceR
   return snapshot.exists ? mapDocToFinanceInvoice(snapshot) : null
 }
 
+export async function getFinancePaymentByInvoiceId(invoiceId: string): Promise<FinancePaymentRecord | null> {
+  const snapshot = await ensureDb().collection(COLLECTIONS.FINANCE_PAYMENTS).where('invoiceId', '==', invoiceId).limit(1).get()
+  return snapshot.empty ? null : mapDocToFinancePayment(snapshot.docs[0])
+}
+
 export async function syncOnboardingFinancePaymentMarker(invoice: FinanceInvoiceRecord): Promise<void> {
   if (invoice.service !== 'ota_onboarding' || invoice.status !== 'paid' || !invoice.sourceId) return
   const docRef = ensureDb().collection(COLLECTIONS.OTA_ONBOARDINGS).doc(invoice.sourceId)
   const snapshot = await docRef.get()
-  if (!snapshot.exists || snapshot.data()?.financePaymentRecordedAt) return
+  if (!snapshot.exists) return
+  const data = snapshot.data() || {}
+  const platformCount = Array.isArray(data.platforms) ? data.platforms.length : 0
+  const commercialTotal = (typeof data.ratePerPlatform === 'number' ? data.ratePerPlatform : 0) * platformCount
+  const commercialNeedsSync = platformCount > 0 && Math.round(commercialTotal * 100) !== Math.round(invoice.amount * 100)
+  if (data.financePaymentRecordedAt && !commercialNeedsSync) return
   await docRef.update({
     paymentStatus: 'complete',
-    financePaymentRecordedAt: FieldValue.serverTimestamp(),
+    ...(!data.financePaymentRecordedAt ? { financePaymentRecordedAt: FieldValue.serverTimestamp() } : {}),
+    ...(commercialNeedsSync ? { ratePerPlatform: invoice.amount / platformCount } : {}),
     updatedAt: FieldValue.serverTimestamp(),
   })
 }
@@ -1107,6 +1199,82 @@ export async function recordFinancePayment(invoiceId: string, input: { amount: n
   })
 
   return { invoice: mapDocToFinanceInvoice(await invoiceRef.get()), payment: mapDocToFinancePayment(await paymentRef.get()) }
+}
+
+export async function correctFinancePayment(invoiceId: string, input: { amount: number; paymentDate: string; method: PaymentMethod; reference: string; notes: string; actorEmail: string }) {
+  const correctedAmount = Math.round(input.amount * 100) / 100
+  if (!Number.isFinite(correctedAmount) || correctedAmount < 0.01 || correctedAmount > 1_000_000_000) throw new Error('FINANCE_PAYMENT_INVALID_AMOUNT')
+  const db = ensureDb()
+  const invoiceRef = db.collection(COLLECTIONS.FINANCE_INVOICES).doc(invoiceId)
+  const paymentQuery = db.collection(COLLECTIONS.FINANCE_PAYMENTS).where('invoiceId', '==', invoiceId).limit(1)
+  const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
+  let paymentId = ''
+
+  await db.runTransaction(async (transaction) => {
+    const invoiceSnapshot = await transaction.get(invoiceRef)
+    if (!invoiceSnapshot.exists) throw new Error('FINANCE_INVOICE_NOT_FOUND')
+    const invoice = mapDocToFinanceInvoice(invoiceSnapshot)
+    if (invoice.status !== 'paid') throw new Error('FINANCE_PAYMENT_NOT_CONFIRMED')
+    const paymentSnapshot = await transaction.get(paymentQuery)
+    if (paymentSnapshot.empty) throw new Error('FINANCE_PAYMENT_NOT_FOUND')
+    const paymentDocument = paymentSnapshot.docs[0]
+    const onboardingRef = invoice.service === 'ota_onboarding' && invoice.sourceId
+      ? db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(invoice.sourceId)
+      : null
+    const onboardingSnapshot = onboardingRef ? await transaction.get(onboardingRef) : null
+    const previous = mapDocToFinancePayment(paymentDocument)
+    paymentId = paymentDocument.id
+    const changes: AuditLogRecord['changes'] = {}
+    if (Math.round(previous.amount * 100) !== Math.round(correctedAmount * 100)) changes.paymentAmount = { from: previous.amount, to: correctedAmount }
+    if (Math.round(invoice.amount * 100) !== Math.round(correctedAmount * 100)) changes.invoiceAmount = { from: invoice.amount, to: correctedAmount }
+    if (previous.paymentDate !== input.paymentDate) changes.paymentDate = { from: previous.paymentDate, to: input.paymentDate }
+    if (previous.method !== input.method) changes.method = { from: previous.method, to: input.method }
+    if (previous.reference !== input.reference.trim()) changes.reference = { from: previous.reference, to: input.reference.trim() }
+    if (previous.notes !== input.notes.trim()) changes.notes = { from: previous.notes, to: input.notes.trim() }
+    if (!Object.keys(changes).length) throw new Error('FINANCE_PAYMENT_NO_CHANGES')
+
+    transaction.update(paymentDocument.ref, {
+      amount: correctedAmount,
+      paymentDate: input.paymentDate,
+      method: input.method,
+      reference: input.reference.trim(),
+      notes: input.notes.trim(),
+      correctedBy: input.actorEmail.trim().toLowerCase(),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+    transaction.update(invoiceRef, {
+      amount: correctedAmount,
+      paidAmount: correctedAmount,
+      status: 'paid',
+      ...(invoice.otaSnapshot?.platforms.length ? { 'otaSnapshot.ratePerPlatform': correctedAmount / invoice.otaSnapshot.platforms.length } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    })
+    if (onboardingRef && onboardingSnapshot?.exists) {
+      const platforms = onboardingSnapshot.data()?.platforms
+      const platformCount = Array.isArray(platforms) ? platforms.length : 0
+      if (platformCount > 0) {
+        transaction.update(onboardingRef, {
+          ratePerPlatform: correctedAmount / platformCount,
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      }
+    }
+    transaction.set(auditRef, {
+      timestamp: FieldValue.serverTimestamp(),
+      actorEmail: input.actorEmail.trim().toLowerCase(),
+      action: 'INVOICE_PAYMENT_CORRECTION',
+      targetId: paymentDocument.id,
+      details: `Payment details corrected for ${invoice.invoiceNumber}.`,
+      changes,
+    })
+  })
+
+  if (!paymentId) throw new Error('FINANCE_PAYMENT_NOT_FOUND')
+  requestAuditLogPrune()
+  return {
+    invoice: mapDocToFinanceInvoice(await invoiceRef.get()),
+    payment: mapDocToFinancePayment(await db.collection(COLLECTIONS.FINANCE_PAYMENTS).doc(paymentId).get()),
+  }
 }
 
 export async function getPropertyById(id: string): Promise<PropertyRecord | null> {
@@ -1177,8 +1345,12 @@ export async function saveEncryptedPropertyCredentials(id: string, payload: stri
 export async function deleteProperty(id: string): Promise<void> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.PROPERTIES).doc(id)
-  const existing = await docRef.get()
+  const [existing, financeSnapshot] = await Promise.all([
+    docRef.get(),
+    db.collection(COLLECTIONS.FINANCE_INVOICES).where('sourceId', '==', id).limit(1).get(),
+  ])
   if (!existing.exists) throw new Error('PROPERTY_NOT_FOUND')
+  if (!financeSnapshot.empty) throw new Error('SOURCE_HAS_FINANCE_HISTORY')
   const batch = db.batch()
   batch.delete(docRef)
   batch.delete(db.collection(COLLECTIONS.PROPERTY_CREDENTIALS).doc(id))
@@ -1216,7 +1388,7 @@ export async function createExpense(input: { staffEmail: string; staffName: stri
     expenseType: input.expenseType,
     customExpenseType: input.customExpenseType?.trim() || '',
     description: input.description.trim(),
-    amount: input.amount,
+    amount: roundCurrency(input.amount),
     notes: input.description.trim(),
     receiptName: input.receiptName.trim(),
     receiptUrl: input.receiptUrl || '',
@@ -1279,7 +1451,7 @@ export async function correctExpense(
       city: input.city.trim(),
       description: input.description.trim(),
       notes: input.description.trim(),
-      amount: input.amount,
+      amount: roundCurrency(input.amount),
       receiptName: input.receiptUrl ? 'External receipt link' : '',
       receiptUrl: input.receiptUrl,
     }
@@ -1355,6 +1527,7 @@ export async function deleteAdminExpense(id: string, adminEmail: string) {
     const data = snapshot.data() || {}
     const belongsToAdmin = data.submittedByRole === 'admin' && String(data.staffEmail || '').trim().toLowerCase() === adminEmail.trim().toLowerCase()
     if (!belongsToAdmin) throw new Error('EXPENSE_NOT_FOUND')
+    if (data.status === 'approved' || data.paymentStatus === 'paid') throw new Error('EXPENSE_DELETE_LOCKED')
     transaction.delete(expenseRef)
     transaction.delete(receiptRef)
   })

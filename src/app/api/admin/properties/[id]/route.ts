@@ -62,6 +62,7 @@ export async function DELETE(_request: Request, context: RouteContext) {
     await logAdminAction({ actorEmail: user.email, action: 'PROPERTY_DELETE', targetId: id, details: `Admin deleted client property: ${property.name}.` })
     return NextResponse.json({ ok: true })
   } catch (error) {
+    if (error instanceof Error && error.message === 'SOURCE_HAS_FINANCE_HISTORY') return NextResponse.json({ message: 'This property has Finance history and cannot be deleted.' }, { status: 409 })
     console.error(`Failed to delete property ${id}:`, error)
     return NextResponse.json({ message: 'Failed to delete client property.' }, { status: 500 })
   }

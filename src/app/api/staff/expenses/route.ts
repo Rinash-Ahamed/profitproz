@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
   const expenseDate = typeof body.expenseDate === 'string' ? body.expenseDate : ''
   const settings = await getExpenseFieldSettings()
 
-  if (!expenseType || (expenseType === 'other' && (!customExpenseType || customExpenseType.length > 100)) || (expenseType !== 'other' && customExpenseType.length > 0) || !parseDateOnly(expenseDate) || !Number.isFinite(amount) || amount <= 0 || amount > 10_000_000 || city.length > 100 || description.length > 2000 || receiptUrl.length > 2048 || (settings.cityRequired && !city) || (settings.descriptionRequired && !description) || (settings.receiptRequired && !receiptUrl)) {
+  if (!expenseType || (expenseType === 'other' && (!customExpenseType || customExpenseType.length > 100)) || (expenseType !== 'other' && customExpenseType.length > 0) || !parseDateOnly(expenseDate) || !Number.isFinite(amount) || amount < 0.01 || amount > 10_000_000 || city.length > 100 || description.length > 2000 || receiptUrl.length > 2048 || (settings.cityRequired && !city) || (settings.descriptionRequired && !description) || (settings.receiptRequired && !receiptUrl)) {
     return NextResponse.json({ message: 'Complete all required expense fields and enter a valid total.' }, { status: 400 })
   }
   if (receiptUrl) {

@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   const expenseDate = typeof body.expenseDate === 'string' ? body.expenseDate : ''
   const adminName = typeof body.adminName === 'string' ? body.adminName.trim() : ''
 
-  if (!adminName || adminName.length > 160 || /\d/.test(adminName) || !expenseType || (expenseType === 'other' && (!customExpenseType || customExpenseType.length > 100)) || (expenseType !== 'other' && customExpenseType.length > 0) || !parseDateOnly(expenseDate) || !Number.isFinite(amount) || amount <= 0 || amount > 10_000_000 || city.length > 100 || description.length > 2000 || receiptUrl.length > 2048) {
+  if (!adminName || adminName.length > 160 || /\d/.test(adminName) || !expenseType || (expenseType === 'other' && (!customExpenseType || customExpenseType.length > 100)) || (expenseType !== 'other' && customExpenseType.length > 0) || !parseDateOnly(expenseDate) || !Number.isFinite(amount) || amount < 0.01 || amount > 10_000_000 || city.length > 100 || description.length > 2000 || receiptUrl.length > 2048) {
     return NextResponse.json({ message: 'Enter a valid Admin name, expense date, type, and amount.' }, { status: 400 })
   }
   if (receiptUrl) {
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
       status: 'approved',
       expenseDate,
     })
-    await logAdminAction({ actorEmail: user.email, action: 'ADMIN_EXPENSE_CREATE', targetId: expense.id, details: `Admin recorded a ${expenseLabel} expense for ${amount}.` })
+    await logAdminAction({ actorEmail: user.email, action: 'ADMIN_EXPENSE_CREATE', targetId: expense.id, details: `Admin recorded a ${expenseLabel} expense for ${expense.amount}.` })
     return NextResponse.json({ expense }, { status: 201 })
   } catch (error) {
     console.error('Failed to record admin expense:', error)

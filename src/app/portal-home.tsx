@@ -651,23 +651,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     }
   }
 
-  async function withdrawAdminExpense(expense: ExpenseRecord) {
-    if (expense.submittedByRole !== 'admin' || expense.staffEmail.toLowerCase() !== user.email.toLowerCase() || !await confirmAction({ title: 'Withdraw Admin expense?', message: 'Withdraw this Admin expense record?', confirmLabel: 'Withdraw expense', tone: 'danger' })) return
-    setDeletingExpenseId(expense.id)
-    setError('')
-    try {
-      const response = await fetch(`/api/admin/expenses/${encodeURIComponent(expense.id)}`, { method: 'DELETE' })
-      const data = await response.json() as { message?: string }
-      if (!response.ok) throw new Error(data.message || 'Unable to withdraw Admin expense.')
-      setExpenseList((current) => current.filter((item) => item.id !== expense.id))
-      setMessage('Admin expense withdrawn.')
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to withdraw Admin expense.')
-    } finally {
-      setDeletingExpenseId('')
-    }
-  }
-
   async function startWork() {
     setWorkActionLoading(true)
     setMessage('')
@@ -1414,7 +1397,6 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                       {expense.submittedByRole === 'admin' ? (
                                         <>
                                         {expense.paymentStatus !== 'paid' ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-[#66B159]/10 px-2.5 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark expense paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />} Mark paid</button> : <span className="text-xs font-medium text-green-400">Paid</span>}
-                                        {expense.staffEmail.toLowerCase() === user.email.toLowerCase() ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawAdminExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw Admin expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : null}
                                         </>
                                     ) : expense.status === 'pending' ? (
                                       <>
