@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/api-auth'
-import { correctFinancePayment, getFinanceInvoiceById, getFinancePaymentByInvoiceId, logAdminAction, recordFinancePayment, syncOnboardingFinancePaymentMarker } from '@/lib/firestore'
+import { correctFinancePayment, getFinanceInvoiceById, getFinancePaymentByInvoiceId, recordFinancePayment, syncOnboardingFinancePaymentMarker } from '@/lib/firestore'
 import { parseDateOnly } from '@/lib/date-only'
 import type { PaymentMethod } from '@/lib/finance'
 
@@ -66,9 +66,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     return NextResponse.json({ message: 'Enter a valid payment amount, date, and method.' }, { status: 400 })
   }
   try {
-    const result = await recordFinancePayment(id, { amount, paymentDate, method, reference, notes, recordedBy: user.email })
-    await logAdminAction({ actorEmail: user.email, action: 'INVOICE_PAYMENT_RECORD', targetId: id, details: `Payment of ${result.payment.amount} recorded for ${result.invoice.invoiceNumber}.` })
-    return NextResponse.json(result, { status: 201 })
+    return NextResponse.json(await recordFinancePayment(id, { amount, paymentDate, method, reference, notes, recordedBy: user.email }), { status: 201 })
   } catch (error) {
     if (error instanceof Error && error.message === 'FINANCE_INVOICE_NOT_FOUND') return NextResponse.json({ message: 'Invoice was not found in Finance.' }, { status: 404 })
     if (error instanceof Error && error.message === 'FINANCE_INVOICE_CLOSED') return NextResponse.json({ message: 'This invoice is already closed.' }, { status: 409 })

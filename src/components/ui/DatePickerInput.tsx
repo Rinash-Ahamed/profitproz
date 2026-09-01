@@ -12,15 +12,16 @@ type DatePickerInputProps = {
   required?: boolean
   min?: string
   max?: string
+  disabled?: boolean
 }
 
-export function DatePickerInput({ id, value, onChange, className, required, min, max }: DatePickerInputProps) {
+export function DatePickerInput({ id, value, onChange, className, required, min, max, disabled = false }: DatePickerInputProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const displayValue = formatDateOnlyDisplay(value)
 
   function openPicker() {
     const input = inputRef.current
-    if (!input) return
+    if (!input || disabled) return
     input.focus()
     try {
       input.showPicker?.()
@@ -46,6 +47,7 @@ export function DatePickerInput({ id, value, onChange, className, required, min,
         placeholder="DD-MM-YYYY"
         readOnly
         required={required}
+        disabled={disabled}
       />
       <input
         ref={inputRef}
@@ -56,9 +58,10 @@ export function DatePickerInput({ id, value, onChange, className, required, min,
         max={max}
         tabIndex={-1}
         aria-hidden="true"
+        disabled={disabled}
         className="pointer-events-none absolute bottom-0 right-0 h-px w-px opacity-0"
       />
-      <button type="button" onClick={openPicker} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ghost transition-colors hover:bg-zinc-800 hover:text-ink" aria-label="Open date picker">
+      <button type="button" onClick={openPicker} disabled={disabled} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-ghost transition-colors hover:bg-zinc-800 hover:text-ink disabled:cursor-not-allowed disabled:opacity-50" aria-label="Open date picker">
         <CalendarDays className="h-4 w-4" />
       </button>
     </div>

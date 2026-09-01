@@ -158,7 +158,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
                     {!readOnly && !editorOnly && paymentStatus === 'complete' ? <span className="rounded-full border border-green-500/25 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-300">Payment complete</span> : null}
                     {!readOnly ? <div className="mt-1 flex w-full flex-wrap items-center justify-start gap-2 sm:ml-1 sm:mt-0 sm:w-auto sm:justify-end sm:gap-1">
                       {!editorOnly && liveCount === record.platforms.length && paymentStatus !== 'complete' ? <button type="button" onClick={() => setInvoiceRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`${paymentStatus === 'pending' ? 'Open' : 'Generate'} invoice for ${record.propertyName}`} title={paymentStatus === 'pending' ? 'Open invoice PDF' : 'Generate invoice'}><FileText className="h-4 w-4" /><span className="ml-2 text-xs font-medium sm:hidden">Invoice</span></button> : null}
-                      {!editorOnly && record.invoiceSequence ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => openPaymentRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50 sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`${paymentStatus === 'complete' ? 'Correct payment' : 'Record payment'} for ${record.propertyName}`} title={paymentStatus === 'complete' ? 'Correct payment' : 'Record payment'}>{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}<span className="ml-2 text-xs font-medium sm:hidden">{paymentStatus === 'complete' ? 'Payment' : 'Pay'}</span></button> : null}
+                      {!editorOnly && record.invoiceSequence && paymentStatus !== 'complete' ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => openPaymentRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50 sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`Record payment for ${record.propertyName}`} title="Record payment">{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}<span className="ml-2 text-xs font-medium sm:hidden">Pay</span></button> : null}
                       {!editorOnly ? <button type="button" onClick={() => setEditing(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-ink sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`Edit onboarding details for ${record.propertyName}`} title="Edit onboarding"><Edit className="h-4 w-4" /><span className="ml-2 text-xs font-medium sm:hidden">Edit</span></button> : null}
                       {!editorOnly ? <button type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50 sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`Delete onboarding for ${record.propertyName}`} title="Delete onboarding">{deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}<span className="ml-2 text-xs font-medium sm:hidden">Delete</span></button> : null}
                     </div> : null}
@@ -204,7 +204,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
       )}
 
       {showCreate ? <OnboardingDetailsModal onClose={() => setShowCreate(false)} onSaved={(record) => { onChange([...onboardings, record].sort((a, b) => a.propertyName.localeCompare(b.propertyName))); setExpandedId(record.id); setShowCreate(false) }} /> : null}
-      {editing ? <OnboardingDetailsModal initial={editing} onClose={() => setEditing(null)} onSaved={(record) => { onChange(onboardings.map((item) => item.id === record.id ? record : item).sort((a, b) => a.propertyName.localeCompare(b.propertyName))); setEditing(null) }} /> : null}
+      {editing ? <OnboardingDetailsModal initial={editing} onCorrectPayment={editing.invoiceSequence && editing.paymentStatus === 'complete' ? () => { const record = editing; setEditing(null); void openPaymentRecord(record) } : undefined} onClose={() => setEditing(null)} onSaved={(record) => { onChange(onboardings.map((item) => item.id === record.id ? record : item).sort((a, b) => a.propertyName.localeCompare(b.propertyName))); setEditing(null) }} /> : null}
       {invoiceRecord ? <InvoiceModal record={invoiceRecord} onGenerated={(updated) => { onChange(onboardings.map((item) => item.id === updated.id ? updated : item)); setInvoiceRecord(updated) }} onClose={() => setInvoiceRecord(null)} /> : null}
       {paymentInvoice ? <RecordPaymentModal invoice={paymentInvoice} payment={paymentRecord} onClose={() => { setPaymentInvoice(null); setPaymentRecord(null) }} onRecorded={(updated) => { const wasCorrection = Boolean(paymentRecord); setPaymentInvoice(null); setPaymentRecord(null); onChange(onboardings.map((item) => item.id === updated.sourceId ? { ...item, ratePerPlatform: wasCorrection && item.platforms.length ? updated.amount / item.platforms.length : item.ratePerPlatform, paymentStatus: 'complete', financePaymentRecordedAt: item.financePaymentRecordedAt || new Date().toISOString() } : item)); setMessage(wasCorrection ? 'Payment and onboarding commercial details corrected.' : 'Payment recorded successfully.') }} /> : null}
     </div>
@@ -254,6 +254,7 @@ const emptyInvoicePaymentSettings: InvoicePaymentSettings = {
 }
 
 function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingRecord; onGenerated: (record: OnboardingRecord) => void; onClose: () => void }) {
+  const { confirmAction } = useAppDialog()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const onGeneratedRef = useRef(onGenerated)
   const [invoiceDate, setInvoiceDate] = useState(todayLocalDateOnly())
@@ -264,6 +265,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
   const [issuedInvoiceNumber, setIssuedInvoiceNumber] = useState('')
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
+  const [issuing, setIssuing] = useState(false)
   const [error, setError] = useState('')
   const effectiveInvoiceDate = issuedInvoice?.invoiceDate || invoiceDate
   const dueDate = issuedInvoice?.dueDate || invoiceDate
@@ -337,29 +339,33 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
     return Object.entries(values).reduce((html, [key, value]) => html.replaceAll(`{{${key}}}`, escapeHtml(value)), template)
   }, [dueDate, effectiveInvoiceDate, invoiceNumber, invoicePlatforms, issuedInvoice, paymentSettings, ratePerPlatform, record, subtotal, template])
 
+  async function issueInvoice() {
+    if (issuedInvoice) return
+    if (!await confirmAction({ title: 'Issue OTA onboarding invoice?', message: `Issue this invoice for ${record.propertyName} for ₹${subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}? This creates the Finance record and locks the invoice details.`, confirmLabel: 'Issue invoice', tone: 'warning' })) return
+    setIssuing(true)
+    setError('')
+    try {
+      const response = await fetch(`/api/admin/onboardings/${encodeURIComponent(record.id)}/invoice-number`, {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceDate, dueDate, amount: subtotal }),
+      })
+      const data = await response.json() as { sequence?: number; onboarding?: OnboardingRecord; invoice?: FinanceInvoiceRecord; message?: string }
+      if (!response.ok || !data.sequence || !data.onboarding || !data.invoice) throw new Error(data.message || 'Invoice number could not be assigned.')
+      setInvoiceSequence(data.sequence)
+      setIssuedInvoiceNumber(data.invoice.invoiceNumber)
+      setIssuedInvoice(data.invoice)
+      onGeneratedRef.current(data.onboarding)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Failed to issue the invoice.')
+    } finally {
+      setIssuing(false)
+    }
+  }
+
   async function downloadPdf() {
     setDownloading(true)
     setError('')
     try {
-      let issuedSequence = invoiceSequence
-      let outputInvoiceNumber = issuedInvoiceNumber
-      if (!issuedSequence) {
-        const response = await fetch(`/api/admin/onboardings/${encodeURIComponent(record.id)}/invoice-number`, {
-          method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ invoiceDate, dueDate, amount: subtotal }),
-        })
-        const data = await response.json() as { sequence?: number; onboarding?: OnboardingRecord; invoice?: FinanceInvoiceRecord; message?: string }
-        if (!response.ok || !data.sequence || !data.onboarding || !data.invoice) throw new Error(data.message || 'Invoice number could not be assigned.')
-        issuedSequence = data.sequence
-        outputInvoiceNumber = data.invoice.invoiceNumber
-        const frame = iframeRef.current
-        const rerendered = new Promise<void>((resolve) => frame?.addEventListener('load', () => resolve(), { once: true }))
-        setInvoiceSequence(issuedSequence)
-        setIssuedInvoiceNumber(data.invoice.invoiceNumber)
-        setIssuedInvoice(data.invoice)
-        onGeneratedRef.current(data.onboarding)
-        await Promise.race([rerendered, new Promise<void>((resolve) => setTimeout(resolve, 2_000))])
-      }
       const document = iframeRef.current?.contentDocument
       const page = document?.querySelector('.invoice-page') as HTMLElement | null
       if (!document || !page) throw new Error('Invoice preview is not ready.')
@@ -382,7 +388,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       // fractional centering offsets, while PNG keeps small text edges lossless.
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pageWidth, pageHeight, undefined, 'FAST')
       releasePdfCanvas(canvas)
-      pdf.save(`${outputInvoiceNumber || `PP-OTA-${month}-${year.slice(-2)}-${String(issuedSequence).padStart(3, '0')}`}.pdf`)
+      pdf.save(`${issuedInvoice?.invoiceNumber || `PP-OTA-${month}-${year.slice(-2)}-PREVIEW`}.pdf`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to download invoice PDF.')
     } finally {
@@ -398,7 +404,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6">
           <div>
             <p className="text-lg font-semibold text-ink">Generate onboarding invoice</p>
-            <p className="mt-1 text-sm text-sub">{record.propertyName} · {invoiceNumber}</p>
+            <p className="mt-1 text-sm text-sub">{record.propertyName} · {issuedInvoice ? invoiceNumber : 'Preview — not recorded in Finance'}</p>
           </div>
           <div className="flex flex-wrap items-end gap-3">
             <label className="block w-44">
@@ -409,9 +415,10 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
               <span className="label-upper mb-2 block text-ghost">Due date</span>
               <div className="flex h-11 items-center rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-sub">{formatDateOnlyDisplay(dueDate)}</div>
             </div>
-            <button type="button" onClick={downloadPdf} disabled={loading || downloading || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
-              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {downloading ? 'Preparing…' : 'Download PDF'}
+            <button type="button" onClick={downloadPdf} disabled={loading || downloading || issuing || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink disabled:cursor-not-allowed disabled:opacity-60">
+              {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {downloading ? 'Preparing…' : issuedInvoice ? 'Download PDF' : 'Download preview'}
             </button>
+            {!issuedInvoice ? <button type="button" onClick={() => void issueInvoice()} disabled={loading || downloading || issuing || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Issue invoice</button> : null}
             <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Close</button>
           </div>
         </div>
@@ -487,7 +494,7 @@ function PlatformProgressCard({ onboardingId, progress, onSaved, readOnly = fals
   )
 }
 
-function OnboardingDetailsModal({ initial, onClose, onSaved }: { initial?: OnboardingRecord; onClose: () => void; onSaved: (record: OnboardingRecord) => void }) {
+function OnboardingDetailsModal({ initial, onCorrectPayment, onClose, onSaved }: { initial?: OnboardingRecord; onCorrectPayment?: () => void; onClose: () => void; onSaved: (record: OnboardingRecord) => void }) {
   const [propertyName, setPropertyName] = useState(initial?.propertyName || '')
   const [clientName, setClientName] = useState(initial?.clientName || '')
   const [propertyAddress, setPropertyAddress] = useState(initial?.propertyAddress || '')
@@ -587,6 +594,7 @@ function OnboardingDetailsModal({ initial, onClose, onSaved }: { initial?: Onboa
 
           <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
           <div className="mt-7 flex justify-end gap-3">
+            {onCorrectPayment ? <button type="button" onClick={onCorrectPayment} className="mr-auto inline-flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Correct payment</button> : null}
             <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
             <button type="submit" disabled={saving || selectedPlatforms.length === 0} className="flex h-11 min-w-32 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {initial ? 'Save changes' : 'Add property'}

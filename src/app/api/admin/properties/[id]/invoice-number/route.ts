@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
-import { createRevenueInvoiceSequence, logAdminAction } from '@/lib/firestore'
+import { createRevenueInvoiceSequence } from '@/lib/firestore'
 import { parseDateOnly } from '@/lib/date-only'
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -30,12 +30,12 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
 
   try {
-    const { sequence, invoice } = await createRevenueInvoiceSequence(id, { invoiceDate, dueDate, billingPeriod, reportUrl, amount })
-    await logAdminAction({ actorEmail: user.email, action: 'REVENUE_INVOICE_NUMBER_ASSIGN', targetId: id, details: `Revenue invoice sequence ${String(sequence).padStart(3, '0')} assigned.` })
-    return NextResponse.json({ sequence, invoice })
+    const { sequence, invoice, created } = await createRevenueInvoiceSequence(id, { invoiceDate, dueDate, billingPeriod, reportUrl, amount, actorEmail: user.email })
+    return NextResponse.json({ sequence, invoice, created })
   } catch (error) {
     if (error instanceof Error && error.message === 'PROPERTY_NOT_FOUND') return NextResponse.json({ message: 'Property was not found.' }, { status: 404 })
     if (error instanceof Error && error.message === 'PROPERTY_NOT_ACTIVE') return NextResponse.json({ message: 'Only active revenue-management clients can be invoiced.' }, { status: 400 })
+    if (error instanceof Error && error.message.startsWith('REVENUE_INVOICE_CONFLICT:')) return NextResponse.json({ message: `${error.message.split(':')[1]} already exists for this property and billing period. Cancel it before issuing a replacement invoice.` }, { status: 409 })
     console.error(`Failed to assign revenue invoice number for ${id}:`, error)
     return NextResponse.json({ message: 'Failed to assign revenue invoice number.' }, { status: 500 })
   }
