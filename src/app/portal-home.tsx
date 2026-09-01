@@ -21,6 +21,7 @@ import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
 import { ADMIN_NAMES } from '@/lib/admin-options'
 import { AdminMfaSettings } from '@/app/admin-mfa-settings'
 import type { HalfDayPeriod, LeaveDurationType, LeavePayrollTreatment } from '@/lib/leave'
+import { HolidayCalendarCard } from '@/components/ui/HolidayCalendarCard'
 import { formatLiveWorkDuration, formatWorkDuration, formatWorkTime } from '@/lib/work-session-format'
 
 const ClientServicesPanel = dynamic(() => import('@/app/client-services-panel').then((module) => module.ClientServicesPanel))
@@ -83,6 +84,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
   const staffListLoadedRef = useRef(false)
   const [staffSearch, setStaffSearch] = useState('')
+  const [viewingStaff, setViewingStaff] = useState<PublicStaffRecord | null>(null)
   const [editingStaff, setEditingStaff] = useState<PublicStaffRecord | null>(null)
   const [offerStaff, setOfferStaff] = useState<PublicStaffRecord | null>(null)
   const [propertyList, setPropertyList] = useState<PropertyRecord[]>([])
@@ -1308,6 +1310,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                       <td className="px-6 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${staff.active ? 'border-green-500/20 bg-green-500/10 text-green-400' : !staff.activatedAt ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' : 'border-zinc-600 bg-zinc-800 text-sub'}`}>{staff.active ? 'Active' : !staff.activatedAt ? 'Pending' : 'Inactive'}</span></td>
                                       <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
+                                          <button type="button" onClick={() => setViewingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`View details for ${staff.name}`} title="View employee details"><Eye className="h-4 w-4" /></button>
                                           {!staff.active && !staff.activatedAt ? <button type="button" onClick={() => setOfferStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`Generate offer letter for ${staff.name}`} title="Generate offer letter"><FileText className="h-4 w-4" /></button> : null}
                                           {!staff.active ? <button type="button" onClick={() => void setStaffActive(staff, true)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-green-500/20 hover:text-green-400 transition-colors" aria-label={`${!staff.activatedAt ? 'Acknowledge offer and activate' : 'Reactivate'} ${staff.name}`} title={!staff.activatedAt ? 'Acknowledge & activate' : 'Reactivate employee'}><CheckCircle2 className="h-4 w-4" /></button> : null}
                                           {staff.active ? <button type="button" onClick={() => void setStaffActive(staff, false)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Make ${staff.name} inactive`} title="Make employee inactive"><XCircle className="h-4 w-4" /></button> : null}
@@ -1784,6 +1787,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   ),
                   leaves: (
                     <div className="staff-workspace space-y-6 text-left">
+                      <HolidayCalendarCard />
                       <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}>
                         <p className="text-lg font-semibold text-ink">Request Leave</p>
                         <p className="mt-2 text-sm leading-6 text-sub">Approved leave is assessed during monthly payroll against the employee&apos;s available CL balance. Half-day leave is available from September 2026. Sundays are excluded.</p>
@@ -1819,6 +1823,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           }}
         />
       )}
+      {viewingStaff ? <StaffDetailsModal staff={viewingStaff} onClose={() => setViewingStaff(null)} /> : null}
       {offerStaff ? <OfferLetterModal staff={offerStaff} onClose={() => setOfferStaff(null)} /> : null}
       {correctingWorkSession ? (
         <WorkSessionCorrectionModal
@@ -1972,6 +1977,51 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
           {!loading && renderedOffer ? <iframe ref={iframeRef} title={`Offer letter preview for ${staff.name}`} srcDoc={renderedOffer} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}
         </div>
       </div>
+    </div>
+  )
+}
+
+function staffDateLabel(value?: string) {
+  if (!value) return 'Not available'
+  const date = new Date(value)
+  if (Number.isNaN(date.valueOf())) return 'Not available'
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
+}
+
+function StaffDetailItem({ label, value, wide = false }: { label: string; value?: ReactNode; wide?: boolean }) {
+  return <div className={wide ? 'sm:col-span-2' : ''}><p className="label-upper text-ghost">{label}</p><div className="mt-1.5 break-words text-sm leading-6 text-ink">{value || <span className="text-sub">Not provided</span>}</div></div>
+}
+
+function StaffDetailsModal({ staff, onClose }: { staff: PublicStaffRecord; onClose: () => void }) {
+  const status = staff.active ? 'Active' : staff.activatedAt ? 'Inactive' : 'Pending activation'
+  const annualCtc = staff.annualCtc || 0
+
+  return (
+    <div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <section className="surface my-auto w-full max-w-2xl overflow-hidden rounded-xl shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="staff-details-title" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 border-b border-zinc-800 p-5 sm:p-6">
+          <div><p id="staff-details-title" className="text-lg font-semibold text-ink">{staff.name}</p><p className="mt-1 text-sm text-sub">{staff.employeeId || 'Employee ID not available'} · {status}</p></div>
+          <button type="button" onClick={onClose} className="h-9 rounded-lg border border-zinc-700 px-3 text-sm font-semibold text-sub transition-colors hover:border-zinc-600 hover:text-ink">Close</button>
+        </div>
+
+        <div className="max-h-[calc(100vh-9rem)] overflow-y-auto p-5 sm:p-6">
+          <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            <StaffDetailItem label="Company email" value={staff.email} />
+            <StaffDetailItem label="Personal email" value={staff.personalEmail} />
+            <StaffDetailItem label="Phone" value={staff.phone} />
+            <StaffDetailItem label="Emergency contact" value={staff.emergencyContactName ? <><span>{staff.emergencyContactName}</span>{staff.emergencyContactPhone ? <span className="block text-sub">{staff.emergencyContactPhone}</span> : null}</> : undefined} />
+            <StaffDetailItem label="Address" value={staff.address} wide />
+            <StaffDetailItem label="Department" value={staff.department} />
+            <StaffDetailItem label="Role" value={staff.role} />
+            <StaffDetailItem label="Annual CTC" value={annualCtc ? `₹${annualCtc.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : undefined} />
+            <StaffDetailItem label="Monthly salary" value={annualCtc ? `₹${(annualCtc / 12).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : undefined} />
+            <StaffDetailItem label="Activated on" value={staffDateLabel(staff.activatedAt)} />
+            <StaffDetailItem label="Created on" value={staffDateLabel(staff.createdAt)} />
+            <StaffDetailItem label="Client access" value={<div className="flex flex-wrap gap-2">{staff.clientAccess?.revenueManagement ? <span className="rounded border border-[#66B159]/25 bg-[#66B159]/10 px-2 py-1 text-xs font-medium text-[#66B159]">Revenue Management</span> : null}{staff.clientAccess?.otaOnboarding ? <span className="rounded border border-[#66B159]/25 bg-[#66B159]/10 px-2 py-1 text-xs font-medium text-[#66B159]">OTA Onboarding</span> : null}{!staff.clientAccess?.revenueManagement && !staff.clientAccess?.otaOnboarding ? <span className="text-sub">Client view only</span> : null}</div>} wide />
+            <StaffDetailItem label="Other details" value={staff.details ? <p className="whitespace-pre-wrap">{staff.details}</p> : undefined} wide />
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
