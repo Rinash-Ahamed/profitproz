@@ -19,6 +19,7 @@ import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
 import { ADMIN_NAMES } from '@/lib/admin-options'
+import { AdminMfaSettings } from '@/app/admin-mfa-settings'
 import { formatLiveWorkDuration, formatWorkDuration, formatWorkTime } from '@/lib/work-session-format'
 
 const ClientServicesPanel = dynamic(() => import('@/app/client-services-panel').then((module) => module.ClientServicesPanel))
@@ -1430,60 +1431,64 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     <AuditPanel />
                   ),
                   settings: (
-                    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+                    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
 
-                      <div className="surface rounded-lg p-6 sm:p-7">
+                      <div className="surface rounded-lg p-5">
                         <p className="text-base font-semibold text-ink">Expense Claim Fields</p>
-                        <p className="mt-2 text-sm leading-6 text-sub">Choose which fields employees must complete when submitting an expense.</p>
-                        <div className="mt-5 space-y-3">
+                        <p className="mt-1 text-sm leading-5 text-sub">Choose which fields employees must complete when submitting an expense.</p>
+                        <div className="mt-4 space-y-2">
                           {([['cityRequired', 'City'], ['descriptionRequired', 'Description'], ['receiptRequired', 'Receipt link']] as const).map(([field, label]) => (
-                            <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-ink">
+                            <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-3.5 py-2.5 text-sm text-ink">
                               {label}
                               <input type="checkbox" checked={expenseSettings[field]} onChange={(event) => setExpenseSettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" />
                             </label>
                           ))}
                         </div>
-                        <button type="button" onClick={saveExpenseSettings} disabled={loading} className="mt-5 flex h-10 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save expense fields</button>
+                        <button type="button" onClick={saveExpenseSettings} disabled={loading} className="mt-4 flex h-9 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save expense fields</button>
                       </div>
 
-                      <form className="surface rounded-lg p-6 sm:p-7" onSubmit={changeAdminPassword}>
+                      <form className="surface rounded-lg p-5" onSubmit={changeAdminPassword}>
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#66B159]/10 text-[#66B159]"><KeyRound className="h-5 w-5" /></div>
                           <div><p className="text-base font-semibold text-ink">Change admin password</p><p className="mt-1 text-sm text-sub">Use at least {securitySettings.minPasswordLength} characters.</p></div>
                         </div>
-                        <div className="mt-5 space-y-4">
+                        <div className="mt-4 space-y-3">
                           <div><label htmlFor="adminCurrentPassword" className="label-upper mb-2 block text-ghost">Current password</label><input id="adminCurrentPassword" type="password" value={adminCurrentPassword} onChange={(event) => setAdminCurrentPassword(event.target.value)} className={inputClass} required /></div>
                           <div><label htmlFor="adminNewPassword" className="label-upper mb-2 block text-ghost">New password</label><input id="adminNewPassword" type="password" minLength={securitySettings.minPasswordLength} value={adminNewPassword} onChange={(event) => setAdminNewPassword(event.target.value)} className={inputClass} required /></div>
                           <div><label htmlFor="adminConfirmPassword" className="label-upper mb-2 block text-ghost">Confirm new password</label><input id="adminConfirmPassword" type="password" minLength={securitySettings.minPasswordLength} value={adminConfirmPassword} onChange={(event) => setAdminConfirmPassword(event.target.value)} className={inputClass} required /></div>
                         </div>
-                        <button type="submit" disabled={loading} className="mt-5 flex h-10 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Update password</button>
+                        <button type="submit" disabled={loading} className="mt-4 flex h-9 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Update password</button>
                       </form>
 
-                      <div className="surface rounded-lg p-6 sm:p-7">
-                        <p className="text-base font-semibold text-ink">Security Policy</p>
-                        <div className="mt-5 space-y-4">
-                          <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Idle session timeout</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select><p className="mt-2 text-xs text-sub">Active sessions renew automatically. Users are logged out after this period without activity.</p></div>
-                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="8" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 8 }))} className={inputClass} /></div>
-                          {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
+                      <div className="space-y-4">
+                        <AdminMfaSettings onMessage={setMessage} onError={setError} />
+                        <div className="surface rounded-lg p-5">
+                          <p className="text-base font-semibold text-ink">Audit Logs</p>
+                          <p className="mt-1 text-sm leading-5 text-sub">
+                            Remove existing audit records now. A fresh record is written after the clear action.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={clearAuditLogs}
+                            disabled={loading}
+                            className="mt-4 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-4 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                          >
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
+                            Clear audit logs
+                          </button>
                         </div>
-                        <button type="button" onClick={saveSecuritySettings} disabled={loading} className="mt-5 flex h-10 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save security policy</button>
                       </div>
 
-                      <div className="surface rounded-lg p-6 sm:p-7">
-                        <p className="text-base font-semibold text-ink">Audit Logs</p>
-                        <p className="mt-2 text-sm leading-6 text-sub">
-                          Remove existing audit records now. A fresh record is written after the clear action.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={clearAuditLogs}
-                          disabled={loading}
-                          className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-4 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
-                          Clear audit logs
-                        </button>
+                      <div className="surface rounded-lg p-5">
+                        <p className="text-base font-semibold text-ink">Security Policy</p>
+                        <div className="mt-4 space-y-3">
+                          <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Idle session timeout</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select><p className="mt-2 text-xs text-sub">Active sessions renew automatically. Users are logged out after this period without activity.</p></div>
+                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="8" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 8 }))} className={inputClass} /></div>
+                          {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-3.5 py-2.5 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
+                        </div>
+                        <button type="button" onClick={saveSecuritySettings} disabled={loading} className="mt-4 flex h-9 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save security policy</button>
                       </div>
+
                     </div>
                   ),
                 }[activeTab]

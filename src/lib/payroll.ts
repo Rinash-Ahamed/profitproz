@@ -24,6 +24,7 @@ export type PayrollRecord = {
   department: string
   monthlySalary: number
   annualCtc: number
+  employmentStartDate?: string
   totalCalendarDays: number
   sundayHolidays: number
   totalWorkingDays: number
@@ -64,6 +65,7 @@ export type PayrollRecord = {
 export type PayrollCalculationInput = {
   month: string
   monthlySalary: number
+  employmentStartDate?: string
   openingCasualLeaveBalance?: number
   calculationThroughDate?: string
   missingAttendanceThroughDate?: string
@@ -165,7 +167,9 @@ function datesWithinMonth(startDate: string, endDate: string, month: string) {
 
 export function calculatePayroll(input: PayrollCalculationInput): PayrollCalculation {
   const calendarDates = payrollMonthDates(input.month)
-  const workingDates = calendarDates.filter((date) => parseDateOnly(date)?.getUTCDay() !== 0)
+  const employmentStartDate = parseDateOnly(input.employmentStartDate || '') ? input.employmentStartDate! : calendarDates[0]
+  const eligibleCalendarDates = calendarDates.filter((date) => date >= employmentStartDate)
+  const workingDates = eligibleCalendarDates.filter((date) => parseDateOnly(date)?.getUTCDay() !== 0)
   const calculationThroughDate = input.calculationThroughDate && input.calculationThroughDate.startsWith(`${input.month}-`)
     ? input.calculationThroughDate
     : calendarDates.at(-1)!
@@ -206,13 +210,14 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
   const lopDays = Math.max(0, approvedLeaveDates.length - casualLeaveUsed) + missingAttendanceLopDays
   const totalWorkingDays = workingDates.length
   const monthlySalary = Math.max(0, input.monthlySalary)
-  const grossSalary = roundMoney(monthlySalary)
   const totalCalendarDays = calendarDates.length
-  const lopDeduction = totalCalendarDays ? roundMoney((grossSalary / totalCalendarDays) * lopDays) : 0
+  const dailySalary = totalCalendarDays ? monthlySalary / totalCalendarDays : 0
+  const grossSalary = roundMoney(dailySalary * eligibleCalendarDates.length)
+  const lopDeduction = roundMoney(dailySalary * lopDays)
 
   return {
     totalCalendarDays,
-    sundayHolidays: calendarDates.length - totalWorkingDays,
+    sundayHolidays: eligibleCalendarDates.length - totalWorkingDays,
     totalWorkingDays,
     daysPresent: attendanceDates.length,
     openingCasualLeaveBalance,
@@ -241,13 +246,15 @@ export function calculatePayrollPeriodAmounts(record: PayrollRecord): PayrollPer
     ? record.completedThroughDate
     : monthEndDate
   const isIncomplete = completedThroughDate < monthEndDate
+  const employmentStartDate = parseDateOnly(record.employmentStartDate || '') ? record.employmentStartDate! : `${record.month}-01`
+  const eligibleCalendarDates = payrollMonthDates(record.month).filter((date) => date >= employmentStartDate)
+  const dailySalary = record.totalCalendarDays ? record.monthlySalary / record.totalCalendarDays : 0
 
   if (!isIncomplete) {
     const pendingMissingAttendanceDays = record.missingAttendanceDates
       .filter((date) => !record.missingAttendanceDecisions[date])
       .length
-    const paidSalaryDays = Math.max(0, record.totalCalendarDays - record.lopDays - pendingMissingAttendanceDays)
-    const dailySalary = record.totalCalendarDays ? record.grossSalary / record.totalCalendarDays : 0
+    const paidSalaryDays = Math.max(0, eligibleCalendarDates.length - record.lopDays - pendingMissingAttendanceDays)
     return {
       isIncomplete: false,
       completedThroughDate: monthEndDate,
@@ -261,7 +268,7 @@ export function calculatePayrollPeriodAmounts(record: PayrollRecord): PayrollPer
   }
 
   const completedWorkingDays = payrollMonthDates(record.month)
-    .filter((date) => date <= completedThroughDate && parseDateOnly(date)?.getUTCDay() !== 0)
+    .filter((date) => date >= employmentStartDate && date <= completedThroughDate && parseDateOnly(date)?.getUTCDay() !== 0)
     .length
   const leaveLopDays = [...record.approvedLeaveDates]
     .sort()
@@ -277,9 +284,8 @@ export function calculatePayrollPeriodAmounts(record: PayrollRecord): PayrollPer
   const lopDays = leaveLopDays + missingAttendanceLopDays
   const payableDays = Math.max(0, completedWorkingDays - lopDays - pendingMissingAttendanceDays)
   const completedCalendarDays = payrollMonthDates(record.month)
-    .filter((date) => date <= completedThroughDate)
+    .filter((date) => date >= employmentStartDate && date <= completedThroughDate)
     .length
-  const dailySalary = record.totalCalendarDays ? record.grossSalary / record.totalCalendarDays : 0
   const paidSalaryDays = Math.max(0, completedCalendarDays - lopDays - pendingMissingAttendanceDays)
 
   return {

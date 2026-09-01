@@ -4,12 +4,13 @@ import { FormEvent, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Eye, EyeOff, Loader2, LockKeyhole, Mail } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Loader2, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
 import { ToastMessage } from '@/components/ui/ToastMessage'
 
 type LoginResponse = {
   message?: string
   redirectTo?: string
+  mfaRequired?: boolean
 }
 
 export function LoginForm({ notice = '' }: { notice?: string }) {
@@ -20,6 +21,8 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [showNotice, setShowNotice] = useState(Boolean(notice))
+  const [mfaRequired, setMfaRequired] = useState(false)
+  const [mfaCode, setMfaCode] = useState('')
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -27,16 +30,27 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
     setLoading(true)
 
     try {
-      const response = await fetch('/api/login', {
+      const response = await fetch(mfaRequired ? '/api/login/mfa' : '/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(mfaRequired ? { code: mfaCode } : { email, password }),
       })
 
       const data = (await response.json()) as LoginResponse
 
-      if (!response.ok || !data.redirectTo) {
+      if (!response.ok) {
         setError(data.message || 'Invalid email or password.')
+        return
+      }
+
+      if (data.mfaRequired) {
+        setMfaRequired(true)
+        setMfaCode('')
+        return
+      }
+
+      if (!data.redirectTo) {
+        setError('The server did not complete login.')
         return
       }
 
@@ -99,13 +113,14 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
                   <span className="h-1.5 w-1.5 rounded-full bg-[#66B159]" />
                   <p className="label-upper text-[#66B159]">Secure login</p>
                 </div>
-                <h2 className="text-2xl font-semibold tracking-tight text-ink">Login Portal</h2>
+                <h2 className="text-2xl font-semibold tracking-tight text-ink">{mfaRequired ? 'Verify your identity' : 'Login Portal'}</h2>
                 <p className="mt-2 text-sm leading-6 text-sub">
-                  Use the credentials assigned to your role.
+                  {mfaRequired ? 'Enter the code from your authenticator app, or use one recovery code.' : 'Use the credentials assigned to your role.'}
                 </p>
               </div>
 
               <form className="space-y-5" onSubmit={handleSubmit}>
+                {!mfaRequired ? <>
                 <div>
                   <label htmlFor="email" className="label-upper mb-2 block text-ghost">
                     Email
@@ -154,14 +169,35 @@ export function LoginForm({ notice = '' }: { notice?: string }) {
                   </div>
                 </div>
 
+                </> : <div>
+                  <label htmlFor="mfaCode" className="label-upper mb-2 block text-ghost">Authenticator or recovery code</label>
+                  <div className="relative">
+                    <ShieldCheck className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" aria-hidden="true" />
+                    <input
+                      id="mfaCode"
+                      name="mfaCode"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      required
+                      autoFocus
+                      value={mfaCode}
+                      onChange={(event) => setMfaCode(event.target.value.slice(0, 32))}
+                      className="h-12 w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-11 pr-4 text-center font-mono text-lg tracking-[0.2em] text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none focus:ring-1 focus:ring-[#66B159]/40"
+                      placeholder="000000"
+                    />
+                  </div>
+                </div>}
+
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || (mfaRequired && !mfaCode.trim())}
                   className="flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none"
                 >
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
-                  {loading ? 'Signing in' : 'Sign in'}
+                  {loading ? 'Verifying' : mfaRequired ? 'Verify and sign in' : 'Sign in'}
                 </button>
+                {mfaRequired ? <button type="button" disabled={loading} onClick={() => { setMfaRequired(false); setMfaCode(''); setError('') }} className="flex h-10 w-full items-center justify-center gap-2 text-sm font-medium text-sub transition-colors hover:text-ink disabled:opacity-50"><ArrowLeft className="h-4 w-4" />Back to password</button> : null}
               </form>
             </div>
 

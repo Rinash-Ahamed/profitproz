@@ -44,6 +44,10 @@ export type AdminRecord = {
   passwordHash: string
   active: boolean
   sessionVersion: number
+  mfaEnabled: boolean
+  mfaSecretEncrypted?: string
+  mfaRecoveryCodeHashes: string[]
+  mfaEnabledAt?: string
   createdAt?: string
   updatedAt?: string
 }
@@ -227,6 +231,10 @@ function mapDocToAdmin(doc: DocumentSnapshot): AdminRecord {
     passwordHash: data.passwordHash || '',
     active: typeof data.active === 'boolean' ? data.active : true,
     sessionVersion: Number.isInteger(data.sessionVersion) ? data.sessionVersion : 0,
+    mfaEnabled: data.mfaEnabled === true && typeof data.mfaSecretEncrypted === 'string' && data.mfaSecretEncrypted.length > 0,
+    mfaSecretEncrypted: typeof data.mfaSecretEncrypted === 'string' ? data.mfaSecretEncrypted : undefined,
+    mfaRecoveryCodeHashes: Array.isArray(data.mfaRecoveryCodeHashes) ? data.mfaRecoveryCodeHashes.filter((value: unknown): value is string => typeof value === 'string') : [],
+    mfaEnabledAt: mapTimestamp(data.mfaEnabledAt),
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
   }
@@ -434,6 +442,55 @@ export async function deleteStaffAccount(id: string, staffEmail: string) {
   }
 
   await db.collection(COLLECTIONS.STAFF).doc(id).delete()
+}
+
+export async function enableAdminMfa(id: string, mfaSecretEncrypted: string, mfaRecoveryCodeHashes: string[]): Promise<AdminRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.ADMINS).doc(id)
+  await docRef.update({
+    mfaEnabled: true,
+    mfaSecretEncrypted,
+    mfaRecoveryCodeHashes,
+    mfaEnabledAt: FieldValue.serverTimestamp(),
+    sessionVersion: FieldValue.increment(1),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+  const updated = await docRef.get()
+  if (!updated.exists) throw new Error('ADMIN_NOT_FOUND')
+  return mapDocToAdmin(updated)
+}
+
+export async function disableAdminMfa(id: string): Promise<AdminRecord> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.ADMINS).doc(id)
+  await docRef.update({
+    mfaEnabled: false,
+    mfaSecretEncrypted: FieldValue.delete(),
+    mfaRecoveryCodeHashes: FieldValue.delete(),
+    mfaEnabledAt: FieldValue.delete(),
+    sessionVersion: FieldValue.increment(1),
+    updatedAt: FieldValue.serverTimestamp(),
+  })
+  const updated = await docRef.get()
+  if (!updated.exists) throw new Error('ADMIN_NOT_FOUND')
+  return mapDocToAdmin(updated)
+}
+
+export async function consumeAdminMfaRecoveryCode(id: string, recoveryCodeHash: string): Promise<boolean> {
+  const db = ensureDb()
+  const docRef = db.collection(COLLECTIONS.ADMINS).doc(id)
+  return db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    if (!snapshot.exists) return false
+    const hashes = Array.isArray(snapshot.data()?.mfaRecoveryCodeHashes)
+      ? snapshot.data()!.mfaRecoveryCodeHashes.filter((value: unknown): value is string => typeof value === 'string')
+      : []
+    const index = hashes.indexOf(recoveryCodeHash)
+    if (index < 0) return false
+    hashes.splice(index, 1)
+    transaction.update(docRef, { mfaRecoveryCodeHashes: hashes, updatedAt: FieldValue.serverTimestamp() })
+    return true
+  })
 }
 
 export async function updateStaffAccount(id: string, updates: Partial<Omit<StaffRecord, 'id' | 'passwordHash'>>): Promise<StaffRecord> {
@@ -702,6 +759,7 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
     department: typeof data.department === 'string' ? data.department : '',
     monthlySalary: Number(data.monthlySalary) || 0,
     annualCtc: Number(data.annualCtc) || 0,
+    employmentStartDate: typeof data.employmentStartDate === 'string' && parseDateOnly(data.employmentStartDate) ? data.employmentStartDate : undefined,
     totalCalendarDays: Number(data.totalCalendarDays) || 0,
     sundayHolidays: Number(data.sundayHolidays) || 0,
     totalWorkingDays: Number(data.totalWorkingDays) || 0,
@@ -1985,9 +2043,15 @@ export async function listPayrollRecords(month: string): Promise<PayrollRecord[]
   if (!db) return []
   const [snapshot, activeStaffSnapshot] = await Promise.all([
     db.collection(COLLECTIONS.PAYROLL).where('month', '==', month).get(),
-    db.collection(COLLECTIONS.STAFF).where('active', '==', true).select().get(),
+    db.collection(COLLECTIONS.STAFF).where('active', '==', true).select('activatedAt').get(),
   ])
-  const activeStaffIds = new Set(activeStaffSnapshot.docs.map((document) => document.id))
+  const monthEndDate = payrollMonthEndDate(month)
+  const activeStaffIds = new Set(activeStaffSnapshot.docs.flatMap((document) => {
+    const activatedAt = mapTimestamp(document.data()?.activatedAt)
+    if (!activatedAt) return [document.id]
+    const activationDate = todayInTimeZone('Asia/Kolkata', new Date(activatedAt))
+    return activationDate <= monthEndDate ? [document.id] : []
+  }))
   return snapshot.docs
     .map(mapDocToPayroll)
     .filter((record) => activeStaffIds.has(record.staffId))
@@ -2006,7 +2070,10 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
     db.collection(COLLECTIONS.PAYROLL).where('month', '<', month).get(),
     db.collection(COLLECTIONS.PAYROLL).where('month', '==', month).get(),
   ])
-  const activeStaff = staff.filter((employee) => employee.active)
+  const activeStaff = staff.filter((employee) => {
+    if (!employee.active || !employee.activatedAt) return employee.active
+    return todayInTimeZone('Asia/Kolkata', new Date(employee.activatedAt)) <= monthEndDate
+  })
   const salaryByStaffId = new Map(salaries.map((salary) => [salary.id, salary]))
   const salaryByEmail = new Map(salaries.map((salary) => [salary.staffEmail, salary]))
   const normalizedActor = actorEmail.trim().toLowerCase()
@@ -2022,7 +2089,13 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
     const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
     const salary = salaryByStaffId.get(employee.id) || salaryByEmail.get(employee.email)
     const monthlySalary = salary?.baseSalary ?? (employee.annualCtc || 0) / 12
-    const openingCasualLeaveBalance = latestPriorPayrollByStaff.get(employee.id)?.closingCasualLeaveBalance || 0
+    const employmentStartDate = employee.activatedAt
+      ? todayInTimeZone('Asia/Kolkata', new Date(employee.activatedAt))
+      : monthStartDate
+    const priorPayroll = latestPriorPayrollByStaff.get(employee.id)
+    const openingCasualLeaveBalance = priorPayroll && priorPayroll.month >= employmentStartDate.slice(0, 7)
+      ? priorPayroll.closingCasualLeaveBalance
+      : 0
     const calculationThroughDate = month === currentPayrollMonth() ? todayInTimeZone('Asia/Kolkata') : payrollMonthEndDate(month)
     const missingAttendanceThroughDate = month === currentPayrollMonth()
       ? new Date(Date.parse(`${calculationThroughDate}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
@@ -2030,6 +2103,7 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
     const calculation = calculatePayroll({
       month,
       monthlySalary,
+      employmentStartDate,
       openingCasualLeaveBalance,
       calculationThroughDate,
       missingAttendanceThroughDate,
@@ -2056,6 +2130,7 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
         department: employee.department || '',
         monthlySalary,
         annualCtc: employee.annualCtc || monthlySalary * 12,
+        employmentStartDate,
         ...calculation,
         calculationThroughDate,
         completedThroughDate: missingAttendanceThroughDate,
@@ -2093,7 +2168,7 @@ function missingAttendancePayrollUpdates(payroll: PayrollRecord, decisions: Payr
   const leaveLopDays = Math.max(0, payroll.lopDays - payroll.missingAttendanceLopDays)
   const lopDays = leaveLopDays + missingAttendanceLopDays
   const lopDeduction = payroll.totalCalendarDays
-    ? Math.round((payroll.grossSalary / payroll.totalCalendarDays) * lopDays + Number.EPSILON)
+    ? Math.round((payroll.monthlySalary / payroll.totalCalendarDays) * lopDays + Number.EPSILON)
     : 0
   const netSalary = Math.round(Math.max(0, payroll.grossSalary - lopDeduction) + Number.EPSILON)
   return {
