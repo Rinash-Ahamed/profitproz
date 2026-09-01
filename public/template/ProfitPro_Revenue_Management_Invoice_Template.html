@@ -35,9 +35,9 @@
     .invoice-page {
       position: relative;
       width: 210mm;
-      min-height: 297mm;
+      height: 297mm;
       margin: 0 auto;
-      padding: 16mm 16mm 13mm;
+      padding: 16mm 16mm 30mm;
       overflow: hidden;
       background: var(--paper);
     }
@@ -248,6 +248,23 @@
       text-transform: uppercase;
     }
 
+    .revenue-report-link {
+      display: block;
+      width: fit-content;
+      margin-top: 2.5mm;
+      padding: 1.8mm 3mm;
+      border: 1px solid rgba(102, 177, 89, 0.35);
+      border-radius: 1.8mm;
+      color: var(--green-dark);
+      background: #ffffff;
+      font-size: 8px;
+      font-weight: 800;
+      text-decoration: none;
+      white-space: normal;
+    }
+
+    .revenue-report-link[href=""] { display: none; }
+
     .totals {
       width: 100%;
       border-collapse: collapse;
@@ -428,8 +445,9 @@
       right: 16mm;
       bottom: 9mm;
       left: 16mm;
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(68mm, auto);
+      align-items: end;
       gap: 8mm;
       padding-top: 3mm;
       border-top: 1px solid var(--line);
@@ -450,6 +468,12 @@
       align-items: flex-end;
       gap: 1mm;
       text-align: right;
+    }
+
+    .footer-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 1mm;
     }
 
     @media screen {
@@ -519,6 +543,7 @@
       <div class="notes">
         <strong>Invoice notes</strong>
         {{notes}}
+        <a class="revenue-report-link" href="{{revenue_report_url}}" target="_blank" rel="noopener noreferrer">Download detailed OTA revenue report (Excel)</a>
       </div>
       <table class="totals">
         <tr><td>Subtotal</td><td>₹{{subtotal}}</td></tr>
@@ -570,8 +595,10 @@
     </section>
 
     <footer class="footer">
-      <span>Thanks for doing business with us.</span>
-      <span>This is an auto-generated invoice for {{property_name}}.</span>
+      <span class="footer-copy">
+        <span>Thanks for doing business with us.</span>
+        <span>This is an auto-generated invoice for {{property_name}}.</span>
+      </span>
       <span class="footer-contact">
         <span>For finance and invoice-related questions, please call <a href="tel:+919363509110">+91 936 350 9110</a>.</span>
         <a href="https://www.profitproz.com" target="_blank" rel="noopener noreferrer">www.profitproz.com</a>

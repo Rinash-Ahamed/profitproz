@@ -779,6 +779,7 @@ function mapDocToFinanceInvoice(doc: DocumentSnapshot): FinanceInvoiceRecord {
     createdAt: mapTimestamp(data.createdAt),
     updatedAt: mapTimestamp(data.updatedAt),
     paidAt: mapTimestamp(data.paidAt),
+    reportUrl: typeof data.reportUrl === 'string' ? data.reportUrl : undefined,
     otaSnapshot: otaSnapshot ? {
       propertyAddress: typeof otaSnapshot.propertyAddress === 'string' ? otaSnapshot.propertyAddress : '',
       emailAddress: typeof otaSnapshot.emailAddress === 'string' ? otaSnapshot.emailAddress : '',
@@ -956,7 +957,7 @@ export async function deleteOnboarding(id: string): Promise<void> {
   await docRef.delete()
 }
 
-type InvoiceSnapshotInput = { invoiceDate: string; dueDate: string; amount: number; billingPeriod?: string }
+type InvoiceSnapshotInput = { invoiceDate: string; dueDate: string; amount: number; billingPeriod?: string; reportUrl?: string }
 
 function serviceInvoiceNumber(service: FinanceService, sequence: number, invoiceDate: string) {
   const [year, month] = invoiceDate.split('-')
@@ -1054,6 +1055,7 @@ export async function createRevenueInvoiceSequence(propertyId: string, input: In
       service: 'revenue_management', sourceId: propertyId, invoiceNumber,
       clientName: property.data()?.contactName || property.data()?.name || '', propertyName: property.data()?.name || '',
       invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: invoiceAmount,
+      reportUrl: input.reportUrl || '',
       paidAmount: 0, status: 'pending', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     })
     return sequence

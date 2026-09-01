@@ -27,6 +27,7 @@ export type FinanceInvoiceRecord = {
   createdAt?: string
   updatedAt?: string
   paidAt?: string
+  reportUrl?: string
   otaSnapshot?: {
     propertyAddress: string
     emailAddress: string

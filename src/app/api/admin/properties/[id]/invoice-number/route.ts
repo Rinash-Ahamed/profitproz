@@ -11,18 +11,26 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   const { id } = await context.params
   if (!id || id.length > 128) return NextResponse.json({ message: 'A valid property ID is required.' }, { status: 400 })
 
-  let body: { invoiceDate?: unknown; dueDate?: unknown; billingPeriod?: unknown; amount?: unknown }
+  let body: { invoiceDate?: unknown; dueDate?: unknown; billingPeriod?: unknown; amount?: unknown; reportUrl?: unknown }
   try { body = await request.json() } catch { return NextResponse.json({ message: 'Invoice details are required.' }, { status: 400 }) }
   const invoiceDate = typeof body.invoiceDate === 'string' ? body.invoiceDate : ''
   const dueDate = typeof body.dueDate === 'string' ? body.dueDate : ''
   const billingPeriod = typeof body.billingPeriod === 'string' ? body.billingPeriod.trim() : ''
+  const reportUrl = typeof body.reportUrl === 'string' ? body.reportUrl.trim() : ''
   const amount = Number(body.amount)
-  if (!parseDateOnly(invoiceDate) || !parseDateOnly(dueDate) || dueDate < invoiceDate || !billingPeriod || billingPeriod.length > 80 || !Number.isFinite(amount) || amount < 0.01 || amount > 1_000_000_000) {
-    return NextResponse.json({ message: 'Enter valid invoice dates, billing period, and amount.' }, { status: 400 })
+  let validReportUrl = !reportUrl
+  if (reportUrl) {
+    try {
+      const parsedReportUrl = new URL(reportUrl)
+      validReportUrl = parsedReportUrl.protocol === 'https:' && !parsedReportUrl.username && !parsedReportUrl.password
+    } catch {}
+  }
+  if (!parseDateOnly(invoiceDate) || !parseDateOnly(dueDate) || dueDate < invoiceDate || !billingPeriod || billingPeriod.length > 80 || !validReportUrl || reportUrl.length > 2048 || !Number.isFinite(amount) || amount < 0.01 || amount > 1_000_000_000) {
+    return NextResponse.json({ message: 'Enter valid invoice dates, billing period, amount, and an HTTPS report link when provided.' }, { status: 400 })
   }
 
   try {
-    const { sequence, invoice } = await createRevenueInvoiceSequence(id, { invoiceDate, dueDate, billingPeriod, amount })
+    const { sequence, invoice } = await createRevenueInvoiceSequence(id, { invoiceDate, dueDate, billingPeriod, reportUrl, amount })
     await logAdminAction({ actorEmail: user.email, action: 'REVENUE_INVOICE_NUMBER_ASSIGN', targetId: id, details: `Revenue invoice sequence ${String(sequence).padStart(3, '0')} assigned.` })
     return NextResponse.json({ sequence, invoice })
   } catch (error) {
