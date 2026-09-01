@@ -5,7 +5,7 @@ import 'server-only'
 import type { OnboardingDetailsInput, OnboardingRecord, OnboardingPlatformProgress, OtaPlatform } from './onboarding'
 import type { PaginationRequest } from './pagination'
 import { countNonSundayDaysInclusive, parseDateOnly, todayInTimeZone } from './date-only'
-import type { HistoricalLeaveType } from './leave'
+import type { HalfDayPeriod, HistoricalLeaveType, LeaveDurationType, LeavePayrollTreatment } from './leave'
 import { calculatePayroll, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthEndDate, type MissingAttendanceDecision, type PayrollRecord, type PayrollStatus } from './payroll'
 import { roundCurrency, sumCurrency, type FinanceInvoiceRecord, type FinanceOverview, type FinancePaymentRecord, type FinanceService, type PaymentMethod } from './finance'
 
@@ -748,6 +748,24 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
     ? new Date(Date.parse(`${calculationThroughDate}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10)
     : monthEndDate
   const storedCompletedThroughDate = typeof data.completedThroughDate === 'string' ? data.completedThroughDate : ''
+  const missingAttendanceDates = Array.isArray(data.missingAttendanceDates) ? data.missingAttendanceDates.filter((value: unknown): value is string => typeof value === 'string') : []
+  const missingAttendanceUnits = data.missingAttendanceUnits && typeof data.missingAttendanceUnits === 'object'
+    ? Object.fromEntries(Object.entries(data.missingAttendanceUnits).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] > 0 && entry[1] <= 1))
+    : Object.fromEntries(missingAttendanceDates.map((date) => [date, 1]))
+  const approvedLeaveDates = Array.isArray(data.approvedLeaveDates) ? data.approvedLeaveDates.filter((value: unknown): value is string => typeof value === 'string') : []
+  const approvedLeaveUnits = data.approvedLeaveUnits && typeof data.approvedLeaveUnits === 'object'
+    ? Object.fromEntries(Object.entries(data.approvedLeaveUnits).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] > 0 && entry[1] <= 1))
+    : Object.fromEntries(approvedLeaveDates.map((date) => [date, 1]))
+  const storedCasualLeaveUsed = Number(data.casualLeaveUsed) || 0
+  let remainingHistoricalCl = storedCasualLeaveUsed
+  const approvedLeaveLopUnits = data.approvedLeaveLopUnits && typeof data.approvedLeaveLopUnits === 'object'
+    ? Object.fromEntries(Object.entries(data.approvedLeaveLopUnits).filter((entry): entry is [string, number] => typeof entry[1] === 'number' && entry[1] >= 0 && entry[1] <= 1))
+    : Object.fromEntries(approvedLeaveDates.map((date) => {
+        const unit = approvedLeaveUnits[date] || 1
+        const clUnit = Math.min(remainingHistoricalCl, unit)
+        remainingHistoricalCl -= clUnit
+        return [date, unit - clUnit]
+      }))
   return {
     id: doc.id,
     month,
@@ -767,12 +785,13 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
     openingCasualLeaveBalance: Number(data.openingCasualLeaveBalance) || 0,
     casualLeaveEntitlement: Number(data.casualLeaveEntitlement) || 1,
     casualLeaveAvailable: Number(data.casualLeaveAvailable) || ((Number(data.openingCasualLeaveBalance) || 0) + 1),
-    casualLeaveUsed: Number(data.casualLeaveUsed) || 0,
+    casualLeaveUsed: storedCasualLeaveUsed,
     closingCasualLeaveBalance: Number.isFinite(Number(data.closingCasualLeaveBalance))
       ? Number(data.closingCasualLeaveBalance)
       : Math.max(0, (Number(data.openingCasualLeaveBalance) || 0) + 1 - (Number(data.casualLeaveUsed) || 0)),
     missingAttendanceDays: Number(data.missingAttendanceDays) || 0,
-    missingAttendanceDates: Array.isArray(data.missingAttendanceDates) ? data.missingAttendanceDates.filter((value: unknown): value is string => typeof value === 'string') : [],
+    missingAttendanceDates,
+    missingAttendanceUnits,
     missingAttendanceDecisions: data.missingAttendanceDecisions && typeof data.missingAttendanceDecisions === 'object'
       ? Object.fromEntries(Object.entries(data.missingAttendanceDecisions).filter((entry): entry is [string, MissingAttendanceDecision] => entry[1] === 'lop' || entry[1] === 'ignored'))
       : {},
@@ -783,8 +802,10 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
     lopDeduction: Number(data.lopDeduction) || 0,
     netSalary: Number(data.netSalary) || 0,
     attendanceDates: Array.isArray(data.attendanceDates) ? data.attendanceDates.filter((value: unknown): value is string => typeof value === 'string') : [],
-    approvedLeaveDates: Array.isArray(data.approvedLeaveDates) ? data.approvedLeaveDates.filter((value: unknown): value is string => typeof value === 'string') : [],
+    approvedLeaveDates,
     approvedLeaveIds: Array.isArray(data.approvedLeaveIds) ? data.approvedLeaveIds.filter((value: unknown): value is string => typeof value === 'string') : [],
+    approvedLeaveUnits,
+    approvedLeaveLopUnits,
     status,
     snapshotVersion: 1,
     statusHistory: history.flatMap((entry: unknown) => {
@@ -1936,6 +1957,9 @@ export type LeaveRequestRecord = {
   endDate: string
   leaveType: HistoricalLeaveType
   durationDays: number
+  durationType: LeaveDurationType
+  halfDayPeriod?: HalfDayPeriod
+  payrollTreatment: LeavePayrollTreatment
   reason: string
   status: 'pending' | 'approved' | 'rejected'
   decisionNote?: string
@@ -2112,7 +2136,7 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
         .map((session) => session.workDate),
       approvedLeaves: leaves
         .filter((leave) => leave.staffEmail === employee.email && leave.status === 'approved')
-        .map((leave) => ({ id: leave.id, startDate: leave.startDate, endDate: leave.endDate })),
+        .map((leave) => ({ id: leave.id, startDate: leave.startDate, endDate: leave.endDate, durationType: leave.durationType, payrollTreatment: leave.payrollTreatment })),
       missingAttendanceDecisions: currentPayrollByStaff.get(employee.id)?.missingAttendanceDecisions,
     })
     const generatedAt = new Date().toISOString()
@@ -2164,8 +2188,10 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
 }
 
 function missingAttendancePayrollUpdates(payroll: PayrollRecord, decisions: PayrollRecord['missingAttendanceDecisions']) {
-  const missingAttendanceLopDays = payroll.missingAttendanceDates.filter((missingDate) => decisions[missingDate] === 'lop').length
-  const leaveLopDays = Math.max(0, payroll.lopDays - payroll.missingAttendanceLopDays)
+  const missingAttendanceLopDays = payroll.missingAttendanceDates
+    .filter((missingDate) => decisions[missingDate] === 'lop')
+    .reduce((total, missingDate) => total + (payroll.missingAttendanceUnits[missingDate] || 1), 0)
+  const leaveLopDays = Object.values(payroll.approvedLeaveLopUnits).reduce((total, unit) => total + unit, 0)
   const lopDays = leaveLopDays + missingAttendanceLopDays
   const lopDeduction = payroll.totalCalendarDays
     ? Math.round((payroll.monthlySalary / payroll.totalCalendarDays) * lopDays + Number.EPSILON)
@@ -2457,13 +2483,17 @@ function mapDocToLeaveRequest(doc: DocumentSnapshot): LeaveRequestRecord {
   const data = doc.data() || {}
   const startDate = typeof data.startDate === 'string' ? data.startDate : ''
   const endDate = typeof data.endDate === 'string' ? data.endDate : ''
+  const durationType: LeaveDurationType = data.durationType === 'half_day' && startDate === endDate && startDate >= '2026-09-01' ? 'half_day' : 'full_day'
   return {
     id: doc.id,
     staffEmail: data.staffEmail || '',
     startDate,
     endDate,
     leaveType: data.leaveType === 'general' || data.leaveType === 'sick' || data.leaveType === 'flexi' ? data.leaveType : 'legacy',
-    durationDays: countNonSundayDaysInclusive(startDate, endDate),
+    durationDays: durationType === 'half_day' ? 0.5 : countNonSundayDaysInclusive(startDate, endDate),
+    durationType,
+    halfDayPeriod: durationType === 'half_day' ? (data.halfDayPeriod === 'second_half' ? 'second_half' : 'first_half') : undefined,
+    payrollTreatment: data.payrollTreatment === 'cl' || data.payrollTreatment === 'lop' ? data.payrollTreatment : 'auto',
     reason: data.reason || '',
     status: data.status === 'approved' || data.status === 'rejected' ? data.status : 'pending',
     decisionNote: data.decisionNote || '',
@@ -2477,17 +2507,20 @@ export function listLeaveRequestsPage(page: PaginationRequest, staffEmail?: stri
   return paginateQuery(query, mapDocToLeaveRequest, page)
 }
 
-export async function createLeaveRequest(input: { staffEmail: string; startDate: string; endDate: string; reason: string }) {
+export async function createLeaveRequest(input: { staffEmail: string; startDate: string; endDate: string; reason: string; durationType: LeaveDurationType; halfDayPeriod?: HalfDayPeriod }) {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc()
   const staffEmail = input.staffEmail.trim().toLowerCase()
-  const durationDays = countNonSundayDaysInclusive(input.startDate, input.endDate)
+  const durationDays = input.durationType === 'half_day' ? 0.5 : countNonSundayDaysInclusive(input.startDate, input.endDate)
   await docRef.set({
     ...input,
     staffEmail,
     leaveType: 'general',
     reason: input.reason.trim(),
     durationDays,
+    durationType: input.durationType,
+    ...(input.durationType === 'half_day' ? { halfDayPeriod: input.halfDayPeriod || 'first_half' } : {}),
+    payrollTreatment: 'auto',
     status: 'pending',
     createdAt: FieldValue.serverTimestamp(),
   })
@@ -2520,14 +2553,21 @@ export async function deleteLeaveRequestAsAdmin(id: string): Promise<LeaveReques
   })
 }
 
-export async function updateLeaveRequestStatus(id: string, status: 'approved' | 'rejected', decisionNote = '') {
+export async function updateLeaveRequestStatus(id: string, status: 'approved' | 'rejected', decisionNote = '', payrollTreatment: LeavePayrollTreatment = 'auto') {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc(id)
   await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(docRef)
     if (!snapshot.exists) throw new Error('LEAVE_NOT_FOUND')
     if (snapshot.data()?.status !== 'pending') throw new Error('LEAVE_DECISION_LOCKED')
-    transaction.update(docRef, { status, decisionNote: decisionNote.trim(), updatedAt: FieldValue.serverTimestamp() })
+    const leave = mapDocToLeaveRequest(snapshot)
+    if (status === 'approved' && leave.durationType === 'half_day' && payrollTreatment !== 'cl' && payrollTreatment !== 'lop') throw new Error('HALF_DAY_TREATMENT_REQUIRED')
+    transaction.update(docRef, {
+      status,
+      decisionNote: decisionNote.trim(),
+      payrollTreatment: status === 'approved' ? (leave.durationType === 'half_day' ? payrollTreatment : 'auto') : 'auto',
+      updatedAt: FieldValue.serverTimestamp(),
+    })
   })
   return mapDocToLeaveRequest(await docRef.get())
 }
