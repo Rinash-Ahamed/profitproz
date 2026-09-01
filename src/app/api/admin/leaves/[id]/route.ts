@@ -2,22 +2,25 @@ import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { deleteLeaveRequestAsAdmin, logAdminAction, updateLeaveRequestStatus } from '@/lib/firestore'
+import type { LeavePayrollTreatment } from '@/lib/leave'
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const cookieStore = await cookies()
   const user = await verifyActiveSessionToken(cookieStore.get(authConfig.cookieName)?.value, { role: 'admin' })
   if (!user || user.role !== 'admin') return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
   const { id } = await context.params
-  let body: { status?: unknown; decisionNote?: unknown }
+  let body: { status?: unknown; decisionNote?: unknown; payrollTreatment?: unknown }
   try { body = await request.json() } catch { return NextResponse.json({ message: 'Invalid leave request.' }, { status: 400 }) }
   if (!id || id.length > 150 || (body.status !== 'approved' && body.status !== 'rejected') || (typeof body.decisionNote === 'string' && body.decisionNote.length > 2000)) return NextResponse.json({ message: 'A valid leave status is required.' }, { status: 400 })
   try {
-    const leave = await updateLeaveRequestStatus(id, body.status, typeof body.decisionNote === 'string' ? body.decisionNote : '')
-    await logAdminAction({ actorEmail: user.email, action: 'LEAVE_DECISION', targetId: id, details: `Leave request marked ${body.status}.` })
+    const payrollTreatment: LeavePayrollTreatment = body.payrollTreatment === 'cl' || body.payrollTreatment === 'lop' ? body.payrollTreatment : 'auto'
+    const leave = await updateLeaveRequestStatus(id, body.status, typeof body.decisionNote === 'string' ? body.decisionNote : '', payrollTreatment)
+    await logAdminAction({ actorEmail: user.email, action: 'LEAVE_DECISION', targetId: id, details: `Leave request marked ${body.status}${leave.durationType === 'half_day' && body.status === 'approved' ? ` as 0.5 ${leave.payrollTreatment.toUpperCase()}` : ''}.` })
     return NextResponse.json({ leave })
   } catch (error) {
     if (error instanceof Error && error.message === 'LEAVE_NOT_FOUND') return NextResponse.json({ message: 'Leave request was not found.' }, { status: 404 })
     if (error instanceof Error && error.message === 'LEAVE_DECISION_LOCKED') return NextResponse.json({ message: 'This leave request has already been reviewed.' }, { status: 409 })
+    if (error instanceof Error && error.message === 'HALF_DAY_TREATMENT_REQUIRED') return NextResponse.json({ message: 'Choose whether the half-day uses 0.5 CL or 0.5 LOP.' }, { status: 400 })
     console.error(`Failed to update leave request ${id}:`, error)
     return NextResponse.json({ message: 'Unable to update leave request.' }, { status: 500 })
   }

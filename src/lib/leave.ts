@@ -1,2 +1,6 @@
 export type LeaveType = 'general'
 export type HistoricalLeaveType = LeaveType | 'sick' | 'flexi' | 'legacy'
+export type LeaveDurationType = 'full_day' | 'half_day'
+export type HalfDayPeriod = 'first_half' | 'second_half'
+export type LeavePayrollTreatment = 'auto' | 'cl' | 'lop'
+export const HALF_DAY_LEAVE_START_DATE = '2026-09-01'

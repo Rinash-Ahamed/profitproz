@@ -19,6 +19,9 @@ import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
 import { ADMIN_NAMES } from '@/lib/admin-options'
+import { AdminMfaSettings } from '@/app/admin-mfa-settings'
+import type { HalfDayPeriod, LeaveDurationType, LeavePayrollTreatment } from '@/lib/leave'
+import { HolidayCalendarCard } from '@/components/ui/HolidayCalendarCard'
 import { formatLiveWorkDuration, formatWorkDuration, formatWorkTime } from '@/lib/work-session-format'
 
 const ClientServicesPanel = dynamic(() => import('@/app/client-services-panel').then((module) => module.ClientServicesPanel))
@@ -81,6 +84,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [staffList, setStaffList] = useState<PublicStaffRecord[]>([])
   const staffListLoadedRef = useRef(false)
   const [staffSearch, setStaffSearch] = useState('')
+  const [viewingStaff, setViewingStaff] = useState<PublicStaffRecord | null>(null)
   const [editingStaff, setEditingStaff] = useState<PublicStaffRecord | null>(null)
   const [offerStaff, setOfferStaff] = useState<PublicStaffRecord | null>(null)
   const [propertyList, setPropertyList] = useState<PropertyRecord[]>([])
@@ -98,8 +102,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [leaveStartDate, setLeaveStartDate] = useState('')
   const [leaveEndDate, setLeaveEndDate] = useState('')
   const [leaveReason, setLeaveReason] = useState('')
+  const [leaveDurationType, setLeaveDurationType] = useState<LeaveDurationType>('full_day')
+  const [leaveHalfDayPeriod, setLeaveHalfDayPeriod] = useState<HalfDayPeriod>('first_half')
   const [deletingLeaveId, setDeletingLeaveId] = useState('')
-  const requestedLeaveDays = countNonSundayDaysInclusive(leaveStartDate, leaveEndDate)
+  const effectiveLeaveEndDate = leaveDurationType === 'half_day' ? leaveStartDate : leaveEndDate
+  const requestedLeaveDays = leaveDurationType === 'half_day'
+    ? (leaveStartDate >= '2026-09-01' && countNonSundayDaysInclusive(leaveStartDate, leaveStartDate) === 1 ? 0.5 : 0)
+    : countNonSundayDaysInclusive(leaveStartDate, leaveEndDate)
   const [expenseCity, setExpenseCity] = useState('')
   const [expenseType, setExpenseType] = useState<'travel' | 'food' | 'fuel' | 'other'>('travel')
   const [customExpenseType, setCustomExpenseType] = useState('')
@@ -701,19 +710,19 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   async function submitLeaveRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoading(true); setError(''); setMessage('')
     try {
-      const response = await fetch('/api/staff/leaves', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startDate: leaveStartDate, endDate: leaveEndDate, reason: leaveReason }) })
+      const response = await fetch('/api/staff/leaves', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startDate: leaveStartDate, endDate: effectiveLeaveEndDate, reason: leaveReason, durationType: leaveDurationType, halfDayPeriod: leaveDurationType === 'half_day' ? leaveHalfDayPeriod : undefined }) })
       const data = await response.json() as { leave?: LeaveRequestRecord; message?: string }
       if (!response.ok || !data.leave) throw new Error(data.message || 'Unable to submit leave request.')
-      setLeaveList((current) => [data.leave!, ...current]); setLeaveStartDate(''); setLeaveEndDate(''); setLeaveReason(''); setMessage('Leave request submitted.')
+      setLeaveList((current) => [data.leave!, ...current]); setLeaveStartDate(''); setLeaveEndDate(''); setLeaveReason(''); setLeaveDurationType('full_day'); setLeaveHalfDayPeriod('first_half'); setMessage('Leave request submitted.')
     } catch (err) { setError(err instanceof Error ? err.message : 'Unable to submit leave request.') } finally { setLoading(false) }
   }
 
-  async function updateLeaveStatus(id: string, status: 'approved' | 'rejected') {
+  async function updateLeaveStatus(id: string, status: 'approved' | 'rejected', payrollTreatment: LeavePayrollTreatment = 'auto') {
     const decisionNote = status === 'rejected'
       ? await promptAction({ title: 'Reject leave request?', message: 'Add the rejection reason that will be shown to the employee.', label: 'Rejection reason', confirmLabel: 'Reject leave', tone: 'danger' })
-      : await confirmAction({ title: 'Approve leave request?', message: 'Approve this leave request? It will be included when Draft payroll is refreshed.', confirmLabel: 'Approve leave' }) ? '' : null
+      : await confirmAction({ title: payrollTreatment === 'lop' ? 'Approve as half-day LOP?' : payrollTreatment === 'cl' ? 'Approve using 0.5 CL?' : 'Approve leave request?', message: payrollTreatment === 'lop' ? 'Approve this half-day as 0.5 LOP? Half of the calendar-day salary will be deducted.' : payrollTreatment === 'cl' ? 'Approve this half-day using 0.5 CL? No salary will be deducted while CL is available.' : 'Approve this leave request? It will be included when Draft payroll is refreshed.', confirmLabel: payrollTreatment === 'lop' ? 'Approve 0.5 LOP' : payrollTreatment === 'cl' ? 'Use 0.5 CL' : 'Approve leave', tone: payrollTreatment === 'lop' ? 'warning' : 'default' }) ? '' : null
     if (decisionNote === null) return
-    const response = await fetch(`/api/admin/leaves/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, decisionNote }) })
+    const response = await fetch(`/api/admin/leaves/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, decisionNote, payrollTreatment }) })
     const data = await response.json() as { leave?: LeaveRequestRecord; message?: string }
     if (!response.ok || !data.leave) { setError(data.message || 'Unable to update leave request.'); return }
     setLeaveList((current) => current.map((leave) => leave.id === id ? data.leave! : leave))
@@ -1301,6 +1310,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                       <td className="px-6 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${staff.active ? 'border-green-500/20 bg-green-500/10 text-green-400' : !staff.activatedAt ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' : 'border-zinc-600 bg-zinc-800 text-sub'}`}>{staff.active ? 'Active' : !staff.activatedAt ? 'Pending' : 'Inactive'}</span></td>
                                       <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
+                                          <button type="button" onClick={() => setViewingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`View details for ${staff.name}`} title="View employee details"><Eye className="h-4 w-4" /></button>
                                           {!staff.active && !staff.activatedAt ? <button type="button" onClick={() => setOfferStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`Generate offer letter for ${staff.name}`} title="Generate offer letter"><FileText className="h-4 w-4" /></button> : null}
                                           {!staff.active ? <button type="button" onClick={() => void setStaffActive(staff, true)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-green-500/20 hover:text-green-400 transition-colors" aria-label={`${!staff.activatedAt ? 'Acknowledge offer and activate' : 'Reactivate'} ${staff.name}`} title={!staff.activatedAt ? 'Acknowledge & activate' : 'Reactivate employee'}><CheckCircle2 className="h-4 w-4" /></button> : null}
                                           {staff.active ? <button type="button" onClick={() => void setStaffActive(staff, false)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Make ${staff.name} inactive`} title="Make employee inactive"><XCircle className="h-4 w-4" /></button> : null}
@@ -1420,7 +1430,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   leaves: (
                     <div className="surface rounded-lg">
                       <div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">Leave Requests</p><p className="mt-1 text-sm text-sub">Review employee leave requests.</p></div>
-                      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="px-6 py-4 text-sub"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4"><div className="flex flex-wrap items-center gap-3">{leave.status === 'pending' ? <><button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved')} className="text-sm text-green-400 disabled:opacity-50">Approve</button><button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="text-sm text-red-400 disabled:opacity-50">Reject</button></> : null}<button type="button" disabled={deletingLeaveId === leave.id} onClick={() => void deleteAdminLeaveRequest(leave)} className="inline-flex items-center gap-1.5 text-sm text-red-400 transition-colors hover:text-red-300 disabled:opacity-50">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}Delete</button></div></td></tr>)}</tbody></table></div>
+                      <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="px-6 py-4 text-sub"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4"><div className="flex flex-wrap items-center gap-3">{leave.status === 'pending' ? <>{leave.durationType === 'half_day' ? <><button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved', 'cl')} className="text-sm text-green-400 disabled:opacity-50">Use 0.5 CL</button><button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved', 'lop')} className="text-sm text-amber-300 disabled:opacity-50">0.5 LOP</button></> : <button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved')} className="text-sm text-green-400 disabled:opacity-50">Approve</button>}<button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="text-sm text-red-400 disabled:opacity-50">Reject</button></> : null}<button type="button" disabled={deletingLeaveId === leave.id} onClick={() => void deleteAdminLeaveRequest(leave)} className="inline-flex items-center gap-1.5 text-sm text-red-400 transition-colors hover:text-red-300 disabled:opacity-50">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}Delete</button></div></td></tr>)}</tbody></table></div>
                     </div>
                   ),
                   payroll: (
@@ -1430,60 +1440,64 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                     <AuditPanel />
                   ),
                   settings: (
-                    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
+                    <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)]">
 
-                      <div className="surface rounded-lg p-6 sm:p-7">
+                      <div className="surface rounded-lg p-5">
                         <p className="text-base font-semibold text-ink">Expense Claim Fields</p>
-                        <p className="mt-2 text-sm leading-6 text-sub">Choose which fields employees must complete when submitting an expense.</p>
-                        <div className="mt-5 space-y-3">
+                        <p className="mt-1 text-sm leading-5 text-sub">Choose which fields employees must complete when submitting an expense.</p>
+                        <div className="mt-4 space-y-2">
                           {([['cityRequired', 'City'], ['descriptionRequired', 'Description'], ['receiptRequired', 'Receipt link']] as const).map(([field, label]) => (
-                            <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-ink">
+                            <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-3.5 py-2.5 text-sm text-ink">
                               {label}
                               <input type="checkbox" checked={expenseSettings[field]} onChange={(event) => setExpenseSettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" />
                             </label>
                           ))}
                         </div>
-                        <button type="button" onClick={saveExpenseSettings} disabled={loading} className="mt-5 flex h-10 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save expense fields</button>
+                        <button type="button" onClick={saveExpenseSettings} disabled={loading} className="mt-4 flex h-9 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save expense fields</button>
                       </div>
 
-                      <form className="surface rounded-lg p-6 sm:p-7" onSubmit={changeAdminPassword}>
+                      <form className="surface rounded-lg p-5" onSubmit={changeAdminPassword}>
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#66B159]/10 text-[#66B159]"><KeyRound className="h-5 w-5" /></div>
                           <div><p className="text-base font-semibold text-ink">Change admin password</p><p className="mt-1 text-sm text-sub">Use at least {securitySettings.minPasswordLength} characters.</p></div>
                         </div>
-                        <div className="mt-5 space-y-4">
+                        <div className="mt-4 space-y-3">
                           <div><label htmlFor="adminCurrentPassword" className="label-upper mb-2 block text-ghost">Current password</label><input id="adminCurrentPassword" type="password" value={adminCurrentPassword} onChange={(event) => setAdminCurrentPassword(event.target.value)} className={inputClass} required /></div>
                           <div><label htmlFor="adminNewPassword" className="label-upper mb-2 block text-ghost">New password</label><input id="adminNewPassword" type="password" minLength={securitySettings.minPasswordLength} value={adminNewPassword} onChange={(event) => setAdminNewPassword(event.target.value)} className={inputClass} required /></div>
                           <div><label htmlFor="adminConfirmPassword" className="label-upper mb-2 block text-ghost">Confirm new password</label><input id="adminConfirmPassword" type="password" minLength={securitySettings.minPasswordLength} value={adminConfirmPassword} onChange={(event) => setAdminConfirmPassword(event.target.value)} className={inputClass} required /></div>
                         </div>
-                        <button type="submit" disabled={loading} className="mt-5 flex h-10 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Update password</button>
+                        <button type="submit" disabled={loading} className="mt-4 flex h-9 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Update password</button>
                       </form>
 
-                      <div className="surface rounded-lg p-6 sm:p-7">
-                        <p className="text-base font-semibold text-ink">Security Policy</p>
-                        <div className="mt-5 space-y-4">
-                          <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Idle session timeout</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select><p className="mt-2 text-xs text-sub">Active sessions renew automatically. Users are logged out after this period without activity.</p></div>
-                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="8" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 8 }))} className={inputClass} /></div>
-                          {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-4 py-3 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
+                      <div className="space-y-4">
+                        <AdminMfaSettings onMessage={setMessage} onError={setError} />
+                        <div className="surface rounded-lg p-5">
+                          <p className="text-base font-semibold text-ink">Audit Logs</p>
+                          <p className="mt-1 text-sm leading-5 text-sub">
+                            Remove existing audit records now. A fresh record is written after the clear action.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={clearAuditLogs}
+                            disabled={loading}
+                            className="mt-4 flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-4 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                          >
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
+                            Clear audit logs
+                          </button>
                         </div>
-                        <button type="button" onClick={saveSecuritySettings} disabled={loading} className="mt-5 flex h-10 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save security policy</button>
                       </div>
 
-                      <div className="surface rounded-lg p-6 sm:p-7">
-                        <p className="text-base font-semibold text-ink">Audit Logs</p>
-                        <p className="mt-2 text-sm leading-6 text-sub">
-                          Remove existing audit records now. A fresh record is written after the clear action.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={clearAuditLogs}
-                          disabled={loading}
-                          className="mt-6 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-red-300 bg-white px-4 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
-                          Clear audit logs
-                        </button>
+                      <div className="surface rounded-lg p-5">
+                        <p className="text-base font-semibold text-ink">Security Policy</p>
+                        <div className="mt-4 space-y-3">
+                          <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Idle session timeout</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select><p className="mt-2 text-xs text-sub">Active sessions renew automatically. Users are logged out after this period without activity.</p></div>
+                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="8" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 8 }))} className={inputClass} /></div>
+                          {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-3.5 py-2.5 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
+                        </div>
+                        <button type="button" onClick={saveSecuritySettings} disabled={loading} className="mt-4 flex h-9 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save security policy</button>
                       </div>
+
                     </div>
                   ),
                 }[activeTab]
@@ -1773,7 +1787,20 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   ),
                   leaves: (
                     <div className="staff-workspace space-y-6 text-left">
-                      <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}><p className="text-lg font-semibold text-ink">Request Leave</p><p className="mt-2 text-sm leading-6 text-sub">Approved leave is assessed during monthly payroll against the employee&apos;s available CL balance. Each unused monthly CL carries forward; leave beyond the available balance is LOP. Sundays are excluded.</p><div className="mt-5 grid gap-4 sm:grid-cols-2"><div><label className="label-upper mb-2 block text-ghost">Start date</label><DatePickerInput value={leaveStartDate} onChange={setLeaveStartDate} className={inputClass} required /></div><div><label className="label-upper mb-2 block text-ghost">End date</label><DatePickerInput value={leaveEndDate} onChange={setLeaveEndDate} className={inputClass} min={leaveStartDate || undefined} required /></div></div>{requestedLeaveDays > 0 ? <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900/60 px-4 py-3 text-sm text-sub">Selected working-day duration: <span className="font-medium text-ink">{requestedLeaveDays} {requestedLeaveDays === 1 ? 'day' : 'days'}</span>. Sundays are already excluded.</div> : null}<div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div><button type="submit" disabled={requestedLeaveDays < 1} className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Submit leave request</button></form>
+                      <HolidayCalendarCard />
+                      <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitLeaveRequest}>
+                        <p className="text-lg font-semibold text-ink">Request Leave</p>
+                        <p className="mt-2 text-sm leading-6 text-sub">Approved leave is assessed during monthly payroll against the employee&apos;s available CL balance. Half-day leave is available from September 2026. Sundays are excluded.</p>
+                        <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                          <div><label className="label-upper mb-2 block text-ghost">Duration</label><select value={leaveDurationType} onChange={(event) => { const value = event.target.value as LeaveDurationType; setLeaveDurationType(value); if (value === 'half_day') setLeaveEndDate(leaveStartDate) }} className={inputClass}><option value="full_day">Full day</option><option value="half_day">Half day</option></select></div>
+                          {leaveDurationType === 'half_day' ? <div><label className="label-upper mb-2 block text-ghost">Half</label><select value={leaveHalfDayPeriod} onChange={(event) => setLeaveHalfDayPeriod(event.target.value as HalfDayPeriod)} className={inputClass}><option value="first_half">First half</option><option value="second_half">Second half</option></select></div> : null}
+                          <div><label className="label-upper mb-2 block text-ghost">{leaveDurationType === 'half_day' ? 'Leave date' : 'Start date'}</label><DatePickerInput value={leaveStartDate} onChange={(value) => { setLeaveStartDate(value); if (leaveDurationType === 'half_day') setLeaveEndDate(value) }} className={inputClass} min={leaveDurationType === 'half_day' ? '2026-09-01' : undefined} required /></div>
+                          {leaveDurationType === 'full_day' ? <div><label className="label-upper mb-2 block text-ghost">End date</label><DatePickerInput value={leaveEndDate} onChange={setLeaveEndDate} className={inputClass} min={leaveStartDate || undefined} required /></div> : null}
+                        </div>
+                        {requestedLeaveDays > 0 ? <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900/60 px-4 py-3 text-sm text-sub">Selected duration: <span className="font-medium text-ink">{requestedLeaveDays} {requestedLeaveDays === 1 ? 'day' : 'days'}</span>. Sundays are excluded.</div> : null}
+                        <div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div>
+                        <button type="submit" disabled={requestedLeaveDays < 0.5} className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Submit leave request</button>
+                      </form>
                       <div className="staff-work-card rounded-lg"><div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">My Leave Requests</p></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800"><td className="px-6 py-4 text-ink"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <button type="button" disabled={deletingLeaveId === leave.id} onClick={() => withdrawLeaveRequest(leave)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw leave request">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : <span className="text-xs text-ghost">Locked</span>}</td></tr>)}</tbody></table></div></div>
                     </div>
                   ),
@@ -1796,6 +1823,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           }}
         />
       )}
+      {viewingStaff ? <StaffDetailsModal staff={viewingStaff} onClose={() => setViewingStaff(null)} /> : null}
       {offerStaff ? <OfferLetterModal staff={offerStaff} onClose={() => setOfferStaff(null)} /> : null}
       {correctingWorkSession ? (
         <WorkSessionCorrectionModal
@@ -1949,6 +1977,51 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
           {!loading && renderedOffer ? <iframe ref={iframeRef} title={`Offer letter preview for ${staff.name}`} srcDoc={renderedOffer} className="mx-auto h-[1123px] w-[794px] max-w-none border-0 bg-white" /> : null}
         </div>
       </div>
+    </div>
+  )
+}
+
+function staffDateLabel(value?: string) {
+  if (!value) return 'Not available'
+  const date = new Date(value)
+  if (Number.isNaN(date.valueOf())) return 'Not available'
+  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'Asia/Kolkata' })
+}
+
+function StaffDetailItem({ label, value, wide = false }: { label: string; value?: ReactNode; wide?: boolean }) {
+  return <div className={wide ? 'sm:col-span-2' : ''}><p className="label-upper text-ghost">{label}</p><div className="mt-1.5 break-words text-sm leading-6 text-ink">{value || <span className="text-sub">Not provided</span>}</div></div>
+}
+
+function StaffDetailsModal({ staff, onClose }: { staff: PublicStaffRecord; onClose: () => void }) {
+  const status = staff.active ? 'Active' : staff.activatedAt ? 'Inactive' : 'Pending activation'
+  const annualCtc = staff.annualCtc || 0
+
+  return (
+    <div className="pwa-safe-modal fixed inset-0 z-[120] flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm sm:items-center" onClick={onClose}>
+      <section className="surface my-auto w-full max-w-2xl overflow-hidden rounded-xl shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="staff-details-title" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 border-b border-zinc-800 p-5 sm:p-6">
+          <div><p id="staff-details-title" className="text-lg font-semibold text-ink">{staff.name}</p><p className="mt-1 text-sm text-sub">{staff.employeeId || 'Employee ID not available'} · {status}</p></div>
+          <button type="button" onClick={onClose} className="h-9 rounded-lg border border-zinc-700 px-3 text-sm font-semibold text-sub transition-colors hover:border-zinc-600 hover:text-ink">Close</button>
+        </div>
+
+        <div className="max-h-[calc(100vh-9rem)] overflow-y-auto p-5 sm:p-6">
+          <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
+            <StaffDetailItem label="Company email" value={staff.email} />
+            <StaffDetailItem label="Personal email" value={staff.personalEmail} />
+            <StaffDetailItem label="Phone" value={staff.phone} />
+            <StaffDetailItem label="Emergency contact" value={staff.emergencyContactName ? <><span>{staff.emergencyContactName}</span>{staff.emergencyContactPhone ? <span className="block text-sub">{staff.emergencyContactPhone}</span> : null}</> : undefined} />
+            <StaffDetailItem label="Address" value={staff.address} wide />
+            <StaffDetailItem label="Department" value={staff.department} />
+            <StaffDetailItem label="Role" value={staff.role} />
+            <StaffDetailItem label="Annual CTC" value={annualCtc ? `₹${annualCtc.toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : undefined} />
+            <StaffDetailItem label="Monthly salary" value={annualCtc ? `₹${(annualCtc / 12).toLocaleString('en-IN', { maximumFractionDigits: 2 })}` : undefined} />
+            <StaffDetailItem label="Activated on" value={staffDateLabel(staff.activatedAt)} />
+            <StaffDetailItem label="Created on" value={staffDateLabel(staff.createdAt)} />
+            <StaffDetailItem label="Client access" value={<div className="flex flex-wrap gap-2">{staff.clientAccess?.revenueManagement ? <span className="rounded border border-[#66B159]/25 bg-[#66B159]/10 px-2 py-1 text-xs font-medium text-[#66B159]">Revenue Management</span> : null}{staff.clientAccess?.otaOnboarding ? <span className="rounded border border-[#66B159]/25 bg-[#66B159]/10 px-2 py-1 text-xs font-medium text-[#66B159]">OTA Onboarding</span> : null}{!staff.clientAccess?.revenueManagement && !staff.clientAccess?.otaOnboarding ? <span className="text-sub">Client view only</span> : null}</div>} wide />
+            <StaffDetailItem label="Other details" value={staff.details ? <p className="whitespace-pre-wrap">{staff.details}</p> : undefined} wide />
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

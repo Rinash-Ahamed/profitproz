@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { authConfig, authenticateUser, createSessionToken, getAuthConfigurationError, getConfiguredUsers, getRoleRedirect } from '@/lib/auth'
-import { getSecuritySettings, isFirestoreConfigured } from '@/lib/firestore'
+import { getAdminByEmail, getSecuritySettings, isFirestoreConfigured } from '@/lib/firestore'
+import { createMfaLoginToken, MFA_LOGIN_COOKIE } from '@/lib/mfa'
 
 const loginAttempts = new Map<string, { count: number; resetAt: number }>()
 
@@ -52,6 +53,22 @@ export async function POST(request: Request) {
 
     loginAttempts.delete(clientKey)
     const maxAge = security.sessionHours * 60 * 60
+
+    if (user.role === 'admin' && isFirestoreConfigured()) {
+      const admin = await getAdminByEmail(user.email)
+      if (admin?.mfaEnabled) {
+        const response = NextResponse.json({ role: 'admin', mfaRequired: true })
+        response.cookies.set(MFA_LOGIN_COOKIE, createMfaLoginToken(admin.email, admin.sessionVersion), {
+          httpOnly: true,
+          sameSite: 'strict',
+          secure: process.env.NODE_ENV === 'production',
+          maxAge: 5 * 60,
+          path: '/',
+          priority: 'high',
+        })
+        return response
+      }
+    }
 
     const response = NextResponse.json({
       role: user.role,
