@@ -34,10 +34,12 @@
 
     .invoice-page {
       position: relative;
+      display: flex;
+      flex-direction: column;
       width: 210mm;
-      min-height: 297mm;
+      height: 297mm;
       margin: 0 auto;
-      padding: 16mm 16mm 13mm;
+      padding: 11mm 16mm 10mm;
       overflow: hidden;
       background: var(--paper);
     }
@@ -52,17 +54,26 @@
       content: "";
     }
 
+    .invoice-page > .header,
+    .invoice-page > .meta-grid,
+    .invoice-page > .client-grid,
+    .invoice-page > .items,
+    .invoice-page > .summary,
+    .invoice-page > .payment {
+      flex: 0 0 auto;
+    }
+
     .header {
       display: flex;
       align-items: flex-start;
       justify-content: space-between;
       gap: 16mm;
-      padding-top: 3mm;
+      padding-top: 1mm;
     }
 
     .logo {
-      width: 48mm;
-      height: 20mm;
+      width: 42mm;
+      height: 15mm;
       object-fit: contain;
       object-position: left center;
     }
@@ -95,7 +106,7 @@
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 3mm;
-      margin-top: 9mm;
+      margin-top: 5mm;
     }
 
     .meta-card,
@@ -105,7 +116,7 @@
       background: var(--paper);
     }
 
-    .meta-card { padding: 4mm; }
+    .meta-card { padding: 3.5mm 4mm; }
 
     .label {
       display: block;
@@ -127,10 +138,10 @@
       display: grid;
       grid-template-columns: 1.15fr 0.85fr;
       gap: 4mm;
-      margin-top: 4mm;
+      margin-top: 3mm;
     }
 
-    .panel { padding: 5mm; }
+    .panel { padding: 4mm; }
 
     .panel-title {
       margin: 0 0 3mm;
@@ -182,7 +193,7 @@
 
     .items {
       width: 100%;
-      margin-top: 6mm;
+      margin-top: 4mm;
       border-collapse: separate;
       border-spacing: 0;
       overflow: hidden;
@@ -191,7 +202,7 @@
     }
 
     .items th {
-      padding: 3.5mm 4mm;
+      padding: 2.5mm 4mm;
       color: #ffffff;
       background: var(--ink);
       font-size: 8px;
@@ -201,7 +212,7 @@
     }
 
     .items td {
-      padding: 5mm 4mm;
+      padding: 3.5mm 4mm;
       border-bottom: 1px solid var(--line);
       font-size: 10px;
       vertical-align: top;
@@ -227,16 +238,17 @@
       display: grid;
       grid-template-columns: 1fr 70mm;
       gap: 8mm;
-      margin-top: 5mm;
+      margin-top: 4mm;
     }
 
     .notes {
-      padding: 4mm;
+      padding: 3mm 4mm;
       border-radius: 3mm;
       color: var(--muted);
       background: var(--soft);
       font-size: 9px;
       line-height: 1.5;
+      white-space: pre-line;
     }
 
     .notes strong {
@@ -246,6 +258,23 @@
       font-size: 9px;
       text-transform: uppercase;
     }
+
+    .revenue-report-link {
+      display: block;
+      width: fit-content;
+      margin-top: 2.5mm;
+      padding: 1.8mm 3mm;
+      border: 1px solid rgba(102, 177, 89, 0.35);
+      border-radius: 1.8mm;
+      color: var(--green-dark);
+      background: #ffffff;
+      font-size: 8px;
+      font-weight: 800;
+      text-decoration: none;
+      white-space: normal;
+    }
+
+    .revenue-report-link[href=""] { display: none; }
 
     .totals {
       width: 100%;
@@ -276,8 +305,8 @@
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 5mm;
-      margin-top: 7mm;
-      padding: 5mm;
+      margin-top: 4mm;
+      padding: 4mm;
       border-radius: 3mm;
       color: #f7faf6;
       background: var(--ink);
@@ -294,7 +323,7 @@
       grid-template-columns: minmax(0, 1fr) 36mm;
       align-items: center;
       gap: 4mm;
-      padding: 3.5mm;
+      padding: 2.5mm 3mm;
       border: 1px solid rgba(102, 177, 89, 0.34);
       border-radius: 2.5mm;
       background: linear-gradient(135deg, rgba(102, 177, 89, 0.14), rgba(102, 177, 89, 0.04));
@@ -408,7 +437,7 @@
 
     .qr-pay-card img {
       display: block;
-      width: 32mm;
+      width: 27mm;
       height: auto;
       margin: 0 auto;
       object-fit: contain;
@@ -423,13 +452,13 @@
     }
 
     .footer {
-      position: absolute;
-      right: 16mm;
-      bottom: 9mm;
-      left: 16mm;
       display: flex;
+      flex: 0 0 auto;
+      align-items: flex-end;
       justify-content: space-between;
       gap: 8mm;
+      width: 100%;
+      margin-top: auto;
       padding-top: 3mm;
       border-top: 1px solid var(--line);
       color: var(--muted);
@@ -445,10 +474,19 @@
 
     .footer-contact {
       display: flex;
+      flex: 0 0 86mm;
       flex-direction: column;
       align-items: flex-end;
       gap: 1mm;
       text-align: right;
+    }
+
+    .footer-copy {
+      display: flex;
+      min-width: 0;
+      flex: 1 1 auto;
+      flex-direction: column;
+      gap: 1mm;
     }
 
     @media screen {
@@ -518,6 +556,7 @@
       <div class="notes">
         <strong>Invoice notes</strong>
         {{notes}}
+        <a class="revenue-report-link" href="{{revenue_report_url}}" target="_blank" rel="noopener noreferrer">View detailed OTA revenue report</a>
       </div>
       <table class="totals">
         <tr><td>Subtotal</td><td>₹{{subtotal}}</td></tr>
@@ -569,8 +608,10 @@
     </section>
 
     <footer class="footer">
-      <span>Thanks for doing business with us.</span>
-      <span>This is an auto-generated invoice for {{property_name}}.</span>
+      <span class="footer-copy">
+        <span>Thanks for doing business with us.</span>
+        <span>This is an auto-generated invoice for {{property_name}}.</span>
+      </span>
       <span class="footer-contact">
         <span>For finance and invoice-related questions, please call <a href="tel:+919363509110">+91 936 350 9110</a>.</span>
         <a href="https://www.profitproz.com" target="_blank" rel="noopener noreferrer">www.profitproz.com</a>

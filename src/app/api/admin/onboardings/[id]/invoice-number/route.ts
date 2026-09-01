@@ -19,7 +19,7 @@ export async function POST(request: Request, context: RouteContext) {
   const invoiceDate = typeof body.invoiceDate === 'string' ? body.invoiceDate : ''
   const dueDate = typeof body.dueDate === 'string' ? body.dueDate : ''
   const amount = Number(body.amount)
-  if (!parseDateOnly(invoiceDate) || !parseDateOnly(dueDate) || dueDate < invoiceDate || !Number.isFinite(amount) || amount <= 0 || amount > 1_000_000_000) {
+  if (!parseDateOnly(invoiceDate) || !parseDateOnly(dueDate) || dueDate < invoiceDate || !Number.isFinite(amount) || amount < 0.01 || amount > 1_000_000_000) {
     return NextResponse.json({ message: 'Enter valid invoice dates and amount.' }, { status: 400 })
   }
 

@@ -9,7 +9,7 @@ import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { ToastMessage } from '@/components/ui/ToastMessage'
 
-const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, unpaidExpenses: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0 }
+const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, paidPayroll: 0, unpaidExpenses: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0, invoicesTruncated: false, paymentsTruncated: false }
 const money = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 
 export function FinancePanel() {
@@ -76,14 +76,17 @@ export function FinancePanel() {
 
   return <div className="space-y-6">
     <ToastMessage message={error || message} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setMessage('') }} />
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <FinanceMetric label="Income received" value={money(finance.incomeReceived)} detail="Payments actually received" />
       <FinanceMetric label="Unpaid expenses" value={money(finance.unpaidExpenses)} detail="Approved expenses awaiting payment" />
       <FinanceMetric label="Expenses paid" value={money(finance.paidExpenses)} detail="Cash expenses and reimbursements" />
-      <FinanceMetric label="Remaining balance" value={money(finance.netCashBalance)} detail="Received income - paid expenses" primary />
+      <FinanceMetric label="Payroll paid" value={money(finance.paidPayroll)} detail="Payroll records marked Paid" />
+      <FinanceMetric label="Remaining balance" value={money(finance.netCashBalance)} detail="Income - paid expenses - paid payroll" primary />
     </div>
 
     <section className="surface rounded-lg p-6"><p className="font-semibold text-ink">Income by service</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">Revenue Management</p><p className="mt-1 font-semibold text-ink">{money(finance.revenueIncome)}</p></div><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">OTA Onboarding</p><p className="mt-1 font-semibold text-ink">{money(finance.onboardingIncome)}</p></div></div></section>
+
+    {finance.invoicesTruncated || finance.paymentsTruncated ? <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">Finance totals include all records. Tables and CSV export show the latest 100 records to protect the Firestore quota.</p> : null}
 
     <section className="surface rounded-lg">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6"><div><p className="text-lg font-semibold text-ink">Client invoices</p><p className="mt-1 text-sm text-sub">Immutable invoice amounts and payment balances by service.</p></div><div className="flex flex-wrap gap-2"><label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search invoice or property" aria-label="Search Finance invoices" /></label><select value={service} onChange={(event) => setService(event.target.value as typeof service)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" aria-label="Filter invoices by service"><option value="all">All services</option><option value="revenue_management">Revenue Management</option><option value="ota_onboarding">OTA Onboarding</option></select><select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" aria-label="Filter invoices by payment status"><option value="all">All payment statuses</option><option value="pending">Payment pending</option><option value="paid">Paid</option></select><button type="button" onClick={() => void load()} className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink"><RefreshCw className="h-4 w-4" /> Refresh</button></div></div>
