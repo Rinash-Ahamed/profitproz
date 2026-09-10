@@ -1,18 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Ban, CreditCard, FileDown, Loader2, RefreshCw, Search } from 'lucide-react'
-import type { FinanceInvoiceRecord, FinanceOverview, FinanceService } from '@/lib/finance'
-import { authenticatedFetch as fetch } from '@/lib/client-api'
+import type { FinanceInvoiceRecord, FinancePaymentRecord, FinanceOverview, FinanceService } from '@/lib/finance'
+import { authenticatedFetch as fetch, cachedTabFetch, clearTabCache } from '@/lib/client-api'
 import { formatDateOnlyDisplay } from '@/lib/date-only'
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { ToastMessage } from '@/components/ui/ToastMessage'
 import { useAppDialog } from '@/components/ui/AppDialogProvider'
+import { useFinancePage } from '@/components/finance/useFinancePage'
 
 const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, paidPayroll: 0, unpaidExpenses: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0, invoicesTruncated: false, paymentsTruncated: false }
 const money = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
-const FINANCE_PAGE_SIZE = 10
 
 export function FinancePanel() {
   const { confirmAction } = useAppDialog()
@@ -23,70 +23,87 @@ export function FinancePanel() {
   const [paymentService, setPaymentService] = useState<'all' | FinanceService>('all')
   const [paymentDateFrom, setPaymentDateFrom] = useState('')
   const [paymentDateTo, setPaymentDateTo] = useState('')
-  const [invoicePage, setInvoicePage] = useState(1)
-  const [paymentPage, setPaymentPage] = useState(1)
+
   const [paymentInvoice, setPaymentInvoice] = useState<FinanceInvoiceRecord | null>(null)
   const [cancellingInvoiceId, setCancellingInvoiceId] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
 
-  async function load() {
-    setLoading(true); setError('')
-    try {
-      const response = await fetch('/api/admin/finance', { cache: 'no-store' })
-      const data = await response.json() as { finance?: FinanceOverview; message?: string }
-      if (!response.ok || !data.finance) throw new Error(data.message || 'Failed to load Finance.')
-      setFinance(data.finance)
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'Failed to load Finance.') } finally { setLoading(false) }
+  const [refresh, setRefresh] = useState(0)
+  const [filteredPaymentTotal, setFilteredPaymentTotal] = useState<number | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const invoiceQuery = new URLSearchParams({ view: 'invoices', service, status, ...(search.trim() ? { search: search.trim().slice(0, 120) } : {}) }).toString()
+  const paymentFilters = new URLSearchParams({ service: paymentService, from: paymentDateFrom, to: paymentDateTo }).toString()
+  const hasPaymentFilters = paymentService !== 'all' || !!paymentDateFrom || !!paymentDateTo
+  const displayedPaymentTotal = hasPaymentFilters ? filteredPaymentTotal : loading ? null : finance.incomeReceived
+  const invoiceTable = useFinancePage<FinanceInvoiceRecord>(invoiceQuery, refresh, setError)
+  const paymentTable = useFinancePage<FinancePaymentRecord>('view=payments&' + paymentFilters, refresh, setError)
+  const invoices = invoiceTable.items
+  const paginatedInvoices = invoices
+  const payments = paymentTable.items
+  const paginatedPayments = payments
+
+  function load() {
+    clearTabCache()
+    setRefresh((value) => value + 1)
   }
 
-  useEffect(() => { void load() }, [])
+  useEffect(() => {
+    const controller = new AbortController()
+    setLoading(true)
+    async function loadSummary() {
+      try {
+        const response = await cachedTabFetch('/api/admin/finance?view=summary', { signal: controller.signal })
+        const data = await response.json()
+        if (!response.ok || !data.finance) throw new Error(data.message || 'Failed to load Finance.')
+        if (!controller.signal.aborted) setFinance(data.finance)
+      } catch (error) {
+        if (!controller.signal.aborted) setError(error instanceof Error ? error.message : 'Failed to load Finance.')
+      } finally { if (!controller.signal.aborted) setLoading(false) }
+    }
+    void loadSummary()
+    return () => controller.abort()
+  }, [refresh])
 
-  const invoices = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return finance.invoices
-      .filter((invoice) => service === 'all' || invoice.service === service)
-      .filter((invoice) => status === 'all' || invoice.status === status)
-      .filter((invoice) => !query || [invoice.invoiceNumber, invoice.clientName, invoice.propertyName].some((value) => value.toLowerCase().includes(query)))
-      .sort((a, b) => {
-        if (query) {
-          const aPropertyMatch = a.propertyName.toLowerCase().startsWith(query)
-          const bPropertyMatch = b.propertyName.toLowerCase().startsWith(query)
-          if (aPropertyMatch !== bPropertyMatch) return aPropertyMatch ? -1 : 1
-        }
-        return (b.invoiceDate || b.createdAt || '').localeCompare(a.invoiceDate || a.createdAt || '')
-      })
-  }, [finance.invoices, search, service, status])
+  useEffect(() => {
+    const controller = new AbortController()
+    setFilteredPaymentTotal(null)
+    if (!hasPaymentFilters) return () => controller.abort()
+    async function loadTotal() {
+      try {
+        const response = await cachedTabFetch('/api/admin/finance?view=payment-total&' + paymentFilters, { signal: controller.signal })
+        const data = await response.json()
+        if (!response.ok || typeof data.total !== 'number') throw new Error(data.message || 'Failed to load payment total.')
+        if (!controller.signal.aborted) setFilteredPaymentTotal(data.total)
+      } catch (error) {
+        if (!controller.signal.aborted) setError(error instanceof Error ? error.message : 'Failed to load payment total.')
+      }
+    }
+    void loadTotal()
+    return () => controller.abort()
+  }, [paymentFilters, refresh, hasPaymentFilters])
 
-  const payments = useMemo(
-    () => finance.payments
-      .filter((payment) => paymentService === 'all' || payment.service === paymentService)
-      .filter((payment) => !paymentDateFrom || payment.paymentDate >= paymentDateFrom)
-      .filter((payment) => !paymentDateTo || payment.paymentDate <= paymentDateTo),
-    [finance.payments, paymentDateFrom, paymentDateTo, paymentService],
-  )
-  const filteredPaymentTotal = useMemo(
-    () => payments.reduce((total, payment) => total + payment.amount, 0),
-    [payments],
-  )
-  const invoiceTotalPages = Math.max(1, Math.ceil(invoices.length / FINANCE_PAGE_SIZE))
-  const currentInvoicePage = Math.min(invoicePage, invoiceTotalPages)
-  const paginatedInvoices = invoices.slice((currentInvoicePage - 1) * FINANCE_PAGE_SIZE, currentInvoicePage * FINANCE_PAGE_SIZE)
-  const paymentTotalPages = Math.max(1, Math.ceil(payments.length / FINANCE_PAGE_SIZE))
-  const currentPaymentPage = Math.min(paymentPage, paymentTotalPages)
-  const paginatedPayments = payments.slice((currentPaymentPage - 1) * FINANCE_PAGE_SIZE, currentPaymentPage * FINANCE_PAGE_SIZE)
-
-  useEffect(() => { setInvoicePage(1) }, [search, service, status])
-  useEffect(() => { setPaymentPage(1) }, [paymentDateFrom, paymentDateTo, paymentService])
-
-  function exportIncome() {
-    if (!payments.length) { setError('No received payments match the selected filters.'); return }
-    const cell = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
-    const rows = payments.map((payment) => [payment.paymentDate, payment.invoiceNumber, payment.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management', payment.amount, payment.method, payment.reference, payment.recordedBy, payment.notes].map(cell).join(','))
-    const csv = ['sep=,', 'Payment Date,Invoice Number,Service,Amount,Method,Reference,Recorded By,Notes', ...rows].join('\r\n')
-    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }))
-    const link = document.createElement('a'); link.href = url; link.download = 'income-payments.csv'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url)
+  async function exportIncome() {
+    setExporting(true)
+    try {
+      const exportPayments: FinancePaymentRecord[] = []
+      let cursor = ''
+      do {
+        const response = await fetch('/api/admin/finance?view=payments&limit=100&' + paymentFilters + '&cursor=' + encodeURIComponent(cursor), { cache: 'no-store' })
+        const data = await response.json()
+        if (!response.ok || !Array.isArray(data.items)) throw new Error(data.message || 'Failed to export payments.')
+        exportPayments.push(...data.items)
+        cursor = data.nextCursor || ''
+      } while (cursor)
+      if (!exportPayments.length) { setError('No received payments match the selected filters.'); return }
+      const cell = (value: unknown) => `"${String(value ?? '').replaceAll('"', '""')}"`
+      const rows = exportPayments.map((payment) => [payment.paymentDate, payment.invoiceNumber, payment.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management', payment.amount, payment.method, payment.reference, payment.recordedBy, payment.notes].map(cell).join(','))
+      const csv = ['sep=,', 'Payment Date,Invoice Number,Service,Amount,Method,Reference,Recorded By,Notes', ...rows].join('\r\n')
+      const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }))
+      const link = document.createElement('a'); link.href = url; link.download = 'income-payments.csv'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url)
+    } catch (error) { setError(error instanceof Error ? error.message : 'Failed to export payments.') }
+    finally { setExporting(false) }
   }
 
   async function cancelInvoice(invoice: FinanceInvoiceRecord) {
@@ -102,7 +119,6 @@ export function FinancePanel() {
       const response = await fetch(`/api/admin/finance/invoices/${encodeURIComponent(invoice.id)}/cancel`, { method: 'PATCH' })
       const data = await response.json() as { invoice?: FinanceInvoiceRecord; message?: string }
       if (!response.ok || !data.invoice) throw new Error(data.message || 'Failed to cancel the invoice.')
-      setFinance((current) => ({ ...current, invoices: current.invoices.filter((item) => item.id !== invoice.id) }))
       setMessage(`${invoice.invoiceNumber} cancelled successfully.`)
       void load()
     } catch (caught) {
@@ -124,17 +140,16 @@ export function FinancePanel() {
 
     <section className="surface rounded-lg p-6"><p className="font-semibold text-ink">Income by service</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">Revenue Management</p><p className="mt-1 font-semibold text-ink">{money(finance.revenueIncome)}</p></div><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">OTA Onboarding</p><p className="mt-1 font-semibold text-ink">{money(finance.onboardingIncome)}</p></div></div></section>
 
-    {finance.invoicesTruncated || finance.paymentsTruncated ? <p className="rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">Finance totals include all records. Tables and CSV export show the latest 100 records to protect the Firestore quota.</p> : null}
 
     <section className="surface rounded-lg">
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6"><div><p className="text-lg font-semibold text-ink">Client invoices</p><p className="mt-1 text-sm text-sub">Immutable invoice amounts and payment balances by service.</p></div><div className="flex flex-wrap gap-2"><label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search invoice or property" aria-label="Search Finance invoices" /></label><select value={service} onChange={(event) => setService(event.target.value as typeof service)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" aria-label="Filter invoices by service"><option value="all">All services</option><option value="revenue_management">Revenue Management</option><option value="ota_onboarding">OTA Onboarding</option></select><select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" aria-label="Filter invoices by payment status"><option value="all">All payment statuses</option><option value="pending">Payment pending</option><option value="paid">Paid</option></select><button type="button" onClick={() => void load()} className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink"><RefreshCw className="h-4 w-4" /> Refresh</button></div></div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1080px] text-sm">
           <thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Client</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Dates</th><th className="px-5 py-4 font-medium text-sub">Amount</th><th className="px-5 py-4 font-medium text-sub">Paid / Balance</th><th className="px-5 py-4 font-medium text-sub">Status</th><th className="px-5 py-4 font-medium text-sub">Actions</th></tr></thead>
-          <tbody>{loading ? <tr><td colSpan={8} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : invoices.length === 0 ? <tr><td colSpan={8} className="py-12 text-center text-sub">No tracked invoices yet. New invoices appear here when generated.</td></tr> : paginatedInvoices.map((invoice) => <tr key={invoice.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 font-medium text-ink">{invoice.invoiceNumber}</td><td className="px-5 py-4"><p className="text-ink">{invoice.propertyName}</p><p className="text-xs text-sub">{invoice.clientName}</p></td><td className="px-5 py-4 text-sub">{invoice.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management'}</td><td className="px-5 py-4 text-xs text-sub"><p>{formatDateOnlyDisplay(invoice.invoiceDate)}</p><p>Due {formatDateOnlyDisplay(invoice.dueDate)}</p>{invoice.billingPeriod ? <p>{invoice.billingPeriod}</p> : null}</td><td className="px-5 py-4 font-semibold text-ink">{money(invoice.amount)}</td><td className="px-5 py-4 text-sub"><p>{money(invoice.paidAmount)} paid</p><p>{money(invoice.balanceAmount)} due</p></td><td className="px-5 py-4"><FinanceStatus status={invoice.status} /></td><td className="px-5 py-4">{invoice.status === 'pending' ? <div className="flex items-center gap-2"><button type="button" onClick={() => setPaymentInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Record payment</button>{invoice.service === 'revenue_management' ? <button type="button" disabled={cancellingInvoiceId === invoice.id} onClick={() => void cancelInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-red-500/20 px-3 text-xs font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50">{cancellingInvoiceId === invoice.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />} Cancel</button> : null}</div> : <span className="text-xs text-ghost">Complete</span>}</td></tr>)}</tbody>
+          <tbody>{invoiceTable.loading ? <tr><td colSpan={8} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : invoices.length === 0 ? <tr><td colSpan={8} className="py-12 text-center text-sub">No invoices match the selected filters.</td></tr> : paginatedInvoices.map((invoice) => <tr key={invoice.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 font-medium text-ink">{invoice.invoiceNumber}</td><td className="px-5 py-4"><p className="text-ink">{invoice.propertyName}</p><p className="text-xs text-sub">{invoice.clientName}</p></td><td className="px-5 py-4 text-sub">{invoice.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management'}</td><td className="px-5 py-4 text-xs text-sub"><p>{formatDateOnlyDisplay(invoice.invoiceDate)}</p><p>Due {formatDateOnlyDisplay(invoice.dueDate)}</p>{invoice.billingPeriod ? <p>{invoice.billingPeriod}</p> : null}</td><td className="px-5 py-4 font-semibold text-ink">{money(invoice.amount)}</td><td className="px-5 py-4 text-sub"><p>{money(invoice.paidAmount)} paid</p><p>{money(invoice.balanceAmount)} due</p></td><td className="px-5 py-4"><FinanceStatus status={invoice.status} /></td><td className="px-5 py-4">{invoice.status === 'pending' ? <div className="flex items-center gap-2"><button type="button" onClick={() => setPaymentInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Record payment</button>{invoice.service === 'revenue_management' ? <button type="button" disabled={cancellingInvoiceId === invoice.id} onClick={() => void cancelInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-red-500/20 px-3 text-xs font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50">{cancellingInvoiceId === invoice.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />} Cancel</button> : null}</div> : <span className="text-xs text-ghost">Complete</span>}</td></tr>)}</tbody>
         </table>
       </div>
-      {invoices.length > FINANCE_PAGE_SIZE ? <FinancePagination page={currentInvoicePage} totalPages={invoiceTotalPages} totalRecords={invoices.length} onPageChange={setInvoicePage} /> : null}
+      <FinancePagination table={invoiceTable} label="Client invoices" />
     </section>
 
     <section className="surface rounded-lg">
@@ -142,8 +157,8 @@ export function FinancePanel() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div><p className="text-lg font-semibold text-ink">Received payments</p><p className="mt-1 text-sm text-sub">Every income transaction recorded against an invoice.</p></div>
           <div className="flex items-center gap-3">
-            <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'Filtered total' : 'Total received'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">{money(filteredPaymentTotal)}</p></div>
-            <button type="button" onClick={exportIncome} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white"><FileDown className="h-4 w-4" /> Export income</button>
+            <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'Filtered total' : 'Total received'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">{displayedPaymentTotal === null ? '—' : money(displayedPaymentTotal)}</p></div>
+            <button type="button" onClick={() => void exportIncome()} disabled={exporting || loading} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white"><FileDown className="h-4 w-4" /> {exporting ? 'Exporting…' : 'Export income'}</button>
           </div>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -153,18 +168,17 @@ export function FinancePanel() {
           <div className="flex items-end"><button type="button" disabled={paymentService === 'all' && !paymentDateFrom && !paymentDateTo} onClick={() => { setPaymentService('all'); setPaymentDateFrom(''); setPaymentDateTo('') }} className="h-10 w-full rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub transition-colors hover:border-zinc-600 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40">Clear filters</button></div>
         </div>
       </div>
-      <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Date</th><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Method</th><th className="px-5 py-4 font-medium text-sub">Reference</th><th className="px-5 py-4 font-medium text-sub">Amount</th></tr></thead><tbody>{payments.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'No received payments match the selected filters.' : 'No payments recorded yet.'}</td></tr> : paginatedPayments.map((payment) => <tr key={payment.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 text-sub">{formatDateOnlyDisplay(payment.paymentDate)}</td><td className="px-5 py-4 font-medium text-ink">{payment.invoiceNumber}</td><td className="px-5 py-4 text-sub">{payment.service === 'ota_onboarding' ? 'OTA' : 'Revenue'}</td><td className="px-5 py-4 uppercase text-sub">{payment.method.replace('_', ' ')}</td><td className="px-5 py-4 text-sub">{payment.reference || '—'}</td><td className="px-5 py-4 font-semibold text-[#66B159]">{money(payment.amount)}</td></tr>)}</tbody></table></div>
-      {payments.length > FINANCE_PAGE_SIZE ? <FinancePagination page={currentPaymentPage} totalPages={paymentTotalPages} totalRecords={payments.length} onPageChange={setPaymentPage} /> : null}
+      <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Date</th><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Method</th><th className="px-5 py-4 font-medium text-sub">Reference</th><th className="px-5 py-4 font-medium text-sub">Amount</th></tr></thead><tbody>{paymentTable.loading ? <tr><td colSpan={6} className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : payments.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'No received payments match the selected filters.' : 'No payments recorded yet.'}</td></tr> : paginatedPayments.map((payment) => <tr key={payment.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 text-sub">{formatDateOnlyDisplay(payment.paymentDate)}</td><td className="px-5 py-4 font-medium text-ink">{payment.invoiceNumber}</td><td className="px-5 py-4 text-sub">{payment.service === 'ota_onboarding' ? 'OTA' : 'Revenue'}</td><td className="px-5 py-4 uppercase text-sub">{payment.method.replace('_', ' ')}</td><td className="px-5 py-4 text-sub">{payment.reference || '—'}</td><td className="px-5 py-4 font-semibold text-[#66B159]">{money(payment.amount)}</td></tr>)}</tbody></table></div>
+      <FinancePagination table={paymentTable} label="Received payments" />
     </section>
 
     {paymentInvoice ? <RecordPaymentModal invoice={paymentInvoice} onClose={() => setPaymentInvoice(null)} onRecorded={() => { setPaymentInvoice(null); setMessage('Payment recorded successfully.'); void load() }} /> : null}
   </div>
 }
 
-function FinancePagination({ page, totalPages, totalRecords, onPageChange }: { page: number; totalPages: number; totalRecords: number; onPageChange: (page: number) => void }) {
-  const firstRecord = (page - 1) * FINANCE_PAGE_SIZE + 1
-  const lastRecord = Math.min(page * FINANCE_PAGE_SIZE, totalRecords)
-  return <div className="flex flex-wrap items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">Showing {firstRecord}–{lastRecord} of {totalRecords} records</p><div className="flex items-center gap-2"><button type="button" onClick={() => onPageChange(Math.max(1, page - 1))} disabled={page === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Previous</button><span className="text-xs text-sub">Page {page} of {totalPages}</span><button type="button" onClick={() => onPageChange(Math.min(totalPages, page + 1))} disabled={page === totalPages} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Next</button></div></div>
+function FinancePagination({ table, label }: { table: { page: number; loading: boolean; hasMore: boolean; previous: () => void; next: () => void }; label: string }) {
+  if (table.page === 1 && !table.hasMore) return null
+  return <nav aria-label={label + ' pagination'} className="flex flex-wrap items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">10 records per page</p><div className="flex items-center gap-2"><button type="button" onClick={table.previous} disabled={table.loading || table.page === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Previous</button><span className="text-xs text-sub">Page {table.page}</span><button type="button" onClick={table.next} disabled={table.loading || !table.hasMore} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Next</button></div></nav>
 }
 
 function FinanceMetric({ label, value, detail, primary = false }: { label: string; value: string; detail: string; primary?: boolean }) {

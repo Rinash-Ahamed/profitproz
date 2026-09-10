@@ -91,3 +91,6 @@ SMTP messages use connection, greeting, and socket timeouts, are serialized per 
 - Revenue invoices are available only for Active revenue-management clients.
 - OTA invoices are available after every selected platform is Live.
 - Monitor Firestore read counts and move high-volume list screens to cursor pagination in the UI as record volumes grow.
+- Finance loads invoice and payment tables in separate 10-row cursor pages. Summary totals cover all history; explicit income export walks all matching payment pages. Substring search and service/status filtering scan ordered batches when needed, so filtered requests can read more than 11 documents. Payment totals use aggregation with a compatible fallback when an index is unavailable.
+- Tab lists use a 30-second memory cache, cleared on mutations, session changes, and window focus. Live task/session/security requests bypass this cache. Finance Refresh forces fresh pages and totals.
+- Run `node scripts/test-performance.mjs` for isolated pagination, export coverage, payment-total, and cache-invalidation regression checks (no Firestore access).

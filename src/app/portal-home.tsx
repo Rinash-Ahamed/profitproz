@@ -14,7 +14,7 @@ import { ToastMessage } from '@/components/ui/ToastMessage'
 import { useAppDialog } from '@/components/ui/AppDialogProvider'
 import { LeaveDateSummary } from '@/components/ui/LeaveDateSummary'
 import { countNonSundayDaysInclusive, formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
-import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
+import { apiFetch, cachedTabFetch, clearTabCache, authenticatedFetch as fetch } from '@/lib/client-api'
 import { escapeHtml } from '@/lib/html'
 import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
 import { STAFF_DEPARTMENTS, STAFF_ROLES } from '@/lib/staff-options'
@@ -65,6 +65,11 @@ const ADMIN_MOBILE_GROUPS = [
 export function PortalHome({ user, version, title, description }: PortalHomeProps) {
   const { confirmAction, promptAction } = useAppDialog()
   const [activeTab, setActiveTab] = useState('dashboard')
+  useEffect(() => {
+    clearTabCache()
+    window.addEventListener('focus', clearTabCache)
+    return () => { clearTabCache(); window.removeEventListener('focus', clearTabCache) }
+  }, [user.email, user.role])
   const [staffSubTab, setStaffSubTab] = useState('all')
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [adminNavMenu, setAdminNavMenu] = useState<AdminNavMenuId | null>(null)
@@ -238,7 +243,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   useEffect(() => {
     if (user.role !== 'admin') return
     const controller = new AbortController()
-    const tabFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, signal: controller.signal })
+    const tabFetch = (input: string, init?: RequestInit) => cachedTabFetch(input, { ...init, cache: 'default', signal: controller.signal })
     const reportError = (fallback: string) => (caught: unknown) => {
       if (controller.signal.aborted || (caught instanceof Error && caught.name === 'AbortError')) return
       setError(fallback)
@@ -336,7 +341,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   useEffect(() => {
     if (user.role !== 'staff' || user.mustChangePassword) return
     const controller = new AbortController()
-    const tabFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(input, { ...init, signal: controller.signal })
+    const tabFetch = (input: string, init?: RequestInit) => cachedTabFetch(input, { ...init, cache: 'default', signal: controller.signal })
     const reportError = (fallback: string) => (caught: unknown) => {
       if (controller.signal.aborted || (caught instanceof Error && caught.name === 'AbortError')) return
       setError(caught instanceof Error && caught.message ? caught.message : fallback)
