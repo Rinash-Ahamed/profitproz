@@ -1177,7 +1177,7 @@ export async function createRevenueInvoiceSequence(propertyId: string, input: In
   return { sequence: result.sequence, invoice: mapDocToFinanceInvoice(await db.collection(COLLECTIONS.FINANCE_INVOICES).doc(result.invoiceId).get()), created: result.created }
 }
 
-export async function getFinanceOverview(): Promise<FinanceOverview> {
+export async function getFinanceOverview(includeTables = true): Promise<FinanceOverview> {
   const db = ensureDb()
   const tableLimit = 100
   const invoicesQuery = db.collection(COLLECTIONS.FINANCE_INVOICES)
@@ -1229,8 +1229,8 @@ export async function getFinanceOverview(): Promise<FinanceOverview> {
     }
   })()
   const [invoiceSnapshot, paymentSnapshot, totals] = await Promise.all([
-    invoicesQuery.orderBy('invoiceDate', 'desc').limit(tableLimit + 1).get(),
-    paymentsQuery.orderBy('paymentDate', 'desc').limit(tableLimit + 1).get(),
+    includeTables ? invoicesQuery.orderBy('invoiceDate', 'desc').limit(tableLimit + 1).get() : Promise.resolve({ docs: [] }),
+    includeTables ? paymentsQuery.orderBy('paymentDate', 'desc').limit(tableLimit + 1).get() : Promise.resolve({ docs: [] }),
     totalsPromise,
   ])
   const { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll } = totals
@@ -1253,6 +1253,66 @@ export async function getFinanceOverview(): Promise<FinanceOverview> {
     onboardingIncome,
     invoicesTruncated,
     paymentsTruncated,
+  }
+}
+
+export async function listFinancePage(input: { kind: 'invoices' | 'payments'; cursor?: string; service?: string; status?: string; search?: string; from?: string; to?: string; limit?: number }) {
+  const limit = input.limit === 100 ? 100 : 10
+  const field = input.kind === 'invoices' ? 'invoiceDate' : 'paymentDate'
+  let query: Query = ensureDb().collection(input.kind === 'invoices' ? COLLECTIONS.FINANCE_INVOICES : COLLECTIONS.FINANCE_PAYMENTS)
+  if (input.from) query = query.where(field, '>=', input.from)
+  if (input.to) query = query.where(field, '<=', input.to)
+  query = query.orderBy(field, 'desc').orderBy(FieldPath.documentId(), 'desc')
+  if (input.cursor) {
+    let cursor: unknown
+    try { cursor = JSON.parse(Buffer.from(input.cursor, 'base64url').toString()) } catch { throw new Error('INVALID_FINANCE_CURSOR') }
+    if (!Array.isArray(cursor) || cursor.length !== 2 || !cursor.every((value) => typeof value === 'string') || !parseDateOnly(cursor[0]) || !cursor[1] || cursor[1].includes('/')) throw new Error('INVALID_FINANCE_CURSOR')
+    query = query.startAfter(cursor[0], cursor[1])
+  }
+  const matches: DocumentSnapshot[] = []
+  const search = (input.search || '').trim().toLowerCase()
+  // Single-field ordering works with existing indexes. Scan only as needed for
+  // legacy substring search and service/status filters; never cap results at 100.
+  while (matches.length <= limit) {
+    const batchSize = Math.max(search || (input.service && input.service !== 'all') || (input.status && input.status !== 'all') ? 32 : 11, limit + 1 - matches.length)
+    const snapshot = await query.limit(batchSize).get()
+    for (const document of snapshot.docs) {
+      const data = document.data()
+      if (input.kind === 'invoices' && data.status === 'cancelled') continue
+      if (input.service && input.service !== 'all' && data.service !== input.service) continue
+      if (input.kind === 'invoices' && input.status && input.status !== 'all' && data.status !== input.status) continue
+      if (search && ![data.invoiceNumber, data.clientName, data.propertyName].some((value) => String(value || '').toLowerCase().includes(search))) continue
+      matches.push(document)
+    }
+    if (snapshot.size < batchSize) break
+    query = query.startAfter(snapshot.docs[snapshot.docs.length - 1])
+    if (matches.length > limit) break
+  }
+  const hasMore = matches.length > limit
+  const documents = matches.slice(0, limit)
+  const last = documents[documents.length - 1]
+  return {
+    items: input.kind === 'invoices' ? documents.map(mapDocToFinanceInvoice) : documents.map(mapDocToFinancePayment),
+    nextCursor: hasMore && last ? Buffer.from(JSON.stringify([last.get(field), last.id])).toString('base64url') : null,
+  }
+}
+
+export async function financePaymentTotal(input: { service?: string; from?: string; to?: string }) {
+  let query: Query = ensureDb().collection(COLLECTIONS.FINANCE_PAYMENTS)
+  if (input.from) query = query.where('paymentDate', '>=', input.from)
+  if (input.to) query = query.where('paymentDate', '<=', input.to)
+  if (input.service && input.service !== 'all') query = query.where('service', '==', input.service)
+  try {
+    const snapshot = await query.aggregate({ total: AggregateField.sum('amount') }).get()
+    return roundCurrency(Number(snapshot.data().total || 0))
+  } catch (error) {
+    if (!isMissingIndexError(error)) throw error
+    // Existing deployments may not yet have the date/service aggregate index.
+    let fallback: Query = ensureDb().collection(COLLECTIONS.FINANCE_PAYMENTS)
+    if (input.from) fallback = fallback.where('paymentDate', '>=', input.from)
+    if (input.to) fallback = fallback.where('paymentDate', '<=', input.to)
+    const snapshot = await fallback.select('amount', 'service').get()
+    return sumCurrency(snapshot.docs.filter((doc) => !input.service || input.service === 'all' || doc.get('service') === input.service).map((doc) => Number(doc.get('amount') || 0)))
   }
 }
 
