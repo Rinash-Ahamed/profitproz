@@ -45,6 +45,10 @@ export function PayrollPanel() {
   const [error, setError] = useState('')
   const [attendanceRecordId, setAttendanceRecordId] = useState('')
 
+  function applyPayrollUpdate(updated: PayrollRecord) {
+    setRecords((current) => current.map((item) => item.id === updated.id ? { ...updated, currentEmployeeId: item.currentEmployeeId } : item))
+  }
+
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError('')
@@ -108,7 +112,7 @@ export function PayrollPanel() {
       })
       const data = await response.json() as { payroll?: PayrollRecord; message?: string }
       if (!response.ok || !data.payroll) throw new Error(data.message || 'Unable to update payroll status.')
-      setRecords((current) => current.map((item) => item.id === data.payroll!.id ? { ...data.payroll!, currentEmployeeId: item.currentEmployeeId } : item))
+      applyPayrollUpdate(data.payroll)
       setMessage(`${record.employeeName}'s payroll is now ${status}.`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to update payroll status.')
@@ -142,7 +146,7 @@ export function PayrollPanel() {
       })
       const data = await response.json() as { payroll?: PayrollRecord; message?: string }
       if (!response.ok || !data.payroll) throw new Error(data.message || 'Unable to save the attendance decision.')
-      setRecords((current) => current.map((item) => item.id === data.payroll!.id ? { ...data.payroll!, currentEmployeeId: item.currentEmployeeId } : item))
+      applyPayrollUpdate(data.payroll)
       setMessage(`${record.employeeName}'s ${displayDate} attendance was marked as ${decision === 'lop' ? 'LOP' : 'ignored'}.`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to save the attendance decision.')
@@ -174,7 +178,7 @@ export function PayrollPanel() {
       })
       const data = await response.json() as { payroll?: PayrollRecord; message?: string }
       if (!response.ok || !data.payroll) throw new Error(data.message || 'Unable to revert the attendance decision.')
-      setRecords((current) => current.map((item) => item.id === data.payroll!.id ? { ...data.payroll!, currentEmployeeId: item.currentEmployeeId } : item))
+      applyPayrollUpdate(data.payroll)
       setMessage(`${record.employeeName}'s ${displayDate} attendance decision was reverted to pending.`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to revert the attendance decision.')
