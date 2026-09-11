@@ -45,6 +45,10 @@ export function PayrollPanel() {
   const [error, setError] = useState('')
   const [attendanceRecordId, setAttendanceRecordId] = useState('')
 
+  function applyPayrollUpdate(updated: PayrollRecord) {
+    setRecords((current) => current.map((item) => item.id === updated.id ? { ...updated, currentEmployeeId: item.currentEmployeeId } : item))
+  }
+
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError('')
@@ -108,7 +112,7 @@ export function PayrollPanel() {
       })
       const data = await response.json() as { payroll?: PayrollRecord; message?: string }
       if (!response.ok || !data.payroll) throw new Error(data.message || 'Unable to update payroll status.')
-      setRecords((current) => current.map((item) => item.id === data.payroll!.id ? data.payroll! : item))
+      applyPayrollUpdate(data.payroll)
       setMessage(`${record.employeeName}'s payroll is now ${status}.`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to update payroll status.')
@@ -142,7 +146,7 @@ export function PayrollPanel() {
       })
       const data = await response.json() as { payroll?: PayrollRecord; message?: string }
       if (!response.ok || !data.payroll) throw new Error(data.message || 'Unable to save the attendance decision.')
-      setRecords((current) => current.map((item) => item.id === data.payroll!.id ? data.payroll! : item))
+      applyPayrollUpdate(data.payroll)
       setMessage(`${record.employeeName}'s ${displayDate} attendance was marked as ${decision === 'lop' ? 'LOP' : 'ignored'}.`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to save the attendance decision.')
@@ -174,7 +178,7 @@ export function PayrollPanel() {
       })
       const data = await response.json() as { payroll?: PayrollRecord; message?: string }
       if (!response.ok || !data.payroll) throw new Error(data.message || 'Unable to revert the attendance decision.')
-      setRecords((current) => current.map((item) => item.id === data.payroll!.id ? data.payroll! : item))
+      applyPayrollUpdate(data.payroll)
       setMessage(`${record.employeeName}'s ${displayDate} attendance decision was reverted to pending.`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to revert the attendance decision.')
@@ -189,10 +193,11 @@ export function PayrollPanel() {
       return
     }
     const firstPeriod = calculatePayrollPeriodAmounts(records[0])
-    const headings = ['Employee Name', 'Employee ID', ...(firstPeriod.isIncomplete ? ['Calculated Through'] : []), 'Calendar Days', 'Paid Sundays', 'Working Days', 'Days Present', 'CL Available', 'Casual Leave Used', 'Missing Attendance', 'LOP Days', 'Payable Working Days', 'Paid Salary Days', 'Gross Salary', 'LOP Deduction', firstPeriod.isIncomplete ? 'Salary Earned' : 'Net Salary', 'Status']
+    const showSnapshotId = records.some((record) => record.currentEmployeeId && record.currentEmployeeId !== record.employeeId)
+    const headings = ['Employee Name', 'Employee ID', ...(showSnapshotId ? ['Payroll Snapshot Employee ID'] : []), ...(firstPeriod.isIncomplete ? ['Calculated Through'] : []), 'Calendar Days', 'Paid Sundays', 'Working Days', 'Days Present', 'CL Available', 'Casual Leave Used', 'Missing Attendance', 'LOP Days', 'Payable Working Days', 'Paid Salary Days', 'Gross Salary', 'LOP Deduction', firstPeriod.isIncomplete ? 'Salary Earned' : 'Net Salary', 'Status']
     const rows = records.map((record) => {
       const period = calculatePayrollPeriodAmounts(record)
-      return [record.employeeName, record.employeeId, ...(firstPeriod.isIncomplete ? [payrollDateLabel(period.completedThroughDate)] : []), record.totalCalendarDays, record.sundayHolidays, record.totalWorkingDays, record.daysPresent, record.closingCasualLeaveBalance, record.casualLeaveUsed, record.missingAttendanceDays, period.lopDays, period.payableDays, period.paidSalaryDays, record.grossSalary, period.lopDeduction, period.netSalary, record.status].map(csvValue).join(',')
+      return [record.employeeName, record.currentEmployeeId || record.employeeId, ...(showSnapshotId ? [record.employeeId] : []), ...(firstPeriod.isIncomplete ? [payrollDateLabel(period.completedThroughDate)] : []), record.totalCalendarDays, record.sundayHolidays, record.totalWorkingDays, record.daysPresent, record.closingCasualLeaveBalance, record.casualLeaveUsed, record.missingAttendanceDays, period.lopDays, period.payableDays, period.paidSalaryDays, record.grossSalary, period.lopDeduction, period.netSalary, record.status].map(csvValue).join(',')
     })
     const csv = ['sep=,', headings.map(csvValue).join(','), ...rows].join('\r\n')
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }))
@@ -246,7 +251,7 @@ export function PayrollPanel() {
                 const period = calculatePayrollPeriodAmounts(record)
                 const finalizationBlocked = period.isIncomplete && (record.status === 'calculated' || record.status === 'approved')
                 return <tr key={record.id} className="border-b border-zinc-800 last:border-none">
-                  <td className="sticky left-0 z-10 border-r border-zinc-800 bg-[#16181a] px-4 py-4"><p className="font-medium text-ink">{record.employeeName}</p><p className="mt-1 text-xs text-sub">{record.employeeId}</p></td>
+                  <td className="sticky left-0 z-10 border-r border-zinc-800 bg-[#16181a] px-4 py-4"><p className="font-medium text-ink">{record.employeeName}</p><p className="mt-1 text-xs text-sub">{record.currentEmployeeId || record.employeeId}</p>{record.currentEmployeeId && record.currentEmployeeId !== record.employeeId ? <p className="mt-1 text-[10px] text-ghost" title="Employee ID recorded when this payroll was generated">Payroll ID: {record.employeeId}</p> : null}</td>
                   <PayrollNumber>{record.totalWorkingDays}</PayrollNumber><PayrollNumber>{record.daysPresent}</PayrollNumber><PayrollNumber>{record.closingCasualLeaveBalance}</PayrollNumber><PayrollNumber>{record.casualLeaveUsed}</PayrollNumber><td className="px-4 py-4">{record.missingAttendanceDays ? <button type="button" onClick={() => setAttendanceRecordId(record.id)} className={`rounded-md border px-2.5 py-1.5 text-xs font-semibold transition-colors ${attendanceReviewComplete ? 'border-green-500/25 bg-green-500/10 text-green-400 hover:bg-green-500/20' : 'border-amber-500/25 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'}`}>{attendanceReviewComplete ? <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" />Reviewed {record.missingAttendanceDays}/{record.missingAttendanceDays}</span> : `Review ${pendingAttendanceCount}/${record.missingAttendanceDays}`}</button> : <span className="text-sub">0</span>}</td><PayrollNumber>{period.lopDays}</PayrollNumber><PayrollNumber>{period.payableDays}</PayrollNumber><PayrollNumber>{period.paidSalaryDays}</PayrollNumber><PayrollNumber>{money(record.grossSalary)}</PayrollNumber><PayrollNumber>{money(period.lopDeduction)}</PayrollNumber><td className="px-4 py-4 font-semibold text-ink">{money(period.netSalary)}</td>
                   <td className="px-4 py-4"><PayrollStatusBadge status={record.status} /></td>
                   <td className="sticky right-0 z-10 border-l border-zinc-800 bg-[#16181a] px-4 py-4">{nextPayrollStatus(record.status) ? <button type="button" onClick={() => advance(record)} disabled={!!actionId || finalizationBlocked || (record.status === 'draft' && record.missingAttendanceDates.some((date) => !record.missingAttendanceDecisions[date]))} title={finalizationBlocked ? 'Approval is available after the complete month has been calculated.' : record.status === 'draft' && record.missingAttendanceDates.some((date) => !record.missingAttendanceDecisions[date]) ? 'Review every missing-attendance date first.' : undefined} className="flex h-9 items-center gap-2 rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20 disabled:opacity-50">{actionId === record.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : record.status === 'approved' ? <CreditCard className="h-3.5 w-3.5" /> : <CheckCircle2 className="h-3.5 w-3.5" />}{record.status === 'draft' ? 'Confirm Calculation' : record.status === 'calculated' ? 'Approve' : 'Mark paid'}</button> : <span className="text-xs text-green-400">Complete</span>}</td>

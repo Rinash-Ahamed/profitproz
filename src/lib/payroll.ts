@@ -17,6 +17,8 @@ export type PayrollRecord = {
   id: string
   month: string
   employeeId: string
+  /** Current profile ID for display only; never persisted in payroll snapshots. */
+  currentEmployeeId?: string
   staffId: string
   employeeName: string
   staffEmail: string

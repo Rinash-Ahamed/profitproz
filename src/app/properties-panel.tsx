@@ -58,6 +58,8 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
     return properties
       .filter((property) => !query || property.name.toLowerCase().includes(query))
       .sort((a, b) => {
+        const statusDifference = Number(a.status === 'inactive') - Number(b.status === 'inactive')
+        if (statusDifference) return statusDifference
         if (query) {
           const rankDifference = Number(!a.name.toLowerCase().startsWith(query)) - Number(!b.name.toLowerCase().startsWith(query))
           if (rankDifference) return rankDifference
