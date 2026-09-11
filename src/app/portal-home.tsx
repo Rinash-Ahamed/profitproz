@@ -932,6 +932,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           .some((value) => value?.toLowerCase().includes(query))
       })
       .sort((a, b) => {
+        const statusRank = (staff: PublicStaffRecord) => staff.active ? 0 : staff.activatedAt ? 2 : 1
+        const statusDifference = statusRank(a) - statusRank(b)
+        if (statusDifference) return statusDifference
         if (query) {
           const rankDifference = Number(!a.name.toLowerCase().startsWith(query)) - Number(!b.name.toLowerCase().startsWith(query))
           if (rankDifference) return rankDifference
