@@ -2127,9 +2127,10 @@ export async function listPayrollRecords(month: string): Promise<PayrollRecord[]
   if (!db) return []
   const [snapshot, activeStaffSnapshot] = await Promise.all([
     db.collection(COLLECTIONS.PAYROLL).where('month', '==', month).get(),
-    db.collection(COLLECTIONS.STAFF).where('active', '==', true).select('activatedAt').get(),
+    db.collection(COLLECTIONS.STAFF).where('active', '==', true).select('activatedAt', 'employeeId').get(),
   ])
   const monthEndDate = payrollMonthEndDate(month)
+  const currentEmployeeIds = new Map(activeStaffSnapshot.docs.map((document) => [document.id, document.data()?.employeeId]))
   const activeStaffIds = new Set(activeStaffSnapshot.docs.flatMap((document) => {
     const activatedAt = mapTimestamp(document.data()?.activatedAt)
     if (!activatedAt) return [document.id]
@@ -2139,6 +2140,10 @@ export async function listPayrollRecords(month: string): Promise<PayrollRecord[]
   return snapshot.docs
     .map(mapDocToPayroll)
     .filter((record) => activeStaffIds.has(record.staffId))
+    .map((record) => {
+      const currentEmployeeId = currentEmployeeIds.get(record.staffId)
+      return { ...record, currentEmployeeId: typeof currentEmployeeId === 'string' && currentEmployeeId.trim() ? currentEmployeeId : record.employeeId }
+    })
     .sort((a, b) => a.employeeName.localeCompare(b.employeeName))
 }
 
