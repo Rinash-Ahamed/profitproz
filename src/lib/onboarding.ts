@@ -37,6 +37,7 @@ export type OnboardingRecord = {
   ratePerPlatform: number
   invoiceNotes: string
   invoiceSequence?: number
+  financeInvoiceId?: string
   paymentStatus: OnboardingPaymentStatus
   invoiceGeneratedAt?: string
   paymentCompletedAt?: string
@@ -46,6 +47,6 @@ export type OnboardingRecord = {
   updatedAt?: string
 }
 
-export type OnboardingDetailsInput = Omit<OnboardingRecord, 'id' | 'platforms' | 'invoiceSequence' | 'paymentStatus' | 'invoiceGeneratedAt' | 'paymentCompletedAt' | 'financePaymentRecordedAt' | 'createdAt' | 'updatedAt'> & {
+export type OnboardingDetailsInput = Omit<OnboardingRecord, 'id' | 'platforms' | 'invoiceSequence' | 'financeInvoiceId' | 'paymentStatus' | 'invoiceGeneratedAt' | 'paymentCompletedAt' | 'financePaymentRecordedAt' | 'createdAt' | 'updatedAt'> & {
   platforms: OtaPlatform[]
 }

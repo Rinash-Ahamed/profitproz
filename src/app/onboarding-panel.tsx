@@ -49,7 +49,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
   }, [onboardings, search])
 
   async function deleteRecord(record: OnboardingRecord) {
-    if (!await confirmAction({ title: 'Delete onboarding tracker?', message: `Delete the OTA onboarding tracker for ${record.propertyName}?`, confirmLabel: 'Delete tracker', tone: 'danger' })) return
+    if (!await confirmAction({ title: 'Delete OTA onboarding client?', message: `Permanently delete the OTA onboarding record for ${record.propertyName}? An active or paid invoice must be resolved first; cancelled invoices remain in Finance and Audit.`, confirmLabel: 'Delete OTA client', tone: 'danger' })) return
     setDeletingId(record.id)
     setError('')
     try {
@@ -69,7 +69,7 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
     setError('')
     setMessage('')
     try {
-      const financeUrl = `/api/admin/finance/invoices/${encodeURIComponent(`ota_${record.id}`)}/payments`
+      const financeUrl = `/api/admin/finance/invoices/${encodeURIComponent(record.financeInvoiceId || `ota_${record.id}`)}/payments`
       const response = await fetch(financeUrl, { cache: 'no-store' })
       let data = await response.json() as { invoice?: FinanceInvoiceRecord; payment?: FinancePaymentRecord | null; message?: string }
 
@@ -266,6 +266,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
   const [issuing, setIssuing] = useState(false)
+  const [replacingCancelledInvoice, setReplacingCancelledInvoice] = useState(false)
   const [error, setError] = useState('')
   const effectiveInvoiceDate = issuedInvoice?.invoiceDate || invoiceDate
   const dueDate = issuedInvoice?.dueDate || invoiceDate
@@ -285,7 +286,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       fetch('/template/ProfitPro_OTA_Onboarding_Invoice_Template.html', { signal: controller.signal }),
       fetch('/api/admin/invoice-settings', { signal: controller.signal }),
       record.invoiceSequence
-        ? fetch(`/api/admin/finance/invoices/${encodeURIComponent(`ota_${record.id}`)}/payments?invoiceOnly=1`, { signal: controller.signal, cache: 'no-store' })
+        ? fetch(`/api/admin/finance/invoices/${encodeURIComponent(record.financeInvoiceId || `ota_${record.id}`)}/payments?invoiceOnly=1`, { signal: controller.signal, cache: 'no-store' })
         : Promise.resolve(null),
     ])
       .then(async ([templateResponse, settingsResponse, invoiceResponse]) => {
@@ -297,10 +298,21 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
         if (invoiceResponse?.ok) {
           const invoiceData = await invoiceResponse.json() as { invoice?: FinanceInvoiceRecord }
           if (invoiceData.invoice) {
-            setIssuedInvoice(invoiceData.invoice)
-            setInvoiceSequence(record.invoiceSequence || 0)
-            setIssuedInvoiceNumber(invoiceData.invoice.invoiceNumber)
-            setInvoiceDate(invoiceData.invoice.invoiceDate)
+            if (invoiceData.invoice.status === 'cancelled') {
+              // Keep the cancelled invoice in Finance, but present a fresh
+              // preview so the admin can issue a corrected replacement.
+              setIssuedInvoice(null)
+              setInvoiceSequence(0)
+              setIssuedInvoiceNumber('')
+              setInvoiceDate(todayLocalDateOnly())
+              setReplacingCancelledInvoice(true)
+            } else {
+              setIssuedInvoice(invoiceData.invoice)
+              setInvoiceSequence(record.invoiceSequence || 0)
+              setIssuedInvoiceNumber(invoiceData.invoice.invoiceNumber)
+              setInvoiceDate(invoiceData.invoice.invoiceDate)
+              setReplacingCancelledInvoice(false)
+            }
           }
         } else if (invoiceResponse && invoiceResponse.status !== 404) {
           throw new Error('The issued invoice snapshot could not be loaded.')
@@ -309,7 +321,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Invoice template could not be loaded.') })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [record.id, record.invoiceSequence])
+  }, [record.financeInvoiceId, record.id, record.invoiceSequence])
 
   const renderedInvoice = useMemo(() => {
     if (!template) return ''
@@ -341,7 +353,14 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
 
   async function issueInvoice() {
     if (issuedInvoice) return
-    if (!await confirmAction({ title: 'Issue OTA onboarding invoice?', message: `Issue this invoice for ${record.propertyName} for ₹${subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}? This creates the Finance record and locks the invoice details.`, confirmLabel: 'Issue invoice', tone: 'warning' })) return
+    if (!await confirmAction({
+      title: replacingCancelledInvoice ? 'Issue corrected replacement invoice?' : 'Issue OTA onboarding invoice?',
+      message: replacingCancelledInvoice
+        ? `Issue a replacement invoice for ${record.propertyName} for ₹${subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}? The cancelled invoice remains in Audit, and this replacement receives a new invoice number.`
+        : `Issue this invoice for ${record.propertyName} for ₹${subtotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}? This creates the Finance record and locks the invoice details.`,
+      confirmLabel: replacingCancelledInvoice ? 'Issue replacement' : 'Issue invoice',
+      tone: 'warning',
+    })) return
     setIssuing(true)
     setError('')
     try {
@@ -354,6 +373,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       setInvoiceSequence(data.sequence)
       setIssuedInvoiceNumber(data.invoice.invoiceNumber)
       setIssuedInvoice(data.invoice)
+      setReplacingCancelledInvoice(false)
       onGeneratedRef.current(data.onboarding)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Failed to issue the invoice.')
@@ -403,8 +423,8 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       <div className="surface w-full max-w-6xl overflow-hidden rounded-xl shadow-2xl">
         <div className="flex flex-wrap items-end justify-between gap-4 border-b border-zinc-800 p-5 sm:px-6">
           <div>
-            <p className="text-lg font-semibold text-ink">Generate onboarding invoice</p>
-            <p className="mt-1 text-sm text-sub">{record.propertyName} · {issuedInvoice ? invoiceNumber : 'Preview — not recorded in Finance'}</p>
+            <p className="text-lg font-semibold text-ink">{replacingCancelledInvoice ? 'Issue corrected replacement invoice' : issuedInvoice ? 'Issued onboarding invoice' : 'Generate onboarding invoice'}</p>
+            <p className="mt-1 text-sm text-sub">{record.propertyName} · {issuedInvoice ? invoiceNumber : replacingCancelledInvoice ? 'Replacement preview — new invoice number assigned when issued' : 'Preview — not recorded in Finance'}</p>
           </div>
           <div className="flex flex-wrap items-end gap-3">
             <label className="block w-44">
@@ -418,7 +438,7 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
             <button type="button" onClick={downloadPdf} disabled={loading || downloading || issuing || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink disabled:cursor-not-allowed disabled:opacity-60">
               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {downloading ? 'Preparing…' : issuedInvoice ? 'Download PDF' : 'Download preview'}
             </button>
-            {!issuedInvoice ? <button type="button" onClick={() => void issueInvoice()} disabled={loading || downloading || issuing || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Issue invoice</button> : null}
+            {!issuedInvoice ? <button type="button" onClick={() => void issueInvoice()} disabled={loading || downloading || issuing || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} {replacingCancelledInvoice ? 'Issue replacement' : 'Issue invoice'}</button> : null}
             <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Close</button>
           </div>
         </div>
