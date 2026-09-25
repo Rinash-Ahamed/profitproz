@@ -566,9 +566,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function handleExpenseStatusUpdate(expenseId: string, status: 'approved' | 'rejected') {
+    const expense = expenseList.find((item) => item.id === expenseId)
+    const expenseDescription = expense
+      ? `${expense.staffName || expense.staffEmail}'s ₹${expense.amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })} expense dated ${formatDateOnlyDisplay(expense.expenseDate)}`
+      : 'this expense request'
     const decisionNote = status === 'rejected'
-      ? await promptAction({ title: 'Reject expense?', message: 'Add the rejection reason that will be shown to the employee.', label: 'Rejection reason', confirmLabel: 'Reject expense', tone: 'danger' })
-      : await confirmAction({ title: 'Approve expense?', message: 'Approve this expense request for reimbursement?', confirmLabel: 'Approve expense' }) ? '' : null
+      ? await promptAction({ title: 'Reject expense claim?', message: `Reject ${expenseDescription}? Add a reason that will be shown to the employee.`, label: 'Rejection reason', confirmLabel: 'Reject claim', tone: 'danger' })
+      : await confirmAction({ title: 'Approve expense for reimbursement?', message: `Approve ${expenseDescription}? It will move to Approved and remain unpaid until you record the reimbursement.`, confirmLabel: 'Approve reimbursement' }) ? '' : null
     if (decisionNote === null) return
     const originalExpenses = [...expenseList]
     setExpenseList((prev) => prev.map((expense) => (expense.id === expenseId ? { ...expense, status } : expense)))
@@ -584,6 +588,8 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
         setExpenseList(originalExpenses)
         const data = await response.json().catch(() => null)
         setError(data?.message || 'Failed to update expense status.')
+      } else {
+        setMessage(status === 'approved' ? 'Expense approved and awaiting reimbursement.' : 'Expense rejected and the employee can see the reason.')
       }
     } catch (err) {
       setExpenseList(originalExpenses)
@@ -593,7 +599,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   async function markExpenseReimbursed(expense: ExpenseRecord) {
     if (expense.status !== 'approved' || expense.paymentStatus === 'paid') return
-    if (!await confirmAction({ title: 'Mark reimbursement paid?', message: `Confirm that ${expense.staffName || expense.staffEmail} has been reimbursed.`, confirmLabel: 'Mark as paid', tone: 'warning' })) return
+    if (!await confirmAction({ title: 'Record reimbursement as paid?', message: `Confirm that ₹${expense.amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })} was reimbursed to ${expense.staffName || expense.staffEmail}. This records the payment date and cannot be reversed.`, confirmLabel: 'Record payment', tone: 'warning' })) return
     setDeletingExpenseId(expense.id)
     setError('')
     try {
@@ -649,7 +655,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function withdrawExpense(expense: ExpenseRecord) {
-    if (expense.status !== 'pending' || !await confirmAction({ title: 'Withdraw expense?', message: 'Withdraw this pending expense request?', confirmLabel: 'Withdraw expense', tone: 'danger' })) return
+    if (expense.status !== 'pending' || !await confirmAction({ title: 'Withdraw expense claim?', message: `Withdraw your ₹${expense.amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })} expense dated ${formatDateOnlyDisplay(expense.expenseDate)}? It will be permanently removed before admin review.`, confirmLabel: 'Withdraw claim', tone: 'danger' })) return
     setDeletingExpenseId(expense.id)
     setError('')
     try {
@@ -723,14 +729,17 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function updateLeaveStatus(id: string, status: 'approved' | 'rejected', payrollTreatment: LeavePayrollTreatment = 'auto') {
+    const leaveRequest = leaveList.find((leave) => leave.id === id)
+    const leaveDescription = leaveRequest ? `${leaveRequest.staffEmail}'s leave from ${leaveRequest.startDate} to ${leaveRequest.endDate}` : 'this leave request'
     const decisionNote = status === 'rejected'
-      ? await promptAction({ title: 'Reject leave request?', message: 'Add the rejection reason that will be shown to the employee.', label: 'Rejection reason', confirmLabel: 'Reject leave', tone: 'danger' })
-      : await confirmAction({ title: payrollTreatment === 'lop' ? 'Approve as half-day LOP?' : payrollTreatment === 'cl' ? 'Approve using 0.5 CL?' : 'Approve leave request?', message: payrollTreatment === 'lop' ? 'Approve this half-day as 0.5 LOP? Half of the calendar-day salary will be deducted.' : payrollTreatment === 'cl' ? 'Approve this half-day using 0.5 CL? No salary will be deducted while CL is available.' : 'Approve this leave request? It will be included when Draft payroll is refreshed.', confirmLabel: payrollTreatment === 'lop' ? 'Approve 0.5 LOP' : payrollTreatment === 'cl' ? 'Use 0.5 CL' : 'Approve leave', tone: payrollTreatment === 'lop' ? 'warning' : 'default' }) ? '' : null
+      ? await promptAction({ title: 'Reject leave request?', message: `Reject ${leaveDescription}? Add a reason that will be shown to the employee.`, label: 'Rejection reason', confirmLabel: 'Reject leave', tone: 'danger' })
+      : await confirmAction({ title: payrollTreatment === 'lop' ? 'Approve as half-day LOP?' : payrollTreatment === 'cl' ? 'Approve using 0.5 CL?' : 'Approve leave request?', message: payrollTreatment === 'lop' ? `Approve ${leaveDescription} as 0.5 LOP? Half of the calendar-day salary will be deducted.` : payrollTreatment === 'cl' ? `Approve ${leaveDescription} using 0.5 CL? No salary will be deducted while CL is available.` : `Approve ${leaveDescription}? It will be included when Draft payroll is refreshed.`, confirmLabel: payrollTreatment === 'lop' ? 'Approve 0.5 LOP' : payrollTreatment === 'cl' ? 'Use 0.5 CL' : 'Approve leave', tone: payrollTreatment === 'lop' ? 'warning' : 'default' }) ? '' : null
     if (decisionNote === null) return
     const response = await fetch(`/api/admin/leaves/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, decisionNote, payrollTreatment }) })
     const data = await response.json() as { leave?: LeaveRequestRecord; message?: string }
     if (!response.ok || !data.leave) { setError(data.message || 'Unable to update leave request.'); return }
     setLeaveList((current) => current.map((leave) => leave.id === id ? data.leave! : leave))
+    setMessage(status === 'approved' ? 'Leave approved and ready for the next Draft payroll refresh.' : 'Leave rejected and the employee can see the reason.')
   }
 
   async function deleteAdminLeaveRequest(leave: LeaveRequestRecord) {
@@ -753,7 +762,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   }
 
   async function withdrawLeaveRequest(leave: LeaveRequestRecord) {
-    if (leave.status !== 'pending' || !await confirmAction({ title: 'Withdraw leave request?', message: 'Withdraw this pending leave request?', confirmLabel: 'Withdraw leave', tone: 'danger' })) return
+    if (leave.status !== 'pending' || !await confirmAction({ title: 'Withdraw leave request?', message: `Withdraw your leave request from ${leave.startDate} to ${leave.endDate}? It will be permanently removed before admin review.`, confirmLabel: 'Withdraw request', tone: 'danger' })) return
     setDeletingLeaveId(leave.id)
     setError('')
     try {

@@ -297,6 +297,7 @@ function mapDocToOnboarding(doc: DocumentSnapshot): OnboardingRecord {
     ratePerPlatform: typeof data.ratePerPlatform === 'number' ? data.ratePerPlatform : 0,
     invoiceNotes: typeof data.invoiceNotes === 'string' ? data.invoiceNotes : '',
     invoiceSequence: Number.isInteger(data.invoiceSequence) && data.invoiceSequence > 0 ? data.invoiceSequence : undefined,
+    financeInvoiceId: typeof data.financeInvoiceId === 'string' ? data.financeInvoiceId : undefined,
     paymentStatus: data.paymentStatus === 'complete'
       ? 'complete'
       : data.paymentStatus === 'pending' || (Number.isInteger(data.invoiceSequence) && data.invoiceSequence > 0)
@@ -1030,10 +1031,10 @@ export async function deleteOnboarding(id: string): Promise<void> {
   const docRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
   const [snapshot, financeSnapshot] = await Promise.all([
     docRef.get(),
-    db.collection(COLLECTIONS.FINANCE_INVOICES).doc(`ota_${id}`).get(),
+    db.collection(COLLECTIONS.FINANCE_INVOICES).where('sourceId', '==', id).get(),
   ])
   if (!snapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
-  if (financeSnapshot.exists) throw new Error('SOURCE_HAS_FINANCE_HISTORY')
+  if (financeSnapshot.docs.some((invoice) => invoice.data().status !== 'cancelled')) throw new Error('SOURCE_HAS_FINANCE_HISTORY')
   await docRef.delete()
 }
 
@@ -1049,14 +1050,17 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
   const invoiceAmount = roundCurrency(input.amount)
   const onboardingRef = db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(id)
   const counterRef = db.collection(COLLECTIONS.SETTINGS).doc('ota-invoice-sequence')
-  const financeRef = db.collection(COLLECTIONS.FINANCE_INVOICES).doc(`ota_${id}`)
   const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
 
   const result = await db.runTransaction(async (transaction) => {
     const onboardingSnapshot = await transaction.get(onboardingRef)
     if (!onboardingSnapshot.exists) throw new Error('ONBOARDING_NOT_FOUND')
-    const financeSnapshot = await transaction.get(financeRef)
     const onboardingData = onboardingSnapshot.data() || {}
+    const currentFinanceInvoiceId = typeof onboardingData.financeInvoiceId === 'string' && onboardingData.financeInvoiceId
+      ? onboardingData.financeInvoiceId
+      : `ota_${id}`
+    const currentFinanceRef = db.collection(COLLECTIONS.FINANCE_INVOICES).doc(currentFinanceInvoiceId)
+    const financeSnapshot = await transaction.get(currentFinanceRef)
     const otaSnapshot = {
       propertyAddress: typeof onboardingData.propertyAddress === 'string' ? onboardingData.propertyAddress : '',
       emailAddress: typeof onboardingData.emailAddress === 'string' ? onboardingData.emailAddress : '',
@@ -1068,6 +1072,10 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
 
     const existingSequence = onboardingSnapshot.data()?.invoiceSequence
     if (Number.isInteger(existingSequence) && existingSequence > 0) {
+      const existingInvoiceCancelled = financeSnapshot.exists && financeSnapshot.data()?.status === 'cancelled'
+      if (existingInvoiceCancelled) {
+        // Continue below to issue a replacement with a new immutable invoice number.
+      } else {
       if (onboardingSnapshot.data()?.paymentStatus !== 'complete') {
         transaction.update(onboardingRef, {
           paymentStatus: 'pending',
@@ -1076,7 +1084,7 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
         })
       }
       if (!financeSnapshot.exists) {
-        transaction.set(financeRef, {
+        transaction.set(currentFinanceRef, {
           service: 'ota_onboarding', sourceId: id, invoiceNumber: serviceInvoiceNumber('ota_onboarding', existingSequence as number, input.invoiceDate),
           clientName: onboardingSnapshot.data()?.clientName || '', propertyName: onboardingSnapshot.data()?.propertyName || '',
           invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: invoiceAmount,
@@ -1087,7 +1095,8 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
         })
         transaction.set(auditRef, { timestamp: FieldValue.serverTimestamp(), actorEmail: input.actorEmail.trim().toLowerCase(), action: 'ONBOARDING_INVOICE_NUMBER_ASSIGN', targetId: id, details: `OTA onboarding invoice sequence ${String(existingSequence).padStart(3, '0')} restored.` })
       }
-      return { sequence: existingSequence as number, created: !financeSnapshot.exists }
+      return { sequence: existingSequence as number, invoiceId: currentFinanceInvoiceId, created: !financeSnapshot.exists }
+      }
     }
 
     const counterSnapshot = await transaction.get(counterRef)
@@ -1095,15 +1104,18 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
       ? counterSnapshot.data()!.lastSequence as number
       : 0
     const nextSequence = lastSequence + 1
+    const nextFinanceInvoiceId = `ota_${id}_${nextSequence}`
+    const nextFinanceRef = db.collection(COLLECTIONS.FINANCE_INVOICES).doc(nextFinanceInvoiceId)
 
     transaction.set(counterRef, { lastSequence: nextSequence, updatedAt: FieldValue.serverTimestamp() }, { merge: true })
     transaction.update(onboardingRef, {
       invoiceSequence: nextSequence,
+      financeInvoiceId: nextFinanceInvoiceId,
       paymentStatus: 'pending',
       invoiceGeneratedAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     })
-    transaction.set(financeRef, {
+    transaction.set(nextFinanceRef, {
       service: 'ota_onboarding', sourceId: id, invoiceNumber: serviceInvoiceNumber('ota_onboarding', nextSequence, input.invoiceDate),
       clientName: onboardingSnapshot.data()?.clientName || '', propertyName: onboardingSnapshot.data()?.propertyName || '',
       invoiceDate: input.invoiceDate, dueDate: input.dueDate, billingPeriod: input.billingPeriod || '', amount: invoiceAmount,
@@ -1111,10 +1123,11 @@ export async function getOrCreateOnboardingInvoiceSequence(id: string, input: In
       paidAmount: 0, status: 'pending', createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
     })
     transaction.set(auditRef, { timestamp: FieldValue.serverTimestamp(), actorEmail: input.actorEmail.trim().toLowerCase(), action: 'ONBOARDING_INVOICE_NUMBER_ASSIGN', targetId: id, details: `OTA onboarding invoice sequence ${String(nextSequence).padStart(3, '0')} assigned.` })
-    return { sequence: nextSequence, created: true }
+    return { sequence: nextSequence, invoiceId: nextFinanceInvoiceId, created: true }
   })
 
   if (result.created) requestAuditLogPrune()
+  const financeRef = db.collection(COLLECTIONS.FINANCE_INVOICES).doc(result.invoiceId)
   return { sequence: result.sequence, onboarding: mapDocToOnboarding(await onboardingRef.get()), invoice: mapDocToFinanceInvoice(await financeRef.get()), created: result.created }
 }
 
@@ -1256,6 +1269,27 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
   }
 }
 
+export async function getFinancialExportData() {
+  const db = ensureDb()
+  const [properties, invoices, payments, expenses, salaries, payroll] = await Promise.all([
+    db.collection(COLLECTIONS.PROPERTIES).get(),
+    db.collection(COLLECTIONS.FINANCE_INVOICES).get(),
+    db.collection(COLLECTIONS.FINANCE_PAYMENTS).get(),
+    db.collection(COLLECTIONS.EXPENSES).get(),
+    db.collection(COLLECTIONS.SALARIES).get(),
+    db.collection(COLLECTIONS.PAYROLL).get(),
+  ])
+
+  return {
+    properties: properties.docs.map(mapDocToProperty),
+    invoices: invoices.docs.map(mapDocToFinanceInvoice),
+    payments: payments.docs.map(mapDocToFinancePayment),
+    expenses: expenses.docs.map(mapDocToExpense),
+    salaries: salaries.docs.map(mapDocToSalary),
+    payroll: payroll.docs.map(mapDocToPayroll),
+  }
+}
+
 export async function listFinancePage(input: { kind: 'invoices' | 'payments'; cursor?: string; service?: string; status?: string; search?: string; from?: string; to?: string; limit?: number }) {
   const limit = input.limit === 100 ? 100 : 10
   const field = input.kind === 'invoices' ? 'invoiceDate' : 'paymentDate'
@@ -1337,7 +1371,7 @@ export async function getFinancePaymentByInvoiceId(invoiceId: string): Promise<F
   return snapshot.empty ? null : mapDocToFinancePayment(snapshot.docs[0])
 }
 
-export async function cancelRevenueFinanceInvoice(invoiceId: string, actorEmail: string): Promise<FinanceInvoiceRecord> {
+export async function cancelFinanceInvoice(invoiceId: string, actorEmail: string): Promise<FinanceInvoiceRecord> {
   const db = ensureDb()
   const invoiceRef = db.collection(COLLECTIONS.FINANCE_INVOICES).doc(invoiceId)
   const revenueInvoiceRef = db.collection(COLLECTIONS.REVENUE_INVOICES).doc(invoiceId)
@@ -1347,7 +1381,11 @@ export async function cancelRevenueFinanceInvoice(invoiceId: string, actorEmail:
     const invoiceSnapshot = await transaction.get(invoiceRef)
     if (!invoiceSnapshot.exists) throw new Error('FINANCE_INVOICE_NOT_FOUND')
     const invoice = mapDocToFinanceInvoice(invoiceSnapshot)
-    if (invoice.service !== 'revenue_management') throw new Error('FINANCE_INVOICE_CANCEL_UNSUPPORTED')
+    const onboardingRef = invoice.service === 'ota_onboarding' && invoice.sourceId
+      ? db.collection(COLLECTIONS.OTA_ONBOARDINGS).doc(invoice.sourceId)
+      : null
+    const onboardingSnapshot = onboardingRef ? await transaction.get(onboardingRef) : null
+    const revenueInvoiceSnapshot = invoice.service === 'revenue_management' ? await transaction.get(revenueInvoiceRef) : null
     if (invoice.status === 'cancelled') throw new Error('FINANCE_INVOICE_ALREADY_CANCELLED')
     if (invoice.status !== 'pending' || invoice.paidAmount > 0) throw new Error('FINANCE_INVOICE_HAS_PAYMENT')
 
@@ -1357,16 +1395,33 @@ export async function cancelRevenueFinanceInvoice(invoiceId: string, actorEmail:
       cancelledBy: actorEmail.trim().toLowerCase(),
       updatedAt: FieldValue.serverTimestamp(),
     })
-    transaction.update(revenueInvoiceRef, {
-      status: 'cancelled',
-      cancelledAt: FieldValue.serverTimestamp(),
-    })
+    if (invoice.service === 'revenue_management') {
+      if (revenueInvoiceSnapshot?.exists) {
+        transaction.update(revenueInvoiceRef, {
+          status: 'cancelled',
+          cancelledAt: FieldValue.serverTimestamp(),
+        })
+      }
+    }
+    if (onboardingRef && onboardingSnapshot?.exists) {
+      const onboardingData = onboardingSnapshot.data() || {}
+      const linkedInvoiceId = typeof onboardingData.financeInvoiceId === 'string' ? onboardingData.financeInvoiceId : `ota_${invoice.sourceId}`
+      if (linkedInvoiceId === invoiceId) {
+        transaction.update(onboardingRef, {
+          invoiceSequence: FieldValue.delete(),
+          financeInvoiceId: FieldValue.delete(),
+          paymentStatus: 'not_invoiced',
+          invoiceGeneratedAt: FieldValue.delete(),
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      }
+    }
     transaction.set(auditRef, {
       timestamp: FieldValue.serverTimestamp(),
       actorEmail: actorEmail.trim().toLowerCase(),
-      action: 'REVENUE_INVOICE_CANCEL',
+      action: invoice.service === 'ota_onboarding' ? 'OTA_ONBOARDING_INVOICE_CANCEL' : 'REVENUE_INVOICE_CANCEL',
       targetId: invoiceId,
-      details: `Revenue invoice ${invoice.invoiceNumber} cancelled.`,
+      details: `${invoice.service === 'ota_onboarding' ? 'OTA onboarding' : 'Revenue'} invoice ${invoice.invoiceNumber} cancelled.`,
       changes: { status: { from: 'pending', to: 'cancelled' } },
     })
   })

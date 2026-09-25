@@ -73,7 +73,7 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
   const paginatedProperties = visibleProperties.slice((currentPage - 1) * 10, currentPage * 10)
 
   async function deleteRecord(property: PropertyRecord) {
-    if (!await confirmAction({ title: 'Delete property?', message: `Delete ${property.name}? This permanently removes the property record.`, confirmLabel: 'Delete property', tone: 'danger' })) return
+    if (!await confirmAction({ title: 'Delete client property?', message: `Permanently delete ${property.name} and its saved platform credentials? Properties with invoice history cannot be deleted. This action cannot be undone.`, confirmLabel: 'Delete client property', tone: 'danger' })) return
     setDeletingId(property.id)
     setError('')
     try {
