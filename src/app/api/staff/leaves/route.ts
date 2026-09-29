@@ -28,7 +28,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Select a valid non-Sunday leave date within the same calendar year, then enter a reason.' }, { status: 400 })
   }
   try {
-    return NextResponse.json({ leave: await createLeaveRequest({ staffEmail: user.email, startDate, endDate, reason, durationType, halfDayPeriod }) }, { status: 201 })
+    return NextResponse.json({
+      leave: await createLeaveRequest({
+        staffEmail: user.email,
+        startDate,
+        endDate,
+        reason,
+        durationType,
+        ...(durationType === 'half_day' ? { halfDayPeriod } : {}),
+      }),
+    }, { status: 201 })
   } catch (error) {
     console.error(`Failed to create leave request for ${user.email}:`, error)
     return NextResponse.json({ message: 'Failed to submit leave request.' }, { status: 500 })

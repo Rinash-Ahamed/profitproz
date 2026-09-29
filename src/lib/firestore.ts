@@ -2633,8 +2633,9 @@ export async function createLeaveRequest(input: { staffEmail: string; startDate:
   const staffEmail = input.staffEmail.trim().toLowerCase()
   const durationDays = input.durationType === 'half_day' ? 0.5 : countNonSundayDaysInclusive(input.startDate, input.endDate)
   await docRef.set({
-    ...input,
     staffEmail,
+    startDate: input.startDate,
+    endDate: input.endDate,
     leaveType: 'general',
     reason: input.reason.trim(),
     durationDays,
