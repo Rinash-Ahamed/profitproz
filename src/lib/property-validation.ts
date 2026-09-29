@@ -51,7 +51,8 @@ export function parsePropertyPayload(body: unknown, partial = false): { value?: 
 
   if (value.signedContractUrl) {
     try {
-      if (new URL(value.signedContractUrl).protocol !== 'https:') return { error: 'Signed contract link must use HTTPS.' }
+      const url = new URL(value.signedContractUrl)
+      if (url.protocol !== 'https:' || url.username || url.password) return { error: 'Signed contract link must be a credential-free HTTPS URL.' }
     } catch {
       return { error: 'Enter a valid signed contract link.' }
     }

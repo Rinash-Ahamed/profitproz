@@ -2135,7 +2135,7 @@ export async function getSecuritySettings(): Promise<SecuritySettings> {
   const data = snapshot.data() || {}
   return {
     sessionHours: [1, 4, 8, 12, 24].includes(data.sessionHours) ? data.sessionHours as SecuritySettings['sessionHours'] : 24,
-    minPasswordLength: typeof data.minPasswordLength === 'number' ? Math.min(64, Math.max(8, data.minPasswordLength)) : 8,
+    minPasswordLength: typeof data.minPasswordLength === 'number' ? Math.min(64, Math.max(12, data.minPasswordLength)) : 12,
     requireUppercase: data.requireUppercase === true,
     requireNumber: data.requireNumber === true,
   }
@@ -2453,7 +2453,7 @@ export type SecuritySettings = {
 }
 
 const defaultExpenseFieldSettings: ExpenseFieldSettings = { cityRequired: true, descriptionRequired: true, receiptRequired: true }
-const defaultSecuritySettings: SecuritySettings = { sessionHours: 12, minPasswordLength: 8, requireUppercase: false, requireNumber: false }
+const defaultSecuritySettings: SecuritySettings = { sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false }
 
 async function deleteAuditLogSnapshot(snapshot: FirebaseFirestore.QuerySnapshot) {
   if (!db || snapshot.empty) return 0

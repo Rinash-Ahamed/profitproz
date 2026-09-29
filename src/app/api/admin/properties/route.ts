@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createProperty, listProperties, listPropertiesPage, logAdminAction, type PropertyInput } from '@/lib/firestore'
 import { parsePropertyPayload } from '@/lib/property-validation'
 import { readPagination } from '@/lib/pagination'
-import { requireAdminSession as requireAdmin, requireClientServiceEditor } from '@/lib/api-auth'
+import { requireAdminSession as requireAdmin } from '@/lib/api-auth'
 
 export async function GET(request: Request) {
   const user = await requireAdmin()
@@ -25,8 +25,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const user = await requireClientServiceEditor('revenueManagement')
-  if (!user) return NextResponse.json({ message: 'Revenue Management access is required.' }, { status: 403 })
+  const user = await requireAdmin()
+  if (!user) return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
 
   let body: unknown
   try {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       actorEmail: user.email,
       action: 'PROPERTY_CREATE',
       targetId: property.id,
-      details: `${user.role === 'admin' ? 'Admin' : 'Employee'} created client property: ${property.name}.`,
+      details: `Admin created client property: ${property.name}.`,
     })
     return NextResponse.json({ property }, { status: 201 })
   } catch (error) {

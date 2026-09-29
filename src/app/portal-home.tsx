@@ -128,7 +128,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [expensePersonSearch, setExpensePersonSearch] = useState('')
   const [expensePaymentFilter, setExpensePaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [expenseSettings, setExpenseSettings] = useState<ExpenseFieldSettings>({ cityRequired: true, descriptionRequired: true, receiptRequired: true })
-  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 12, minPasswordLength: 8, requireUppercase: false, requireNumber: false })
+  const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false })
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummary | null>(null)
 
   // Password change state
@@ -1512,7 +1512,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         <p className="text-base font-semibold text-ink">Security Policy</p>
                         <div className="mt-4 space-y-3">
                           <div><label htmlFor="sessionHours" className="label-upper mb-2 block text-ghost">Idle session timeout</label><select id="sessionHours" value={securitySettings.sessionHours} onChange={(event) => setSecuritySettings((current) => ({ ...current, sessionHours: Number(event.target.value) as SecuritySettings['sessionHours'] }))} className={inputClass}>{[1, 4, 8, 12, 24].map((hours) => <option key={hours} value={hours}>{hours} hour{hours === 1 ? '' : 's'}</option>)}</select><p className="mt-2 text-xs text-sub">Active sessions renew automatically. Users are logged out after this period without activity.</p></div>
-                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="8" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 8 }))} className={inputClass} /></div>
+                          <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="12" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 12 }))} className={inputClass} /></div>
                           {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-3.5 py-2.5 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
                         </div>
                         <button type="button" onClick={saveSecuritySettings} disabled={loading} className="mt-4 flex h-9 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save security policy</button>
@@ -1641,7 +1641,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       </div>
                     </div>
                   ),
-                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} readOnly revenueEditor={user.clientAccess?.revenueManagement === true} onboardingEditor={user.clientAccess?.otaOnboarding === true} />,
+                  properties: <ClientServicesPanel properties={propertyList} onboardings={onboardingList} loading={loading} onPropertiesChange={setPropertyList} onOnboardingsChange={setOnboardingList} readOnly />,
                   expenses: (
                     <div className="staff-workspace space-y-6 text-left">
                       <form className="staff-work-card rounded-lg p-6 sm:p-7" onSubmit={submitExpense}>
