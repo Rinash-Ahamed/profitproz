@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { deleteProperty, getPropertyById, logAdminAction, updateProperty } from '@/lib/firestore'
 import { parsePropertyPayload } from '@/lib/property-validation'
-import { requireAdminSession as requireAdmin, requireClientServiceEditor } from '@/lib/api-auth'
+import { requireAdminSession as requireAdmin } from '@/lib/api-auth'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const user = await requireClientServiceEditor('revenueManagement')
-  if (!user) return NextResponse.json({ message: 'Revenue Management edit access is required.' }, { status: 403 })
+  const user = await requireAdmin()
+  if (!user) return NextResponse.json({ message: 'Admin access is required.' }, { status: 403 })
   const { id } = await context.params
   if (!id || id.length > 128) return NextResponse.json({ message: 'A valid property ID is required.' }, { status: 400 })
 
@@ -20,11 +20,6 @@ export async function PATCH(request: Request, context: RouteContext) {
   const parsed = parsePropertyPayload(body, true)
   if (!parsed.value || parsed.error) return NextResponse.json({ message: parsed.error || 'Invalid property update request.' }, { status: 400 })
   const propertyUpdates = { ...parsed.value }
-  if (user.role === 'staff') {
-    delete propertyUpdates.gstNumber
-    delete propertyUpdates.signedContractUrl
-    delete propertyUpdates.status
-  }
 
   try {
     const before = await getPropertyById(id)
@@ -39,7 +34,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       actorEmail: user.email,
       action: 'PROPERTY_UPDATE',
       targetId: id,
-      details: `${user.role === 'admin' ? 'Admin' : 'Employee'} updated client property: ${property.name}.`,
+      details: `Admin updated client property: ${property.name}.`,
       changes: Object.fromEntries(Object.entries(propertyUpdates).map(([field, value]) => [field, { from: before[field as keyof typeof before], to: value }])),
     })
     return NextResponse.json({ property })

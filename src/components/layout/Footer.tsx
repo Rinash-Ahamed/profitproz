@@ -112,9 +112,9 @@ export function Footer() {
             © 2026 ProfitPro. All rights reserved. · Turn Potential Into Profit.
           </p>
           <div className="flex items-center gap-5">
-            <span className="text-ghost text-xs font-sans">Privacy Policy</span>
+            <Link href="/privacy-policy" className="text-ghost hover:text-ink text-xs font-sans transition-colors">Privacy Policy</Link>
             <span className="text-zinc-700">·</span>
-            <span className="text-ghost text-xs font-sans">Terms of Service</span>
+            <Link href="/privacy-policy#terms-of-service" className="text-ghost hover:text-ink text-xs font-sans transition-colors">Terms of Service</Link>
             <span className="text-zinc-700">·</span>
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full bg-[#66B159] pulse-dot" />

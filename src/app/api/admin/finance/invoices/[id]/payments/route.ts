@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/api-auth'
-import { correctFinancePayment, getFinanceInvoiceById, getFinancePaymentByInvoiceId, recordFinancePayment, syncOnboardingFinancePaymentMarker } from '@/lib/firestore'
+import { correctFinancePayment, getFinanceInvoiceById, getFinancePaymentByInvoiceId, recordFinancePayment } from '@/lib/firestore'
 import { parseDateOnly } from '@/lib/date-only'
 import type { PaymentMethod } from '@/lib/finance'
 
@@ -13,7 +13,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   if (!id || id.length > 128) return NextResponse.json({ message: 'A valid invoice ID is required.' }, { status: 400 })
   try {
     const invoice = await getFinanceInvoiceById(id)
-    if (invoice) await syncOnboardingFinancePaymentMarker(invoice)
     const invoiceOnly = new URL(request.url).searchParams.get('invoiceOnly') === '1'
     return invoice ? NextResponse.json({ invoice, payment: invoiceOnly ? null : await getFinancePaymentByInvoiceId(id) }) : NextResponse.json({ message: 'Invoice was not found in Finance.' }, { status: 404 })
   } catch (error) {

@@ -25,6 +25,7 @@ const ONE_DAY_SECONDS = 60 * 60 * 24
 const PASSWORD_ITERATIONS = 600000
 const MIN_SUPPORTED_PASSWORD_ITERATIONS = 120000
 const PASSWORD_KEY_LENGTH = 32
+const DUMMY_PASSWORD_HASH = '600000:00000000000000000000000000000000:7cc65cdc5b27253d91cfceca7106590fcb5db81eae6fbe18719ad6479cd18cc7'
 
 export const authConfig = {
   cookieName: SESSION_COOKIE,
@@ -166,6 +167,10 @@ export async function authenticateUser(email: string, password: string): Promise
         sessionVersion: staff.sessionVersion,
       }
     }
+
+    // Unknown and inactive accounts still perform the same expensive password
+    // operation as a normal failed login to avoid exposing account existence.
+    if (!admin?.active && !staff?.active) await verifyPassword(password, DUMMY_PASSWORD_HASH)
 
     return null
   }
