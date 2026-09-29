@@ -1,5 +1,6 @@
 'use client'
-import { motion } from 'framer-motion'
+import { useEffect, useRef } from 'react'
+import { motion, useReducedMotion } from 'framer-motion'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
 import { Ticker } from '@/components/sections/Ticker'
@@ -13,15 +14,30 @@ import { ease } from '@/lib/utils'
 const activeMessage = {
   titleLines: ['One Platform', 'Every OTA'],
   lastLine: 'Complete Control',
-  subtitle: "we make property listing and management effortless across multiple ota's",
+  subtitle: 'We make property listing and management effortless across multiple OTAs.',
   theme: { glowA: 'rgba(102, 177, 89, 0.18)', accent: '#66B159' },
 }
 
 export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt: string }[] }) {
   const tickerSpeed = 40
+  const reduceMotion = useReducedMotion()
+  const heroVideoRef = useRef<HTMLVideoElement>(null)
+
+  useEffect(() => {
+    const video = heroVideoRef.current
+    if (!video) return
+
+    if (reduceMotion) {
+      video.pause()
+      video.currentTime = 0
+      return
+    }
+
+    void video.play().catch(() => undefined)
+  }, [reduceMotion])
 
   return (
-    <div className="min-h-screen bg-zinc-1000">
+    <div className="min-h-[100dvh] bg-zinc-1000">
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────── */}
@@ -32,8 +48,9 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         {/* Video Background */}
         <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
           <video
-            autoPlay
-            loop
+            ref={heroVideoRef}
+            autoPlay={!reduceMotion}
+            loop={!reduceMotion}
             muted
             playsInline
             preload="metadata"

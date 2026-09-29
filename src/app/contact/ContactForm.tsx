@@ -208,9 +208,9 @@ export function ContactForm() {
                       <label className="label-upper text-ghost block mb-2">Number of Rooms</label>
                       <select value={form.rooms} onChange={set('rooms')} className={`${inputClass} border-zinc-700`}>
                         <option value="" disabled>Select room count</option>
-                        <option value="1-15">1–15 rooms</option>
-                        <option value="16-40">16–40 rooms</option>
-                        <option value="41-100">41–100 rooms</option>
+                        <option value="1-15">1-15 rooms</option>
+                        <option value="16-40">16-40 rooms</option>
+                        <option value="41-100">41-100 rooms</option>
                         <option value="100+">100+ rooms</option>
                       </select>
                     </div>

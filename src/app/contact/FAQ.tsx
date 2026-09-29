@@ -7,7 +7,7 @@ import { ease } from '@/lib/utils'
 const faqs = [
   {
     q: 'How quickly can you start managing our revenue?',
-    a: 'We can audit your property and deploy a pricing strategy within 5–7 business days. Most hotels see measurable rate improvement within the first two weeks.',
+    a: 'We can audit your property and deploy a pricing strategy within 5-7 business days. Most hotels see measurable rate improvement within the first two weeks.',
   },
   {
     q: 'Do we need a channel manager already?',

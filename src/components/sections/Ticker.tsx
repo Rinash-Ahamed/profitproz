@@ -1,6 +1,7 @@
 'use client'
 /* eslint-disable @next/next/no-img-element -- OTA logos intentionally use intrinsic img sizing in the continuous ticker. */
 import React, { useEffect, useMemo, useState } from 'react'
+import { useReducedMotion } from 'framer-motion'
 
 type TickerProps = {
   logos: { src: string; alt: string }[]
@@ -28,6 +29,7 @@ const tickerKeyframes = `
 const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
   const duplicatedLogos = [...logos, ...logos]
   const [mobileSet, setMobileSet] = useState(0)
+  const reduceMotion = useReducedMotion()
 
   const mobileLogos = useMemo(() => {
     if (logos.length <= 6) return logos
@@ -36,14 +38,14 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
   }, [logos, mobileSet])
 
   useEffect(() => {
-    if (logos.length <= 6) return
+    if (logos.length <= 6 || reduceMotion) return
 
     const id = window.setInterval(() => {
       setMobileSet((current) => (current + 1) % Math.ceil(logos.length / 3))
     }, 2400)
 
     return () => window.clearInterval(id)
-  }, [logos.length])
+  }, [logos.length, reduceMotion])
 
   return (
     <div className="relative w-full overflow-hidden [transform:translateZ(0)]">
@@ -53,7 +55,7 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
         key={mobileSet}
         className="mx-auto grid max-w-sm grid-cols-3 items-center justify-items-center gap-x-6 gap-y-5 px-6 md:hidden"
         style={{
-          animation: 'mobile-logo-rotate 420ms ease-out both',
+          animation: reduceMotion ? 'none' : 'mobile-logo-rotate 420ms ease-out both',
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',
         }}
@@ -75,7 +77,7 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
       <div
         className="ota-ticker-track hidden w-max flex-nowrap items-center md:flex"
         style={{
-          animation: `ticker ${duration}s linear infinite`,
+          animation: reduceMotion ? 'none' : `ticker ${duration}s linear infinite`,
           willChange: 'transform',
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',

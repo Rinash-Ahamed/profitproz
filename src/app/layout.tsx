@@ -1,22 +1,15 @@
 import type { Metadata, Viewport } from 'next'
 import { Analytics } from '@vercel/analytics/next'
-import { Instrument_Serif, Inter } from 'next/font/google'
+import { Inter } from 'next/font/google'
 import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration'
 import { AppDialogProvider } from '@/components/ui/AppDialogProvider'
+import { MotionPreferences } from '@/components/ui/MotionPreferences'
 import './globals.css'
 
 const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
-})
-
-const instrument = Instrument_Serif({
-  subsets: ['latin'],
-  variable: '--font-instrument',
-  display: 'swap',
-  weight: ['400'],
-  style: ['normal', 'italic'],
 })
 
 export const metadata: Metadata = {
@@ -60,12 +53,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${instrument.variable}`}>
+    <html lang="en" className={inter.variable}>
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body className="bg-zinc-1000 text-ink font-sans antialiased overflow-x-hidden">
-        <AppDialogProvider>{children}</AppDialogProvider>
+        <MotionPreferences>
+          <AppDialogProvider>{children}</AppDialogProvider>
+        </MotionPreferences>
         <ServiceWorkerRegistration />
         <Analytics />
       </body>

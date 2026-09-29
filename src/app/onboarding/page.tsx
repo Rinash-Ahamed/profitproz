@@ -56,7 +56,7 @@ export default function OnboardingPage() {
   const stage = stages[active]
 
   return (
-    <div className="min-h-screen bg-zinc-1000">
+    <div className="min-h-[100dvh] bg-zinc-1000">
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────── */}

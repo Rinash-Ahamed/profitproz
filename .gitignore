@@ -3,6 +3,7 @@ node_modules/
 .next/
 .env*.local
 .env
+.agents
 .vercel
 *.tsbuildinfo
 firebase-debug.log

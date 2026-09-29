@@ -38,7 +38,7 @@ export function HomeCTA() {
                   </span>
                 </h2>
                 <p className="text-sub text-sm leading-relaxed max-w-md mb-10">
-                  The average independent hotel in India leaves 22–38% of revenue on the table through suboptimal pricing and poor OTA visibility. We find that gap, and we close it.
+                  The average independent hotel in India leaves 22-38% of revenue on the table through suboptimal pricing and poor OTA visibility. We find that gap, and we close it.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
                   <Link

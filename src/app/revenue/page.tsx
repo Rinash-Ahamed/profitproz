@@ -11,7 +11,7 @@ const services = [
   {
     title: 'Dynamic Pricing Engine',
     description: 'Rates are recommended daily based on real-time demand signals, your competitor set, local events, and your own historical patterns. No more static pricing that leaves money on the table during peak periods or kills occupancy in soft ones.',
-    result: 'Hotels see ADR improvement of 20–40% within 60 days.',
+    result: 'Hotels see ADR improvement of 20-40% within 60 days.',
   },
   {
     title: 'Competitor Rate Intelligence',
@@ -48,12 +48,12 @@ const process = [
     description: 'We analyse 12 months of your pricing history, channel-by-channel revenue contribution, competitor positioning, and missed demand events. The output is a frank assessment of where revenue is being lost and why.',
   },
   {
-    week: 'Week 1–2',
+    week: 'Week 1-2',
     title: 'Strategy Design',
     description: 'A custom revenue strategy blueprint for your property: seasonal rate architecture, comp set definition, demand event calendar, channel mix targets, and yield rule framework. Nothing generic - every hotel gets its own plan.',
   },
   {
-    week: 'Week 2–3',
+    week: 'Week 2-3',
     title: 'System Configuration',
     description: 'Rate rules, restrictions, and yield controls are configured live in your channel manager and OTA extranets. We test every scenario before going live to ensure no rate leakage or parity violations.',
   },
@@ -85,7 +85,7 @@ export default function RevenuePage() {
   const kpi   = useInView(0.2)
 
   return (
-    <div className="min-h-screen bg-zinc-1000">
+    <div className="min-h-[100dvh] bg-zinc-1000">
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────── */}

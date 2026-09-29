@@ -1,4 +1,3 @@
-'use client'
 import Link from 'next/link'
 import { Nav } from '@/components/layout/Nav'
 import { Footer } from '@/components/layout/Footer'
@@ -20,7 +19,7 @@ const pillars = [
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-zinc-1000">
+    <div className="min-h-[100dvh] bg-zinc-1000">
       <Nav />
 
       <section className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">

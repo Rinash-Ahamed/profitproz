@@ -25,7 +25,7 @@ const contactCards = [
     ),
     label: 'Phone',
     value: '+91 936 350 9110',
-    sub: 'Mon–Sat, 9 AM – 8 PM IST',
+    sub: 'Mon-Sat, 9 AM - 8 PM IST',
     href: 'tel:+919363509110',
   },
   {
@@ -44,7 +44,7 @@ const contactCards = [
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-zinc-1000">
+    <div className="min-h-[100dvh] bg-zinc-1000">
       <Nav />
 
       {/* ── HERO ────────────────────────────────────── */}

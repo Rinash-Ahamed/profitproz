@@ -36,15 +36,6 @@ body {
   letter-spacing: -0.04em;
 }
 
-.display-serif {
-  font-family: var(--font-instrument), Georgia, serif;
-  font-size: clamp(2.5rem, 6vw, 5.5rem);
-  font-weight: 400;
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  font-style: italic;
-}
-
 .headline {
   font-family: var(--font-inter), system-ui, sans-serif;
   font-size: clamp(1.75rem, 4vw, 3rem);
@@ -410,5 +401,20 @@ body {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+  }
+
+  .pulse-dot,
+  .ambient-glow,
+  .ota-ticker-track {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-panel,
+  .glass-pill {
+    background: #18181b;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
