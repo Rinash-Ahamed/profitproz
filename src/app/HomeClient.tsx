@@ -77,7 +77,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         <div className="relative z-10 max-w-6xl mx-auto w-full px-6 md:px-10">
           {/* Live status pill */}
           <motion.div
-            className="inline-flex items-center gap-2.5 glass-pill px-4 py-2 rounded-full mb-10"
+            className="inline-flex items-center gap-2.5 glass-pill px-4 py-2 rounded-full mb-8"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: ease.out, delay: 0.12 }}
@@ -108,7 +108,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
           </motion.div>
 
           {/* CTA row */}
-          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-12 mt-8">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-8 mt-6">
           <a
             href="/contact"
             className="group inline-flex items-center justify-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-6 py-3 rounded-lg transition-colors duration-200 w-full sm:w-auto"
@@ -159,7 +159,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
 
       {/* ── LIVE TICKER ──────────────────────────────── */}
       {otaLogos.length > 0 && (
-        <div className="py-16 text-center">
+        <div className="py-12 text-center">
           <p className="label-upper text-sub mb-6">Powering listings on every major platform</p>
           <Ticker key={tickerSpeed} logos={otaLogos} duration={tickerSpeed} />
         </div>

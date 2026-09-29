@@ -55,11 +55,11 @@ export function Testimonials() {
     <section
       id="testimonials"
       ref={ref as React.RefObject<HTMLElement>}
-      className="pt-16 pb-20 md:pt-20 md:pb-24 px-6 md:px-10 border-t border-zinc-800"
+      className="pt-14 pb-12 md:pt-16 md:pb-14 px-6 md:px-10 border-t border-zinc-800"
     >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 md:mb-12">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8 md:mb-10">
           <div>
             <h2 className="headline text-ink">
               Heard directly from <span className="text-[#66B159]">hotel owners.</span>

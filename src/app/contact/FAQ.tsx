@@ -74,8 +74,8 @@ export function FAQ() {
   const { ref, inView } = useInView(0.15)
 
   return (
-    <section ref={ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-3xl mx-auto">
-      <motion.div className="mb-10" initial={{ opacity: 0, y: 16 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
+    <section ref={ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-16 max-w-3xl mx-auto">
+      <motion.div className="mb-8" initial={{ opacity: 0, y: 16 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.6, ease: ease.out }}>
         <p className="label-upper text-sub mb-3">FAQ</p>
         <h2 className="text-3xl md:text-4xl font-bold text-ink tracking-tight leading-tight">Questions we hear often</h2>
       </motion.div>

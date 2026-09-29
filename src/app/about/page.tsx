@@ -22,7 +22,7 @@ export default function AboutPage() {
     <div className="min-h-[100dvh] bg-zinc-1000">
       <Nav />
 
-      <section className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+      <section className="relative pt-28 pb-12 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
         <div
           className="absolute inset-0 -z-10 pointer-events-none"
           style={{
@@ -33,7 +33,7 @@ export default function AboutPage() {
           }}
         />
         <div>
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">About ProfitPro</span>
           </div>
@@ -46,11 +46,11 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
+      <section className="px-6 md:px-10 pb-16 max-w-6xl mx-auto">
         <div
           className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-8"
         >
-          <div className="surface rounded-2xl p-8 md:p-10">
+          <div className="surface rounded-2xl p-6 md:p-8">
             <p className="label-upper text-[#66B159] mb-4">Why we exist</p>
             <h2 className="headline text-ink mb-4">Most hotels are not short on potential. They are short on structure.</h2>
             <p className="text-sub text-sm leading-relaxed">
@@ -69,7 +69,7 @@ export default function AboutPage() {
         </div>
 
         <div
-          className="mt-8 surface rounded-2xl p-8 md:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
+          className="mt-6 surface rounded-2xl p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6"
         >
           <div>
             <p className="label-upper text-sub mb-3">Ready to see what’s possible?</p>

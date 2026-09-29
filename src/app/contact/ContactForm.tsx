@@ -96,7 +96,7 @@ export function ContactForm() {
     'w-full bg-zinc-900 border rounded-lg px-4 py-3 text-ink text-sm font-sans placeholder:text-ghost focus:outline-none focus:border-[#66B159] focus:ring-1 focus:ring-[#66B159]/40 transition-all duration-200'
 
   return (
-    <section ref={ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
+    <section ref={ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-16 max-w-6xl mx-auto">
       <div className="flex justify-center">
         <motion.div
           ref={containerRef}
@@ -109,7 +109,7 @@ export function ContactForm() {
             {submitted ? (
               <motion.div
                 key="success"
-                className="surface rounded-2xl p-12 flex flex-col items-center justify-center text-center min-h-[480px]"
+                className="surface rounded-2xl p-8 flex flex-col items-center justify-center text-center min-h-[400px]"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.5, ease: ease.out }}
@@ -151,13 +151,13 @@ export function ContactForm() {
             ) : (
               <motion.div
                 key="form"
-                className="surface rounded-2xl p-8 md:p-10"
+                className="surface rounded-2xl p-6 md:p-8"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
               >
                 <p className="font-sans font-semibold text-ink text-lg mb-1">Free Revenue Audit Request</p>
-                <p className="text-sub text-sm mb-8">Fill in your details and we'll prepare a personalised assessment.</p>
+                <p className="text-sub text-sm mb-6">Fill in your details and we'll prepare a personalised assessment.</p>
 
                 <div className="space-y-5">
                   {/* Row 1 */}

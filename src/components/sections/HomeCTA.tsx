@@ -15,7 +15,7 @@ export function HomeCTA() {
   return (
     <section
       ref={ref as React.RefObject<HTMLElement>}
-      className="py-24 md:py-32 px-6 md:px-10"
+      className="py-12 md:py-14 px-6 md:px-10"
     >
       <motion.div
         className="max-w-6xl mx-auto"
@@ -27,7 +27,7 @@ export function HomeCTA() {
           <div className="grid grid-cols-1 lg:grid-cols-2">
 
             {/* Left - text */}
-            <div className="p-10 md:p-14 flex flex-col justify-between">
+            <div className="p-8 md:p-10 flex flex-col justify-between">
               <div>
                 <p className="label-upper text-[#66B159] mb-6">Start Today - It's Free</p>
                 <h2 className="headline text-ink mb-5">
@@ -37,7 +37,7 @@ export function HomeCTA() {
                     Better revenue.
                   </span>
                 </h2>
-                <p className="text-sub text-sm leading-relaxed max-w-md mb-10">
+                <p className="text-sub text-sm leading-relaxed max-w-md mb-8">
                   The average independent hotel in India leaves 22-38% of revenue on the table through suboptimal pricing and poor OTA visibility. We find that gap, and we close it.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -60,7 +60,7 @@ export function HomeCTA() {
               </div>
 
               {/* Trust signals */}
-              <div className="flex flex-wrap gap-x-6 gap-y-2 mt-10 pt-8 border-t border-zinc-800">
+              <div className="flex flex-wrap gap-x-6 gap-y-2 mt-8 pt-6 border-t border-zinc-800">
                 {['100+ hotels onboarded', '₹40Lakhs+ revenue managed', '99.9% client retention'].map((t) => (
                   <div key={t} className="flex items-center gap-2">
                     <div className="w-1 h-1 rounded-full bg-[#66B159]" />
@@ -71,7 +71,7 @@ export function HomeCTA() {
             </div>
 
             {/* Right - three points */}
-            <div className="border-t lg:border-t-0 lg:border-l border-zinc-800 p-10 md:p-14 flex flex-col justify-center gap-8">
+            <div className="border-t lg:border-t-0 lg:border-l border-zinc-800 p-8 md:p-10 flex flex-col justify-center gap-6">
               {points.map((p, i) => (
                 <motion.div
                   key={p.heading}

@@ -9,7 +9,7 @@ const mobileImages = [
 
 export function MobilePreview() {
   return (
-    <section className="relative pt-12 pb-10 md:pt-16 md:pb-12 px-6 md:px-10">
+    <section className="relative py-10 md:py-12 px-6 md:px-10">
       <div className="absolute inset-x-0 top-8 mx-auto h-40 w-full max-w-4xl rounded-full bg-[radial-gradient(circle,_rgba(102,177,89,0.28)_0%,_rgba(102,177,89,0)_70%)] opacity-0 blur-3xl transition-all duration-500" />
 
       <div className="max-w-6xl mx-auto text-center relative z-10">
@@ -21,7 +21,7 @@ export function MobilePreview() {
         </div>
 
         {/* Image Grid */}
-        <div className="mt-12 md:mt-14 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+        <div className="mt-8 md:mt-10 grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
           {mobileImages.map((img) => (
             <div key={img.src} className="group relative cursor-pointer">
               <div className="absolute inset-x-2 bottom-[-6px] h-8 rounded-full bg-[radial-gradient(circle,_rgba(102,177,89,0.45)_0%,_rgba(102,177,89,0)_72%)] opacity-0 blur-2xl transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-1" />
