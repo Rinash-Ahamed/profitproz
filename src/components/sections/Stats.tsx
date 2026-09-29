@@ -16,7 +16,7 @@ function Stat({ item, active, i }: { item: typeof data[0]; active: boolean; i: n
   const n = useCounter(item.value, 2.2, active)
   return (
     <motion.div
-      className="flex flex-col items-center text-center py-8 px-4 relative"
+      className="flex flex-col items-center text-center py-6 px-4 relative"
       initial={{ opacity: 0, y: 18, scale: 0.98, willChange: 'transform, opacity' }}
       animate={active ? { opacity: 1, y: 0, scale: 1, willChange: 'auto' } : {}}
       transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: i * 0.06 }}

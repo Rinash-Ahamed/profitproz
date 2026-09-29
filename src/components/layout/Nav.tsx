@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, useMotionValueEvent, useScroll } from 'framer-motion'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ease } from '@/lib/utils'
@@ -20,12 +20,11 @@ export function Nav() {
   const [open, setOpen] = useState(false)
   const path = usePathname()
   const [hash, setHash] = useState('')
+  const { scrollY } = useScroll()
 
-  useEffect(() => {
-    const h = () => setScrolled(window.scrollY > 24)
-    window.addEventListener('scroll', h, { passive: true })
-    return () => window.removeEventListener('scroll', h)
-  }, [])
+  useMotionValueEvent(scrollY, 'change', (latest) => {
+    setScrolled(latest > 24)
+  })
 
   useEffect(() => { setOpen(false) }, [path])
 

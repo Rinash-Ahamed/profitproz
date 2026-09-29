@@ -25,7 +25,7 @@ const contactCards = [
     ),
     label: 'Phone',
     value: '+91 936 350 9110',
-    sub: 'Mon–Sat, 9 AM – 8 PM IST',
+    sub: 'Mon-Sat, 9 AM - 8 PM IST',
     href: 'tel:+919363509110',
   },
   {
@@ -44,11 +44,11 @@ const contactCards = [
 
 export default function ContactPage() {
   return (
-    <div className="min-h-screen bg-zinc-1000">
+    <div className="min-h-[100dvh] bg-zinc-1000">
       <Nav />
 
       {/* ── HERO ────────────────────────────────────── */}
-      <section className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+      <section className="relative pt-28 pb-12 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
         {/* Subtle animated background */}
         <div
           className="absolute inset-0 -z-10 pointer-events-none"
@@ -61,7 +61,7 @@ export default function ContactPage() {
         />
 
         <div>
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Contact Us</span>
           </div>
@@ -79,7 +79,7 @@ export default function ContactPage() {
         </div>
 
         {/* Contact info cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-12">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
           {contactCards.map((c) => {
             const Inner = (
               <div className="surface rounded-xl p-5 flex items-start gap-4 hover:border-zinc-600 transition-colors duration-200 h-full">

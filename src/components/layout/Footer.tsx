@@ -18,9 +18,9 @@ const platforms = ['MakeMyTrip', 'Booking.com', 'Agoda', 'Yatra', 'Expedia', 'Go
 
 export function Footer() {
   return (
-    <footer className="border-t border-zinc-800 mt-8">
+    <footer className="border-t border-zinc-800">
       {/* Main footer body */}
-      <div className="max-w-6xl mx-auto px-6 md:px-10 pt-16 pb-12">
+      <div className="max-w-6xl mx-auto px-6 md:px-10 pt-10 pb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8">
 
           {/* Brand column */}
@@ -104,7 +104,7 @@ export function Footer() {
         </div>
 
         {/* Divider */}
-        <div className="h-px bg-zinc-800 mt-12 mb-8" />
+        <div className="h-px bg-zinc-800 mt-8 mb-6" />
 
         {/* Bottom bar */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">

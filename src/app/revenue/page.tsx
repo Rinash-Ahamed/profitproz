@@ -11,7 +11,7 @@ const services = [
   {
     title: 'Dynamic Pricing Engine',
     description: 'Rates are recommended daily based on real-time demand signals, your competitor set, local events, and your own historical patterns. No more static pricing that leaves money on the table during peak periods or kills occupancy in soft ones.',
-    result: 'Hotels see ADR improvement of 20–40% within 60 days.',
+    result: 'Hotels see ADR improvement of 20-40% within 60 days.',
   },
   {
     title: 'Competitor Rate Intelligence',
@@ -48,12 +48,12 @@ const process = [
     description: 'We analyse 12 months of your pricing history, channel-by-channel revenue contribution, competitor positioning, and missed demand events. The output is a frank assessment of where revenue is being lost and why.',
   },
   {
-    week: 'Week 1–2',
+    week: 'Week 1-2',
     title: 'Strategy Design',
     description: 'A custom revenue strategy blueprint for your property: seasonal rate architecture, comp set definition, demand event calendar, channel mix targets, and yield rule framework. Nothing generic - every hotel gets its own plan.',
   },
   {
-    week: 'Week 2–3',
+    week: 'Week 2-3',
     title: 'System Configuration',
     description: 'Rate rules, restrictions, and yield controls are configured live in your channel manager and OTA extranets. We test every scenario before going live to ensure no rate leakage or parity violations.',
   },
@@ -85,11 +85,11 @@ export default function RevenuePage() {
   const kpi   = useInView(0.2)
 
   return (
-    <div className="min-h-screen bg-zinc-1000">
+    <div className="min-h-[100dvh] bg-zinc-1000">
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────── */}
-      <section className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+      <section className="relative pt-28 pb-12 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
         {/* Subtle animated background */}
         <div
           className="absolute inset-0 -z-10 pointer-events-none"
@@ -101,14 +101,14 @@ export default function RevenuePage() {
           }}
         />
         <div>
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Revenue Management</span>
           </div>
           <h1 className="headline text-ink mb-7">
             Every Night <span className="text-[#66B159]">Maximum revenue.</span>
           </h1>
-          <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
+          <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-8">
             Most hotels price based on intuition and what worked last year. We replace that with a data-driven revenue engine - competitor rates tracked daily, demand signals captured in advance, and pricing adjusted to maximise what you earn every single night.
           </p>
           <div className="flex flex-wrap gap-3">
@@ -124,7 +124,7 @@ export default function RevenuePage() {
       </section>
 
       {/* ── KPIs ─────────────────────────────────────── */}
-      <section ref={kpi.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-16 max-w-6xl mx-auto">
+      <section ref={kpi.ref as React.RefObject<HTMLElement>} className="px-6 md:px-10 pb-12 max-w-6xl mx-auto">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <KPI pre="+" n={38} suf="%" label="Average RevPAR uplift" active={kpi.inView} />
           <KPI pre="+" n={24} suf="%" label="Average ADR growth" active={kpi.inView} />
@@ -133,8 +133,8 @@ export default function RevenuePage() {
       </section>
 
       {/* ── SERVICES ─────────────────────────────────── */}
-      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-24">
-        <div className="mb-12">
+      <section className="px-6 md:px-10 py-16 max-w-6xl mx-auto border-t border-zinc-800">
+        <div className="mb-8">
           <p className="label-upper text-sub mb-3">What's Included</p>
           <h2 className="headline text-ink">Six disciplines <span className="text-[#66B159]">One Outcome</span></h2>
           <p className="text-sub text-sm max-w-xl mt-4 leading-relaxed">Revenue management isn't a single lever. It's six instruments played simultaneously. We conduct all of them.</p>
@@ -157,8 +157,8 @@ export default function RevenuePage() {
       </section>
 
       {/* ── PROCESS ──────────────────────────────────── */}
-      <section className="px-6 md:px-10 pb-24 max-w-4xl mx-auto">
-        <div className="mb-12">
+      <section className="px-6 md:px-10 pb-16 max-w-4xl mx-auto">
+        <div className="mb-8">
           <p className="label-upper text-sub mb-3">How It Works</p>
           <h2 className="headline text-ink">Audit to performance in <span className="text-[#66B159]">three weeks.</span></h2>
         </div>
@@ -186,13 +186,13 @@ export default function RevenuePage() {
       </section>
 
       {/* ── CTA ──────────────────────────────────────── */}
-      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
+      <section className="px-6 md:px-10 pb-16 max-w-6xl mx-auto">
         <div
-          className="surface rounded-2xl p-12 md:p-16 text-center"
+          className="surface rounded-2xl p-8 md:p-12 text-center"
         >
           <p className="label-upper text-[#66B159] mb-5">Free, No Obligation</p>
           <h2 className="headline text-ink mb-4">See what your revenue <span className="text-[#66B159]">could look like.</span></h2>
-          <p className="text-sub text-sm max-w-lg mx-auto mb-10 leading-relaxed">
+          <p className="text-sub text-sm max-w-lg mx-auto mb-8 leading-relaxed">
             We'll audit your current pricing strategy, OTA positioning, and competitor rates - then show you the gap and exactly what we'd do to close it.
           </p>
           <Link href="/contact" className="group inline-flex items-center gap-2 bg-[#66B159] hover:bg-[#73bd66] text-[#FFFCFC] font-sans font-semibold text-sm px-9 py-4 rounded-xl transition-colors duration-200">

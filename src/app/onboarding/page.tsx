@@ -56,11 +56,11 @@ export default function OnboardingPage() {
   const stage = stages[active]
 
   return (
-    <div className="min-h-screen bg-zinc-1000">
+    <div className="min-h-[100dvh] bg-zinc-1000">
       <Nav />
 
       {/* ── HERO ─────────────────────────────────────── */}
-      <section className="relative pt-32 pb-16 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
+      <section className="relative pt-28 pb-12 px-6 md:px-10 max-w-6xl mx-auto overflow-hidden">
         <div
           className="absolute inset-0 -z-10 pointer-events-none"
           style={{
@@ -71,19 +71,19 @@ export default function OnboardingPage() {
           }}
         />
         <div>
-          <div className="flex items-center gap-3 mb-8">
+          <div className="flex items-center gap-3 mb-6">
             <div className="w-2 h-2 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-sub">Hotel Onboarding</span>
           </div>
           <h1 className="headline text-ink mb-7">
             Listed everywhere <span className="text-[#66B159]">Booked constantly.</span>
           </h1>
-          <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-10">
+          <p className="text-sub text-lg md:text-xl max-w-2xl leading-relaxed mb-8">
             Most hotels spend 2 to 4 months getting their OTA setup right. We do it completely, correctly, and across every major OTA - in just 3 days.
           </p>
 
           {/* Three badges */}
-          <div className="flex flex-wrap gap-3 mb-10">
+          <div className="flex flex-wrap gap-3 mb-8">
             {[
               { label: 'Time to go live', value: '3 Days', sub: 'average across OTAs' },
               { label: 'Platforms covered', value: '7+ OTAs', sub: 'simultaneously, from day one' },
@@ -110,9 +110,9 @@ export default function OnboardingPage() {
       </section>
 
       {/* ── WHY IT'S HARD ────────────────────────────── */}
-      <section className="px-6 md:px-10 pb-20 max-w-6xl mx-auto">
+      <section className="px-6 md:px-10 pb-16 max-w-6xl mx-auto">
         <div
-          className="surface rounded-2xl p-8 md:p-10"
+          className="surface rounded-2xl p-6 md:p-8"
         >
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
             <div>
@@ -150,14 +150,14 @@ export default function OnboardingPage() {
       </section>
 
       {/* ── JOURNEY ──────────────────────────────────── */}
-      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto border-t border-zinc-800 pt-20">
-        <div className="mb-10">
+      <section className="px-6 md:px-10 py-16 max-w-6xl mx-auto border-t border-zinc-800">
+        <div className="mb-8">
           <p className="label-upper text-sub mb-3">The Process</p>
           <h2 className="headline text-ink">Three days <span className="text-[#66B159]">Step by step</span></h2>
         </div>
 
         {/* Progress bar */}
-        <div className="flex gap-1 mb-8">
+        <div className="flex gap-1 mb-6">
           {stages.map((_, i) => (
             <button
               key={i}
@@ -189,7 +189,7 @@ export default function OnboardingPage() {
 
           {/* Stage detail */}
           <div className="lg:col-span-3">
-            <div key={stage.title} className="surface-accent rounded-2xl p-8 h-full flex flex-col">
+            <div key={stage.title} className="surface-accent rounded-2xl p-6 h-full flex flex-col">
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <div>
                     <p className="label-upper text-[#66B159] mb-1.5">{stage.day}</p>
@@ -230,11 +230,11 @@ export default function OnboardingPage() {
       </section>
 
       {/* ── CTA ──────────────────────────────────────── */}
-      <section className="px-6 md:px-10 pb-24 max-w-6xl mx-auto">
-        <div className="surface rounded-2xl p-12 md:p-16 text-center">
+      <section className="px-6 md:px-10 pb-16 max-w-6xl mx-auto">
+        <div className="surface rounded-2xl p-8 md:p-12 text-center">
           <p className="label-upper text-[#66B159] mb-5">500+ Hotels Onboarded</p>
           <h2 className="headline text-ink mb-4">3 days to fully live <span className="text-[#66B159]">Let's begin today.</span></h2>
-          <p className="text-sub text-sm max-w-md mx-auto mb-10 leading-relaxed">
+          <p className="text-sub text-sm max-w-md mx-auto mb-8 leading-relaxed">
             The process is proven, the timeline is real, and we've done it for hotels across India - from 10 room to 100+ room city hotels.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
