@@ -10,6 +10,7 @@ import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { ToastMessage } from '@/components/ui/ToastMessage'
 import { useAppDialog } from '@/components/ui/AppDialogProvider'
 import { useFinancePage } from '@/components/finance/useFinancePage'
+import { currentPayrollMonth, parsePayrollMonth } from '@/lib/payroll'
 
 const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, paidPayroll: 0, unpaidExpenses: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0, invoicesTruncated: false, paymentsTruncated: false }
 const money = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
@@ -20,9 +21,14 @@ export function FinancePanel() {
   const [service, setService] = useState<'all' | FinanceService>('all')
   const [status, setStatus] = useState<'all' | 'pending' | 'paid' | 'cancelled'>('all')
   const [search, setSearch] = useState('')
+  const [invoiceDateFrom, setInvoiceDateFrom] = useState('')
+  const [invoiceDateTo, setInvoiceDateTo] = useState('')
   const [paymentService, setPaymentService] = useState<'all' | FinanceService>('all')
   const [paymentDateFrom, setPaymentDateFrom] = useState('')
   const [paymentDateTo, setPaymentDateTo] = useState('')
+  const [incomeMonth, setIncomeMonth] = useState(currentPayrollMonth())
+  const [monthlyServiceIncome, setMonthlyServiceIncome] = useState<{ revenueIncome: number; onboardingIncome: number } | null>(null)
+  const [monthlyServiceIncomeLoading, setMonthlyServiceIncomeLoading] = useState(true)
 
   const [paymentInvoice, setPaymentInvoice] = useState<FinanceInvoiceRecord | null>(null)
   const [cancellingInvoiceId, setCancellingInvoiceId] = useState('')
@@ -34,7 +40,8 @@ export function FinancePanel() {
   const [filteredPaymentTotal, setFilteredPaymentTotal] = useState<number | null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportingAll, setExportingAll] = useState(false)
-  const invoiceQuery = new URLSearchParams({ view: 'invoices', service, status, ...(search.trim() ? { search: search.trim().slice(0, 120) } : {}) }).toString()
+  const invoiceQuery = new URLSearchParams({ view: 'invoices', service, status, ...(search.trim() ? { search: search.trim().slice(0, 120) } : {}), ...(invoiceDateFrom ? { from: invoiceDateFrom } : {}), ...(invoiceDateTo ? { to: invoiceDateTo } : {}) }).toString()
+  const hasInvoiceFilters = !!search.trim() || service !== 'all' || status !== 'all' || !!invoiceDateFrom || !!invoiceDateTo
   const paymentFilters = new URLSearchParams({ service: paymentService, from: paymentDateFrom, to: paymentDateTo }).toString()
   const hasPaymentFilters = paymentService !== 'all' || !!paymentDateFrom || !!paymentDateTo
   const displayedPaymentTotal = hasPaymentFilters ? filteredPaymentTotal : loading ? null : finance.incomeReceived
@@ -64,6 +71,35 @@ export function FinancePanel() {
     void loadSummary()
     return () => controller.abort()
   }, [refresh])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    const parsed = parsePayrollMonth(incomeMonth)
+    if (!parsed) {
+      setMonthlyServiceIncome(null)
+      setMonthlyServiceIncomeLoading(false)
+      return () => controller.abort()
+    }
+    const from = `${incomeMonth}-01`
+    const to = `${incomeMonth}-${String(new Date(Date.UTC(parsed.year, parsed.month, 0)).getUTCDate()).padStart(2, '0')}`
+    setMonthlyServiceIncome(null)
+    setMonthlyServiceIncomeLoading(true)
+    async function loadMonthlyServiceIncome() {
+      try {
+        const params = new URLSearchParams({ view: 'service-income', from, to })
+        const response = await cachedTabFetch(`/api/admin/finance?${params.toString()}`, { signal: controller.signal })
+        const data = await response.json() as { revenueIncome?: number; onboardingIncome?: number; message?: string }
+        if (!response.ok || typeof data.revenueIncome !== 'number' || typeof data.onboardingIncome !== 'number') throw new Error(data.message || 'Failed to load monthly service income.')
+        if (!controller.signal.aborted) setMonthlyServiceIncome({ revenueIncome: data.revenueIncome, onboardingIncome: data.onboardingIncome })
+      } catch (error) {
+        if (!controller.signal.aborted) setError(error instanceof Error ? error.message : 'Failed to load monthly service income.')
+      } finally {
+        if (!controller.signal.aborted) setMonthlyServiceIncomeLoading(false)
+      }
+    }
+    void loadMonthlyServiceIncome()
+    return () => controller.abort()
+  }, [incomeMonth, refresh])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -172,11 +208,27 @@ export function FinancePanel() {
       <FinanceMetric label="Remaining balance" value={money(finance.netCashBalance)} detail="Income - paid expenses - paid payroll" primary />
     </div>
 
-    <section className="surface rounded-lg p-6"><p className="font-semibold text-ink">Income by service</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">Revenue Management</p><p className="mt-1 font-semibold text-ink">{money(finance.revenueIncome)}</p></div><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">OTA Onboarding</p><p className="mt-1 font-semibold text-ink">{money(finance.onboardingIncome)}</p></div></div></section>
+    <div className="grid gap-4 lg:grid-cols-2">
+      <section className="surface rounded-lg p-6"><p className="font-semibold text-ink">Total income by service</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">Revenue Management</p><p className="mt-1 font-semibold text-ink">{money(finance.revenueIncome)}</p></div><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">OTA Onboarding</p><p className="mt-1 font-semibold text-ink">{money(finance.onboardingIncome)}</p></div></div></section>
+      <section className="surface rounded-lg p-4 sm:p-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="font-semibold text-ink">Monthly income by service</p><label className="block w-full sm:w-44"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub sm:sr-only">Income month</span><input type="month" value={incomeMonth} onChange={(event) => setIncomeMonth(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" /></label></div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">Revenue Management</p><p className="mt-1 font-semibold text-ink">{monthlyServiceIncomeLoading || !monthlyServiceIncome ? '—' : money(monthlyServiceIncome.revenueIncome)}</p></div><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">OTA Onboarding</p><p className="mt-1 font-semibold text-ink">{monthlyServiceIncomeLoading || !monthlyServiceIncome ? '—' : money(monthlyServiceIncome.onboardingIncome)}</p></div></div>
+      </section>
+    </div>
 
 
     <section className="surface rounded-lg">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 p-6"><div><p className="text-lg font-semibold text-ink">Client invoices</p><p className="mt-1 text-sm text-sub">Issued invoice amounts, received payments, outstanding balances, and cancellation history.</p></div><div className="flex flex-wrap gap-2"><label className="relative"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search invoice or property" aria-label="Search Finance invoices" /></label><select value={service} onChange={(event) => setService(event.target.value as typeof service)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" aria-label="Filter invoices by service"><option value="all">All services</option><option value="revenue_management">Revenue Management</option><option value="ota_onboarding">OTA Onboarding</option></select><select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" aria-label="Filter invoices by status"><option value="all">All invoice statuses</option><option value="pending">Payment pending</option><option value="paid">Paid</option><option value="cancelled">Cancelled</option></select><button type="button" onClick={() => void load()} className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink"><RefreshCw className="h-4 w-4" /> Refresh data</button></div></div>
+      <div className="border-b border-zinc-800 p-4 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-lg font-semibold text-ink">Client invoices</p><p className="mt-1 text-sm text-sub">Issued invoice amounts, received payments, outstanding balances, and cancellation history.</p></div><button type="button" onClick={() => void load()} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink sm:w-auto"><RefreshCw className="h-4 w-4" /> Refresh data</button></div>
+        <div className="mt-5 grid gap-3 border-t border-zinc-800 pt-4 sm:grid-cols-2 xl:grid-cols-6">
+          <label className="block sm:col-span-2"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Search invoices</span><span className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Invoice, client or property" /></span></label>
+          <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Service</span><select value={service} onChange={(event) => setService(event.target.value as typeof service)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="all">All services</option><option value="revenue_management">Revenue Management</option><option value="ota_onboarding">OTA Onboarding</option></select></label>
+          <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Status</span><select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="all">All statuses</option><option value="pending">Payment pending</option><option value="paid">Paid</option><option value="cancelled">Cancelled</option></select></label>
+          <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Invoice from</span><DatePickerInput value={invoiceDateFrom} onChange={(value) => { setInvoiceDateFrom(value); if (invoiceDateTo && invoiceDateTo < value) setInvoiceDateTo('') }} max={invoiceDateTo || undefined} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
+          <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Invoice to</span><DatePickerInput value={invoiceDateTo} onChange={setInvoiceDateTo} min={invoiceDateFrom || undefined} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
+        </div>
+        <div className="mt-3 flex justify-stretch sm:justify-end"><button type="button" disabled={!hasInvoiceFilters} onClick={() => { setSearch(''); setService('all'); setStatus('all'); setInvoiceDateFrom(''); setInvoiceDateTo('') }} className="h-10 w-full rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub transition-colors hover:border-zinc-600 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40 sm:w-auto">Clear filters</button></div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1080px] text-sm">
           <thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Client</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Dates</th><th className="px-5 py-4 font-medium text-sub">Amount</th><th className="px-5 py-4 font-medium text-sub">Paid / Balance</th><th className="px-5 py-4 font-medium text-sub">Status</th><th className="px-5 py-4 font-medium text-sub">Actions</th></tr></thead>
@@ -190,9 +242,9 @@ export function FinancePanel() {
       <div className="border-b border-zinc-800 p-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div><p className="text-lg font-semibold text-ink">Received payments</p><p className="mt-1 text-sm text-sub">Every income transaction recorded against an invoice.</p></div>
-          <div className="flex items-center gap-3">
-            <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'Filtered total' : 'Total received'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">{displayedPaymentTotal === null ? '—' : money(displayedPaymentTotal)}</p></div>
-            <button type="button" onClick={() => void exportIncome()} disabled={exporting || loading} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white"><FileDown className="h-4 w-4" /> {exporting ? 'Exporting…' : 'Export income'}</button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+            <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-left sm:text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'Filtered total' : 'Total received'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">{displayedPaymentTotal === null ? '—' : money(displayedPaymentTotal)}</p></div>
+            <button type="button" onClick={() => void exportIncome()} disabled={exporting || loading} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white sm:w-auto"><FileDown className="h-4 w-4" /> {exporting ? 'Exporting…' : 'Export income'}</button>
           </div>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

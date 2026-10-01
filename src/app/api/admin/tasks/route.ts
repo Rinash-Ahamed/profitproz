@@ -5,7 +5,7 @@ import { requireAdminSession } from '@/lib/api-auth'
 import { timedApiResponse } from '@/lib/api-timing'
 import { buildAdminTaskSummaryPage, buildAdminTodayTaskSummary, filterAdminTaskExport, type AdminTaskDurationSort, type AdminTaskStatusFilter } from '@/lib/admin-task-summary'
 import { listStaffAccounts } from '@/lib/firestore'
-import { todayInTimeZone } from '@/lib/date-only'
+import { parseDateOnly, todayInTimeZone } from '@/lib/date-only'
 
 let retainedTaskCache: { sessions: Awaited<ReturnType<typeof listWorkSessions>>; expiresAt: number } | null = null
 
@@ -26,14 +26,18 @@ export async function GET(request: Request) {
       const forceRefresh = url.searchParams.has('refresh')
       if (view === 'summary' || view === 'export') {
         const employeeSearch = url.searchParams.get('employeeSearch')?.slice(0, 120) || ''
-        const dateFilter = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get('date') || '') ? url.searchParams.get('date') || '' : ''
+        const dateFrom = url.searchParams.get('from') || ''
+        const dateTo = url.searchParams.get('to') || ''
+        if ((dateFrom && !parseDateOnly(dateFrom)) || (dateTo && !parseDateOnly(dateTo)) || (dateFrom && dateTo && dateFrom > dateTo)) {
+          return NextResponse.json({ message: 'Select a valid task date range.' }, { status: 400 })
+        }
         const requestedPage = Number(url.searchParams.get('page') || 1)
         const page = Number.isInteger(requestedPage) ? Math.max(1, requestedPage) : 1
         const statusValue = url.searchParams.get('status')
         const statusFilter: AdminTaskStatusFilter = statusValue === 'working' || statusValue === 'completed' || statusValue === 'not-started' ? statusValue : 'all'
         const sortValue = url.searchParams.get('sort')
         const durationSort: AdminTaskDurationSort = sortValue === 'highest' || sortValue === 'lowest' ? sortValue : 'recent'
-        const useEfficientDefaultPage = view === 'summary' && !employeeSearch.trim() && !dateFilter && statusFilter === 'all' && durationSort === 'recent'
+        const useEfficientDefaultPage = view === 'summary' && !employeeSearch.trim() && !dateFrom && !dateTo && statusFilter === 'all' && durationSort === 'recent'
 
         if (useEfficientDefaultPage) {
           const today = todayInTimeZone('Asia/Kolkata')
@@ -43,17 +47,20 @@ export async function GET(request: Request) {
             listStaffAccounts(),
           ])
           const publicStaff = staff.map(({ passwordHash: _passwordHash, ...employee }) => employee)
-          const pageSummary = buildAdminTaskSummaryPage({ sessions: recentPage.items, staff: publicStaff, employeeSearch: '', dateFilter: '', statusFilter: 'all', durationSort: 'recent', page: 1, limit: 10 })
+          const pageSummary = buildAdminTaskSummaryPage({ sessions: recentPage.items, staff: publicStaff, employeeSearch: '', dateFrom: '', dateTo: '', statusFilter: 'all', durationSort: 'recent', page: 1, limit: 10 })
           return NextResponse.json({ summaries: pageSummary.summaries, total: recentPage.total, todaySummary: buildAdminTodayTaskSummary(todaySessions, publicStaff) })
         }
 
-        const [workSessions, staff] = await Promise.all([
-          dateFilter ? listWorkSessions(undefined, { from: dateFilter, to: dateFilter }) : listCachedRetainedWorkSessions(forceRefresh),
+        const today = todayInTimeZone('Asia/Kolkata')
+        const [workSessions, staff, todaySessions] = await Promise.all([
+          dateFrom || dateTo ? listWorkSessions(undefined, { from: dateFrom, to: dateTo || undefined }) : listCachedRetainedWorkSessions(forceRefresh),
           listStaffAccounts(),
+          view === 'summary' ? listWorkSessions(undefined, { from: today, to: today }) : Promise.resolve([]),
         ])
         const publicStaff = staff.map(({ passwordHash: _passwordHash, ...employee }) => employee)
-        if (view === 'export') return NextResponse.json({ workSessions: filterAdminTaskExport(workSessions, publicStaff, employeeSearch, dateFilter) })
-        return NextResponse.json(buildAdminTaskSummaryPage({ sessions: workSessions, staff: publicStaff, employeeSearch, dateFilter, statusFilter, durationSort, page, limit: 10 }))
+        if (view === 'export') return NextResponse.json({ workSessions: filterAdminTaskExport(workSessions, publicStaff, employeeSearch, dateFrom, dateTo) })
+        const result = buildAdminTaskSummaryPage({ sessions: workSessions, staff: publicStaff, employeeSearch, dateFrom, dateTo, statusFilter, durationSort, page, limit: 10 })
+        return NextResponse.json({ ...result, todaySummary: buildAdminTodayTaskSummary(todaySessions, publicStaff) })
       }
       const pagination = readPagination(request)
       if (pagination) {

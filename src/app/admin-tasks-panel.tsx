@@ -33,7 +33,8 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
   refreshToken?: number
 }) {
   const [employeeSearch, setEmployeeSearch] = useState('')
-  const [dateFilter, setDateFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const [statusFilter, setStatusFilter] = useState<TaskStatusFilter>('all')
   const [durationSort, setDurationSort] = useState<TaskDurationSort>('recent')
   const [expandedSummary, setExpandedSummary] = useState('')
@@ -54,7 +55,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
         const employeeName = staffNameByEmail.get(session.staffEmail) || ''
         return employeeName.toLowerCase().includes(query) || session.staffEmail.toLowerCase().includes(query)
       })
-      .filter((session) => !dateFilter || session.workDate === dateFilter)
+      .filter((session) => (!dateFrom || session.workDate >= dateFrom) && (!dateTo || session.workDate <= dateTo))
 
     const grouped = new Map<string, DailyWorkSummary>()
     matchingSessions.forEach((session) => {
@@ -81,7 +82,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
     if (statusFilter === 'working') result = result.filter((summary) => summary.status === 'active')
     if (statusFilter === 'completed') result = result.filter((summary) => summary.status === 'completed')
     if (statusFilter === 'not-started') {
-      const targetDate = dateFilter || todayLocalDateOnly()
+      const targetDate = dateTo || dateFrom || todayLocalDateOnly()
       const employeesWithSessions = new Set(sessions.filter((session) => session.workDate === targetDate).map((session) => session.staffEmail))
       result = staff
         .filter((employee) => employee.active && !employeesWithSessions.has(employee.email))
@@ -108,7 +109,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
       }
       return b.workDate.localeCompare(a.workDate) || a.staffEmail.localeCompare(b.staffEmail)
     })
-  }, [dateFilter, durationSort, employeeSearch, now, sessions, staff, staffNameByEmail, statusFilter])
+  }, [dateFrom, dateTo, durationSort, employeeSearch, now, sessions, staff, staffNameByEmail, statusFilter])
 
   const clientTodaySummary = useMemo(() => {
     const today = todayLocalDateOnly()
@@ -121,7 +122,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
     }
   }, [sessions, staff])
 
-  useEffect(() => { setPage(1); setExpandedSummary('') }, [dateFilter, durationSort, employeeSearch, statusFilter])
+  useEffect(() => { setPage(1); setExpandedSummary('') }, [dateFrom, dateTo, durationSort, employeeSearch, statusFilter])
   useEffect(() => {
     if (!serverPagination) return
     const controller = new AbortController()
@@ -129,7 +130,8 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
       setServerLoading(true)
       const params = new URLSearchParams({ view: 'summary', page: String(page), employeeSearch, status: statusFilter, sort: durationSort })
       if (refreshToken) params.set('refresh', String(refreshToken))
-      if (dateFilter) params.set('date', dateFilter)
+      if (dateFrom) params.set('from', dateFrom)
+      if (dateTo) params.set('to', dateTo)
       try {
         const response = await fetch(`/api/admin/tasks?${params.toString()}`, { signal: controller.signal })
         const data = await response.json() as { summaries?: DailyWorkSummary[]; total?: number; todaySummary?: { working: number; completed: number; notStarted: number }; message?: string }
@@ -144,7 +146,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
       }
     }, employeeSearch ? 250 : 0)
     return () => { controller.abort(); window.clearTimeout(timeout) }
-  }, [dateFilter, durationSort, employeeSearch, onError, page, refreshToken, serverPagination, statusFilter])
+  }, [dateFrom, dateTo, durationSort, employeeSearch, onError, page, refreshToken, serverPagination, statusFilter])
 
   const summaries = serverPagination ? serverSummaries : clientSummaries
   const summaryTotal = serverPagination ? serverTotal : summaries.length
@@ -159,7 +161,8 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
     let exportSessions = sessions
     if (serverPagination) {
       const params = new URLSearchParams({ view: 'export', employeeSearch })
-      if (dateFilter) params.set('date', dateFilter)
+      if (dateFrom) params.set('from', dateFrom)
+      if (dateTo) params.set('to', dateTo)
       const response = await fetch(`/api/admin/tasks?${params.toString()}`)
       const data = await response.json() as { workSessions?: WorkSessionRecord[]; message?: string }
       if (!response.ok || !data.workSessions) {
@@ -170,7 +173,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
     }
     const completed = exportSessions
       .filter((session) => session.status === 'completed')
-      .filter((session) => !dateFilter || session.workDate === dateFilter)
+      .filter((session) => (!dateFrom || session.workDate >= dateFrom) && (!dateTo || session.workDate <= dateTo))
       .filter((session) => {
         if (!query) return true
         const name = staffNameByEmail.get(session.staffEmail) || ''
@@ -208,7 +211,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
     const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = `working-days-${dateFilter || 'all-dates'}-${todayLocalDateOnly()}.csv`
+    link.download = `working-days-${dateFrom || 'start'}-to-${dateTo || 'latest'}-${todayLocalDateOnly()}.csv`
     document.body.appendChild(link)
     link.click()
     link.remove()
@@ -239,7 +242,7 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
     }
   }
 
-  const hasFilters = employeeSearch || dateFilter || statusFilter !== 'all' || durationSort !== 'recent'
+  const hasFilters = employeeSearch || dateFrom || dateTo || statusFilter !== 'all' || durationSort !== 'recent'
   return (
     <div className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-3">
@@ -249,23 +252,22 @@ export function AdminTasksPanel({ staff, sessions, loading, now, onCorrect, onDe
       </div>
       <div role="note" className="flex items-start gap-3 rounded-lg border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
         <Info className="mt-0.5 h-4 w-4 flex-none" />
-        <p><span className="font-semibold">Task history:</span> Only the latest 3 months of task records are available. Older records are automatically deleted from Firestore.</p>
+        <p><span className="font-semibold">Task history:</span> Only the latest 3 months of task records are available. Older records are automatically deleted from database.</p>
       </div>
       <div className="surface rounded-lg">
-        <div className="border-b border-zinc-800 p-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="border-b border-zinc-800 p-4 sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div><p className="text-lg font-semibold text-ink">Daily Employee Summary</p><p className="mt-1 text-sm text-sub">Compact daily totals with expandable work details.</p></div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <label className="relative block"><span className="sr-only">Search employee</span><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} className="h-10 w-56 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employee" /></label>
-              <button type="button" onClick={() => void exportWorkingDays()} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
-            </div>
+            <button type="button" onClick={() => void exportWorkingDays()} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-3 text-sm font-semibold text-white hover:bg-[#73bd66] sm:w-auto"><FileDown className="h-4 w-4" /> Export CSV</button>
           </div>
-          <div className="mt-4 flex flex-wrap items-end justify-end gap-2 border-t border-zinc-800 pt-4">
-            <label className="block w-44"><span className="sr-only">Filter by work date</span><DatePickerInput value={dateFilter} onChange={setDateFilter} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as TaskStatusFilter)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="all">All statuses</option><option value="working">Working</option><option value="completed">Completed</option><option value="not-started">Not started</option></select>
-            <select value={durationSort} onChange={(event) => setDurationSort(event.target.value as TaskDurationSort)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="recent">Newest first</option><option value="highest">Highest hours</option><option value="lowest">Lowest hours</option></select>
-            {hasFilters ? <button type="button" onClick={() => { setEmployeeSearch(''); setDateFilter(''); setStatusFilter('all'); setDurationSort('recent') }} className="h-10 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub hover:text-ink">Clear filters</button> : null}
+          <div className="mt-5 grid gap-3 border-t border-zinc-800 pt-4 sm:grid-cols-2 xl:grid-cols-5">
+            <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Search employee</span><span className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={employeeSearch} onChange={(event) => setEmployeeSearch(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Name or email" /></span></label>
+            <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Task from</span><DatePickerInput value={dateFrom} onChange={(value) => { setDateFrom(value); if (dateTo && dateTo < value) setDateTo('') }} max={dateTo || undefined} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
+            <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Task to</span><DatePickerInput value={dateTo} onChange={setDateTo} min={dateFrom || undefined} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
+            <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Status</span><select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as TaskStatusFilter)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="all">All statuses</option><option value="working">Working</option><option value="completed">Completed</option><option value="not-started">Not started</option></select></label>
+            <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Sort</span><select value={durationSort} onChange={(event) => setDurationSort(event.target.value as TaskDurationSort)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="recent">Newest first</option><option value="highest">Highest hours</option><option value="lowest">Lowest hours</option></select></label>
           </div>
+          {hasFilters ? <div className="mt-3 flex justify-stretch sm:justify-end"><button type="button" onClick={() => { setEmployeeSearch(''); setDateFrom(''); setDateTo(''); setStatusFilter('all'); setDurationSort('recent') }} className="h-10 w-full rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub hover:text-ink sm:w-auto">Clear filters</button></div> : null}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[860px] text-sm">

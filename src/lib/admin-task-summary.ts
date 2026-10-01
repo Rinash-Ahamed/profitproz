@@ -19,7 +19,8 @@ export function buildAdminTaskSummaryPage(input: {
   sessions: WorkSessionRecord[]
   staff: PublicStaffRecord[]
   employeeSearch: string
-  dateFilter: string
+  dateFrom: string
+  dateTo: string
   statusFilter: AdminTaskStatusFilter
   durationSort: AdminTaskDurationSort
   page: number
@@ -31,7 +32,7 @@ export function buildAdminTaskSummaryPage(input: {
   const staffNameByEmail = new Map(input.staff.map((employee) => [employee.email, employee.name]))
   const matchingSessions = input.sessions
     .filter((session) => !query || (staffNameByEmail.get(session.staffEmail) || '').toLowerCase().includes(query) || session.staffEmail.toLowerCase().includes(query))
-    .filter((session) => !input.dateFilter || session.workDate === input.dateFilter)
+    .filter((session) => (!input.dateFrom || session.workDate >= input.dateFrom) && (!input.dateTo || session.workDate <= input.dateTo))
   const grouped = new Map<string, AdminDailyWorkSummary>()
 
   matchingSessions.forEach((session) => {
@@ -58,7 +59,7 @@ export function buildAdminTaskSummaryPage(input: {
   if (input.statusFilter === 'working') summaries = summaries.filter((summary) => summary.status === 'active')
   if (input.statusFilter === 'completed') summaries = summaries.filter((summary) => summary.status === 'completed')
   if (input.statusFilter === 'not-started') {
-    const targetDate = input.dateFilter || todayInTimeZone('Asia/Kolkata')
+    const targetDate = input.dateTo || input.dateFrom || todayInTimeZone('Asia/Kolkata')
     const employeesWithSessions = new Set(input.sessions.filter((session) => session.workDate === targetDate).map((session) => session.staffEmail))
     summaries = input.staff
       .filter((employee) => employee.active && !employeesWithSessions.has(employee.email))
@@ -92,11 +93,11 @@ export function buildAdminTaskSummaryPage(input: {
   }
 }
 
-export function filterAdminTaskExport(sessions: WorkSessionRecord[], staff: PublicStaffRecord[], employeeSearch: string, dateFilter: string) {
+export function filterAdminTaskExport(sessions: WorkSessionRecord[], staff: PublicStaffRecord[], employeeSearch: string, dateFrom: string, dateTo: string) {
   const query = employeeSearch.trim().toLowerCase()
   const staffNameByEmail = new Map(staff.map((employee) => [employee.email, employee.name]))
   return sessions.filter((session) => session.status === 'completed')
-    .filter((session) => !dateFilter || session.workDate === dateFilter)
+    .filter((session) => (!dateFrom || session.workDate >= dateFrom) && (!dateTo || session.workDate <= dateTo))
     .filter((session) => !query || (staffNameByEmail.get(session.staffEmail) || '').toLowerCase().includes(query) || session.staffEmail.toLowerCase().includes(query))
 }
 

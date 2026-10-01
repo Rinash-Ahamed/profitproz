@@ -18,6 +18,15 @@ export function clearTabCache() {
   inFlightGetRequests.clear()
 }
 
+async function detachResponse(response: Response) {
+  const body = await response.clone().arrayBuffer()
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  })
+}
+
 // Memory only: no employee or finance data is persisted to browser storage.
 export async function cachedTabFetch(url: string, init?: RequestInit) {
   if ((init?.method || 'GET').toUpperCase() !== 'GET' || !/^\/api\/(?:admin\/(?:staff|properties|onboardings|expenses|leaves|finance)|staff\/(?:expenses|leaves)|properties|onboardings)(?:\?|$)/.test(url)) return authenticatedFetch(url, init)
@@ -28,8 +37,13 @@ export async function cachedTabFetch(url: string, init?: RequestInit) {
   const response = await authenticatedFetch(url, { ...init, cache: 'no-store' })
   init?.signal?.throwIfAborted()
   if (response.ok && generation === cacheGeneration) {
+    // A cloned fetch Response still shares the original request's abort signal.
+    // Materialize its body before caching so cancelling an obsolete date/filter
+    // request cannot invalidate a later cache hit.
+    const cachedResponse = await detachResponse(response)
+    init?.signal?.throwIfAborted()
     if (tabResponses.size >= 40) tabResponses.delete(tabResponses.keys().next().value!)
-    tabResponses.set(url, { expiresAt: Date.now() + 30_000, response: response.clone() })
+    tabResponses.set(url, { expiresAt: Date.now() + 30_000, response: cachedResponse })
   }
   return response
 }

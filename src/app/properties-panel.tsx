@@ -9,7 +9,8 @@ import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { apiFetch, authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { escapeHtml } from '@/lib/html'
-import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
+import { getInvoicePdfRenderScale, getPdfRenderScale, loadPdfLibraries, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
+import { loadInvoiceSettings, loadInvoiceTemplate } from '@/lib/client-invoice-assets'
 import { PropertyCredentialsModal } from './property-credentials-modal'
 import { ToastMessage } from '@/components/ui/ToastMessage'
 import { useAppDialog } from '@/components/ui/AppDialogProvider'
@@ -46,6 +47,17 @@ export function PropertiesPanel({ properties, loading, onChange, readOnly = fals
   const [editing, setEditing] = useState<PropertyRecord | null>(null)
   const [contractProperty, setContractProperty] = useState<PropertyRecord | null>(null)
   const [invoiceProperty, setInvoiceProperty] = useState<PropertyRecord | null>(null)
+
+  useEffect(() => {
+    if (readOnly || editorOnly) return
+    const timer = window.setTimeout(() => {
+      void Promise.all([
+        loadInvoiceTemplate('/template/ProfitPro_Revenue_Management_Invoice_Template.html'),
+        loadInvoiceSettings(),
+      ]).catch(() => undefined)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [editorOnly, readOnly])
   const [paymentsProperty, setPaymentsProperty] = useState<PropertyRecord | null>(null)
   const [credentialsProperty, setCredentialsProperty] = useState<PropertyRecord | null>(null)
   const [deletingId, setDeletingId] = useState('')
@@ -350,9 +362,9 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
   useEffect(() => {
     const controller = new AbortController()
     Promise.all([
-      fetch('/template/ProfitPro_Revenue_Management_Invoice_Template.html', { signal: controller.signal }).then(async (response) => { if (!response.ok) throw new Error('Revenue invoice template could not be loaded.'); return response.text() }),
-      apiFetch<{ settings: InvoiceSettings }>('/api/admin/invoice-settings', { signal: controller.signal }),
-    ]).then(([html, payment]) => { setTemplate(html); setSettings(payment.settings || emptyInvoiceSettings) })
+      loadInvoiceTemplate('/template/ProfitPro_Revenue_Management_Invoice_Template.html'),
+      loadInvoiceSettings(),
+    ]).then(([html, payment]) => { if (!controller.signal.aborted) { setTemplate(html); setSettings(payment || emptyInvoiceSettings); void loadPdfLibraries().catch(() => undefined) } })
       .catch((caught) => { if (!controller.signal.aborted) setError(caught instanceof Error ? caught.message : 'Revenue invoice could not be prepared.') })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
@@ -412,8 +424,8 @@ function RevenueInvoiceModal({ property, onClose }: { property: PropertyRecord; 
       const page = iframeRef.current?.contentDocument?.querySelector('.invoice-page') as HTMLElement | null
       if (!page) throw new Error('Revenue invoice preview is not ready.')
       await waitForPdfAssets(page)
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
-      const canvas = await html2canvas(page, { scale: getPdfRenderScale(), useCORS: true, backgroundColor: '#ffffff', logging: false })
+      const [{ default: html2canvas }, { jsPDF }] = await loadPdfLibraries()
+      const canvas = await html2canvas(page, { scale: getInvoicePdfRenderScale(), useCORS: true, backgroundColor: '#ffffff', logging: false })
       const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true })
       pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight(), undefined, 'FAST')
       const reportLink = page.querySelector('.revenue-report-link') as HTMLElement | null

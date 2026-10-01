@@ -392,6 +392,7 @@ export async function createStaffAccount(input: { name: string; email?: string; 
     transaction.set(db.collection(COLLECTIONS.SALARIES).doc(docRef.id), {
       staffEmail: generatedEmail,
       baseSalary: input.annualCtc / 12,
+      history: [{ baseSalary: input.annualCtc / 12, effectiveFromMonth: currentPayrollMonth() }],
       notes: 'Monthly salary calculated from annual CTC.',
       updatedAt: FieldValue.serverTimestamp(),
     })
@@ -494,7 +495,11 @@ export async function consumeAdminMfaRecoveryCode(id: string, recoveryCodeHash: 
   })
 }
 
-export async function updateStaffAccount(id: string, updates: Partial<Omit<StaffRecord, 'id' | 'passwordHash'>>): Promise<StaffRecord> {
+export async function updateStaffAccount(
+  id: string,
+  updates: Partial<Omit<StaffRecord, 'id' | 'passwordHash'>>,
+  options: { salaryEffectiveFromMonth?: string } = {},
+): Promise<StaffRecord> {
   const db = ensureDb()
   const docRef = db.collection(COLLECTIONS.STAFF).doc(id)
 
@@ -520,6 +525,8 @@ export async function updateStaffAccount(id: string, updates: Partial<Omit<Staff
     const existing = await transaction.get(docRef)
     if (!existing.exists) throw new Error('STAFF_NOT_FOUND')
     const existingData = existing.data() || {}
+    const salaryRef = db.collection(COLLECTIONS.SALARIES).doc(id)
+    const salarySnapshot = await transaction.get(salaryRef)
 
     if (typeof updates.active === 'boolean' && !existingData.activatedAt && (updates.active || existingData.active === true)) {
       dataToUpdate.activatedAt = FieldValue.serverTimestamp()
@@ -538,9 +545,21 @@ export async function updateStaffAccount(id: string, updates: Partial<Omit<Staff
     if (typeof dataToUpdate.annualCtc === 'number' || typeof dataToUpdate.email === 'string') {
       const staffEmail = typeof dataToUpdate.email === 'string' ? dataToUpdate.email : String(existingData.email || '')
       const annualCtc = typeof dataToUpdate.annualCtc === 'number' ? dataToUpdate.annualCtc : Number(existingData.annualCtc || 0)
-      transaction.set(db.collection(COLLECTIONS.SALARIES).doc(id), {
+      const existingSalary = mapDocToSalary(salarySnapshot)
+      let history = existingSalary.history.length
+        ? existingSalary.history
+        : [{ baseSalary: existingSalary.baseSalary || annualCtc / 12, effectiveFromMonth: PAYROLL_START_MONTH }]
+      if (typeof dataToUpdate.annualCtc === 'number') {
+        const effectiveFromMonth = options.salaryEffectiveFromMonth || currentPayrollMonth()
+        history = [
+          ...history.filter((entry) => entry.effectiveFromMonth !== effectiveFromMonth),
+          { baseSalary: annualCtc / 12, effectiveFromMonth },
+        ].sort((a, b) => a.effectiveFromMonth.localeCompare(b.effectiveFromMonth))
+      }
+      transaction.set(salaryRef, {
         staffEmail,
         baseSalary: annualCtc / 12,
+        history,
         notes: 'Monthly salary calculated from annual CTC.',
         updatedAt: FieldValue.serverTimestamp(),
       }, { merge: true })
@@ -662,6 +681,7 @@ export type SalaryRecord = {
   id: string
   staffEmail: string
   baseSalary: number
+  history: Array<{ baseSalary: number; effectiveFromMonth: string }>
   notes: string
   updatedAt?: string
 }
@@ -718,11 +738,25 @@ function mapDocToWorkSession(doc: DocumentSnapshot): WorkSessionRecord {
 
 function mapDocToSalary(doc: DocumentSnapshot): SalaryRecord {
   const data = doc.data() || {}
+  const history = Array.isArray(data.history)
+    ? data.history
+        .filter((entry: unknown): entry is { baseSalary: number; effectiveFromMonth: string } => {
+          if (!entry || typeof entry !== 'object') return false
+          const value = entry as Record<string, unknown>
+          return typeof value.baseSalary === 'number'
+            && Number.isFinite(value.baseSalary)
+            && value.baseSalary >= 0
+            && typeof value.effectiveFromMonth === 'string'
+            && parsePayrollMonth(value.effectiveFromMonth) !== null
+        })
+        .sort((a, b) => a.effectiveFromMonth.localeCompare(b.effectiveFromMonth))
+    : []
 
   return {
     id: doc.id,
     staffEmail: data.staffEmail || '',
     baseSalary: data.baseSalary || 0,
+    history,
     notes: data.notes || '',
     updatedAt: mapTimestamp(data.updatedAt),
   }
@@ -809,6 +843,7 @@ function mapDocToPayroll(doc: DocumentSnapshot): PayrollRecord {
     approvedLeaveLopUnits,
     status,
     snapshotVersion: 1,
+    sourceFingerprint: typeof data.sourceFingerprint === 'string' ? data.sourceFingerprint : undefined,
     statusHistory: history.flatMap((entry: unknown) => {
       if (!entry || typeof entry !== 'object') return []
       const value = entry as Record<string, unknown>
@@ -1348,6 +1383,14 @@ export async function financePaymentTotal(input: { service?: string; from?: stri
     const snapshot = await fallback.select('amount', 'service').get()
     return sumCurrency(snapshot.docs.filter((doc) => !input.service || input.service === 'all' || doc.get('service') === input.service).map((doc) => Number(doc.get('amount') || 0)))
   }
+}
+
+export async function financeIncomeByService(input: { from: string; to: string }) {
+  const [revenueIncome, onboardingIncome] = await Promise.all([
+    financePaymentTotal({ ...input, service: 'revenue_management' }),
+    financePaymentTotal({ ...input, service: 'ota_onboarding' }),
+  ])
+  return { revenueIncome, onboardingIncome }
 }
 
 export async function getFinanceInvoiceById(id: string): Promise<FinanceInvoiceRecord | null> {
@@ -2157,19 +2200,28 @@ export function listSalariesPage(page: PaginationRequest) {
   return paginateQuery(ensureDb().collection(COLLECTIONS.SALARIES), mapDocToSalary, page)
 }
 
-export async function saveSalary(staffId: string, input: { staffEmail: string; baseSalary: number; notes: string }): Promise<SalaryRecord> {
+export async function saveSalary(staffId: string, input: { staffEmail: string; baseSalary: number; notes: string; effectiveFromMonth: string }): Promise<SalaryRecord> {
   const db = ensureDb()
 
   const docRef = db.collection(COLLECTIONS.SALARIES).doc(staffId)
-
-  const salaryData = {
-    staffEmail: input.staffEmail.trim().toLowerCase(),
-    baseSalary: input.baseSalary,
-    notes: input.notes.trim(),
-    updatedAt: FieldValue.serverTimestamp(),
-  }
-
-  await docRef.set(salaryData, { merge: true })
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(docRef)
+    const existing = mapDocToSalary(snapshot)
+    const history = [
+      ...(existing.history.length
+        ? existing.history
+        : [{ baseSalary: existing.baseSalary || input.baseSalary, effectiveFromMonth: PAYROLL_START_MONTH }]
+      ).filter((entry) => entry.effectiveFromMonth !== input.effectiveFromMonth),
+      { baseSalary: input.baseSalary, effectiveFromMonth: input.effectiveFromMonth },
+    ].sort((a, b) => a.effectiveFromMonth.localeCompare(b.effectiveFromMonth))
+    transaction.set(docRef, {
+      staffEmail: input.staffEmail.trim().toLowerCase(),
+      baseSalary: input.baseSalary,
+      history,
+      notes: input.notes.trim(),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true })
+  })
 
   const updatedDoc = await docRef.get()
   if (!updatedDoc.exists) {
@@ -2232,7 +2284,10 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
     const docRef = db.collection(COLLECTIONS.PAYROLL).doc(`${month}_${employee.id}`)
     const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
     const salary = salaryByStaffId.get(employee.id) || salaryByEmail.get(employee.email)
-    const monthlySalary = salary?.baseSalary ?? (employee.annualCtc || 0) / 12
+    const effectiveSalary = salary?.history
+      .filter((entry) => entry.effectiveFromMonth <= month)
+      .at(-1)?.baseSalary
+    const monthlySalary = effectiveSalary ?? salary?.baseSalary ?? (employee.annualCtc || 0) / 12
     const employmentStartDate = employee.activatedAt
       ? todayInTimeZone('Asia/Kolkata', new Date(employee.activatedAt))
       : monthStartDate
@@ -2259,11 +2314,28 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
         .map((leave) => ({ id: leave.id, startDate: leave.startDate, endDate: leave.endDate, durationType: leave.durationType, payrollTreatment: leave.payrollTreatment })),
       missingAttendanceDecisions: currentPayrollByStaff.get(employee.id)?.missingAttendanceDecisions,
     })
+    const sourceFingerprint = crypto.createHash('sha256').update(JSON.stringify({
+      employee: {
+        employeeId: employee.employeeId || employee.id,
+        name: employee.name,
+        email: employee.email,
+        role: employee.role || '',
+        department: employee.department || '',
+      },
+      month,
+      monthlySalary,
+      employmentStartDate,
+      calculationThroughDate,
+      completedThroughDate: missingAttendanceThroughDate,
+      calculation,
+    })).digest('hex')
     const generatedAt = new Date().toISOString()
 
     await db.runTransaction(async (transaction) => {
       const existing = await transaction.get(docRef)
-      if (existing.exists && mapDocToPayroll(existing).status !== 'draft') return
+      const existingPayroll = existing.exists ? mapDocToPayroll(existing) : null
+      if (existingPayroll && existingPayroll.status !== 'draft') return
+      if (existingPayroll?.sourceFingerprint === sourceFingerprint) return
       const snapshotData = {
         month,
         employeeId: employee.employeeId || employee.id,
@@ -2273,11 +2345,12 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
         designation: employee.role || '',
         department: employee.department || '',
         monthlySalary,
-        annualCtc: employee.annualCtc || monthlySalary * 12,
+        annualCtc: monthlySalary * 12,
         employmentStartDate,
         ...calculation,
         calculationThroughDate,
         completedThroughDate: missingAttendanceThroughDate,
+        sourceFingerprint,
         refreshedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       }

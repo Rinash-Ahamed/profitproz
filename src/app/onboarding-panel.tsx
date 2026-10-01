@@ -8,7 +8,8 @@ import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import { formatDateOnlyDisplay, todayLocalDateOnly } from '@/lib/date-only'
 import { escapeHtml } from '@/lib/html'
-import { getPdfRenderScale, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
+import { getInvoicePdfRenderScale, loadPdfLibraries, releasePdfCanvas, waitForPdfAssets } from '@/lib/client-pdf'
+import { loadInvoiceSettings, loadInvoiceTemplate } from '@/lib/client-invoice-assets'
 import type { FinanceInvoiceRecord, FinancePaymentRecord } from '@/lib/finance'
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
 import { ToastMessage } from '@/components/ui/ToastMessage'
@@ -27,6 +28,17 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
   const [showCreate, setShowCreate] = useState(false)
   const [editing, setEditing] = useState<OnboardingRecord | null>(null)
   const [invoiceRecord, setInvoiceRecord] = useState<OnboardingRecord | null>(null)
+
+  useEffect(() => {
+    if (readOnly || editorOnly) return
+    const timer = window.setTimeout(() => {
+      void Promise.all([
+        loadInvoiceTemplate('/template/ProfitPro_OTA_Onboarding_Invoice_Template.html'),
+        loadInvoiceSettings(),
+      ]).catch(() => undefined)
+    }, 250)
+    return () => window.clearTimeout(timer)
+  }, [editorOnly, readOnly])
   const [paymentInvoice, setPaymentInvoice] = useState<FinanceInvoiceRecord | null>(null)
   const [paymentRecord, setPaymentRecord] = useState<FinancePaymentRecord | null>(null)
   const [deletingId, setDeletingId] = useState('')
@@ -283,18 +295,17 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
   useEffect(() => {
     const controller = new AbortController()
     Promise.all([
-      fetch('/template/ProfitPro_OTA_Onboarding_Invoice_Template.html', { signal: controller.signal }),
-      fetch('/api/admin/invoice-settings', { signal: controller.signal }),
+      loadInvoiceTemplate('/template/ProfitPro_OTA_Onboarding_Invoice_Template.html'),
+      loadInvoiceSettings(),
       record.invoiceSequence
         ? fetch(`/api/admin/finance/invoices/${encodeURIComponent(record.financeInvoiceId || `ota_${record.id}`)}/payments?invoiceOnly=1`, { signal: controller.signal, cache: 'no-store' })
         : Promise.resolve(null),
     ])
-      .then(async ([templateResponse, settingsResponse, invoiceResponse]) => {
-        if (!templateResponse.ok) throw new Error('Invoice template could not be loaded.')
-        if (!settingsResponse.ok) throw new Error('Invoice payment details could not be loaded.')
-        const settingsData = await settingsResponse.json() as { settings?: InvoicePaymentSettings }
-        setTemplate(await templateResponse.text())
-        setPaymentSettings(settingsData.settings || emptyInvoicePaymentSettings)
+      .then(async ([templateHtml, settings, invoiceResponse]) => {
+        if (controller.signal.aborted) return
+        setTemplate(templateHtml)
+        setPaymentSettings(settings || emptyInvoicePaymentSettings)
+        void loadPdfLibraries().catch(() => undefined)
         if (invoiceResponse?.ok) {
           const invoiceData = await invoiceResponse.json() as { invoice?: FinanceInvoiceRecord }
           if (invoiceData.invoice) {
@@ -391,12 +402,9 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
       if (!document || !page) throw new Error('Invoice preview is not ready.')
       await waitForPdfAssets(page)
 
-      const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
-        import('html2canvas'),
-        import('jspdf'),
-      ])
+      const [{ default: html2canvas }, { jsPDF }] = await loadPdfLibraries()
       const canvas = await html2canvas(page, {
-        scale: getPdfRenderScale(),
+        scale: getInvoicePdfRenderScale(),
         useCORS: true,
         backgroundColor: '#ffffff',
         logging: false,
