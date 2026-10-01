@@ -53,6 +53,7 @@ export type PayrollRecord = {
   approvedLeaveLopUnits: Record<string, number>
   status: PayrollStatus
   snapshotVersion: 1
+  sourceFingerprint?: string
   statusHistory: PayrollStatusHistoryEntry[]
   calculationThroughDate: string
   completedThroughDate: string
@@ -199,7 +200,10 @@ export function calculatePayroll(input: PayrollCalculationInput): PayrollCalcula
       .filter((date) => workingDateSet.has(date) && date <= calculationThroughDate)
     const isHalfDay = leave.durationType === 'half_day' && leave.startDate === leave.endDate
     const unit = isHalfDay ? 0.5 : 1
-    const applicableDates = dates.filter((date) => isHalfDay || !attendanceDateSet.has(date))
+    // An approved leave is authoritative for payroll. A work session recorded
+    // on the same date must not silently cancel the approved leave or its
+    // configured CL/LOP treatment.
+    const applicableDates = dates
     if (applicableDates.length) approvedLeaveIds.add(leave.id)
     applicableDates.forEach((date) => {
       const current = leaveByDate.get(date) || { unit: 0, directLop: 0, clCandidate: 0 }

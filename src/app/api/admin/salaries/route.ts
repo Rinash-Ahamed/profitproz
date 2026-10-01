@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server'
 import { authConfig, verifyActiveSessionToken } from '@/lib/auth'
 import { listExpenses, listSalaries, listSalariesPage, listStaffAccounts, logAdminAction, saveSalary, toPublicStaff } from '@/lib/firestore'
 import { readPagination } from '@/lib/pagination'
+import { parsePayrollMonth } from '@/lib/payroll'
 
 export async function GET(request: Request) {
   const cookieStore = await cookies()
@@ -49,12 +50,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Invalid salary request.' }, { status: 400 })
   }
 
-  const input = body as { staffEmail?: unknown; baseSalary?: unknown; notes?: unknown }
+  const input = body as { staffEmail?: unknown; baseSalary?: unknown; notes?: unknown; effectiveFromMonth?: unknown }
   const staffEmail = typeof input.staffEmail === 'string' ? input.staffEmail.trim().toLowerCase() : ''
   const baseSalary = Number(input.baseSalary)
   const notes = typeof input.notes === 'string' ? input.notes : ''
+  const effectiveFromMonth = typeof input.effectiveFromMonth === 'string' ? input.effectiveFromMonth : ''
 
-  if (!staffEmail || staffEmail.length > 254 || !Number.isFinite(baseSalary) || baseSalary < 0 || baseSalary > 100_000_000 || notes.length > 2000) {
+  if (!staffEmail || staffEmail.length > 254 || !Number.isFinite(baseSalary) || baseSalary < 0 || baseSalary > 100_000_000 || notes.length > 2000 || !parsePayrollMonth(effectiveFromMonth)) {
     return NextResponse.json({ message: 'Staff email and valid salary are required.' }, { status: 400 })
   }
 
@@ -64,7 +66,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Staff member was not found.' }, { status: 404 })
   }
 
-  const salary = await saveSalary(staff.id, { staffEmail, baseSalary, notes })
+  const salary = await saveSalary(staff.id, { staffEmail, baseSalary, notes, effectiveFromMonth })
   await logAdminAction({ actorEmail: user.email, action: 'SALARY_UPDATE', targetId: staff.id, details: `Salary updated for ${staff.email}.` })
   return NextResponse.json({ salary })
 }

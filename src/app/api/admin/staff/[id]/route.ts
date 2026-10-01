@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { deleteStaffAccount, getStaffById, logAdminAction, toPublicStaff, updateStaffAccount } from '@/lib/firestore'
 import { requireAdminSession as requireAdmin } from '@/lib/api-auth'
 import { isStaffDepartment, isStaffRole } from '@/lib/staff-options'
+import { parsePayrollMonth } from '@/lib/payroll'
 
 type RouteContext = {
   params: Promise<{ id: string }>
@@ -36,6 +37,7 @@ export async function PATCH(request: Request, context: RouteContext) {
     department?: unknown
     role?: unknown
     annualCtc?: unknown
+    salaryEffectiveFromMonth?: unknown
     active?: unknown
     clientAccess?: unknown
   }
@@ -82,6 +84,10 @@ export async function PATCH(request: Request, context: RouteContext) {
     if (!Number.isFinite(annualCtc) || annualCtc <= 0 || annualCtc > 1_000_000_000) return NextResponse.json({ message: 'Annual CTC must be a valid positive number.' }, { status: 400 })
     updates.annualCtc = annualCtc
   }
+  const salaryEffectiveFromMonth = typeof input.salaryEffectiveFromMonth === 'string' ? input.salaryEffectiveFromMonth : ''
+  if (updates.annualCtc !== undefined && !parsePayrollMonth(salaryEffectiveFromMonth)) {
+    return NextResponse.json({ message: 'Select the month when the salary change takes effect.' }, { status: 400 })
+  }
 
   if (typeof input.active === 'boolean') {
     updates.active = input.active
@@ -107,7 +113,7 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   try {
     const before = await getStaffById(id)
-    const staff = await updateStaffAccount(id, updates)
+    const staff = await updateStaffAccount(id, updates, { salaryEffectiveFromMonth: salaryEffectiveFromMonth || undefined })
 
     await logAdminAction({
       actorEmail: user.email,

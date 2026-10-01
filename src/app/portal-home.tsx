@@ -23,6 +23,7 @@ import { AdminMfaSettings } from '@/app/admin-mfa-settings'
 import type { HalfDayPeriod, LeaveDurationType, LeavePayrollTreatment } from '@/lib/leave'
 import { HolidayCalendarCard } from '@/components/ui/HolidayCalendarCard'
 import { formatLiveWorkDuration, formatWorkDuration, formatWorkTime } from '@/lib/work-session-format'
+import { currentPayrollMonth } from '@/lib/payroll'
 
 const ClientServicesPanel = dynamic(() => import('@/app/client-services-panel').then((module) => module.ClientServicesPanel))
 const FinancePanel = dynamic(() => import('@/app/finance-panel').then((module) => module.FinancePanel))
@@ -126,6 +127,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [adminExpenseName, setAdminExpenseName] = useState('')
   const [expenseTrackingView, setExpenseTrackingView] = useState<'staff' | 'admin'>('staff')
   const [expensePersonSearch, setExpensePersonSearch] = useState('')
+  const [expenseMonthFilter, setExpenseMonthFilter] = useState('')
   const [expensePaymentFilter, setExpensePaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
   const [expenseSettings, setExpenseSettings] = useState<ExpenseFieldSettings>({ cityRequired: true, descriptionRequired: true, receiptRequired: true })
   const [securitySettings, setSecuritySettings] = useState<SecuritySettings>({ sessionHours: 12, minPasswordLength: 12, requireUppercase: false, requireNumber: false })
@@ -969,9 +971,14 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
 
   const pendingExpenses = expenseList.filter((expense) => expense.status === 'pending')
   const expensePersonQuery = expensePersonSearch.trim().toLowerCase()
+  const expenseMonthOptions = Array.from(new Set(expenseList
+    .map((expense) => expense.expenseDate?.slice(0, 7) || '')
+    .filter((month) => /^\d{4}-\d{2}$/.test(month))))
+    .sort((a, b) => b.localeCompare(a))
   const visibleTrackedExpenses = expenseList
     .filter((expense) => expenseTrackingView === 'admin' ? expense.submittedByRole === 'admin' : expense.submittedByRole !== 'admin')
     .filter((expense) => !expensePersonQuery || (expense.staffName || expense.staffEmail).toLowerCase().includes(expensePersonQuery))
+    .filter((expense) => !expenseMonthFilter || expense.expenseDate?.startsWith(`${expenseMonthFilter}-`))
     .filter((expense) => expensePaymentFilter === 'all' || (expensePaymentFilter === 'paid' ? expense.paymentStatus === 'paid' : expense.status === 'approved' && expense.paymentStatus !== 'paid'))
     .sort((a, b) => {
       if (expensePersonQuery) {
@@ -1374,15 +1381,26 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <div className="flex flex-wrap items-center justify-between gap-4">
                             <div><p className="text-lg font-semibold text-ink">{expenseTrackingView === 'admin' ? 'Admin Expenses' : 'Staff Expense Approvals'}</p><p className="mt-1 text-sm text-sub">{expenseTrackingView === 'admin' ? 'Review expenses recorded directly by Admin users.' : 'Review and decide employee expense claims.'}</p></div>
                             <div className="flex flex-wrap items-center gap-3">
-                              <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{expensePersonSearch.trim() || expensePaymentFilter !== 'all' ? 'Filtered total' : 'Total amount'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">₹{visibleTrackedExpenseTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p></div>
+                              <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{expensePersonSearch.trim() || expenseMonthFilter || expensePaymentFilter !== 'all' ? 'Filtered total' : 'Total amount'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">₹{visibleTrackedExpenseTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p></div>
                               <button type="button" onClick={handleExportExpenses} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
                             </div>
                           </div>
                           <div className="mt-5 flex flex-wrap gap-2 rounded-lg border border-zinc-800 bg-zinc-950/30 p-1.5">
                             <button type="button" onClick={() => { setExpenseTrackingView('staff'); setExpensePersonSearch(''); setExpensePaymentFilter('all') }} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'staff' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Staff Expenses</button>
                             <button type="button" onClick={() => { setExpenseTrackingView('admin'); setExpensePersonSearch(''); setExpensePaymentFilter('all') }} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'admin' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Admin Expenses</button>
-                            <label className="relative ml-auto min-w-64 flex-1 sm:max-w-sm"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={expensePersonSearch} onChange={(event) => setExpensePersonSearch(event.target.value)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder={expenseTrackingView === 'admin' ? 'Search Admin name' : 'Search staff name'} aria-label={expenseTrackingView === 'admin' ? 'Search expenses by Admin name' : 'Search expenses by staff name'} /></label>
-                            <select value={expensePaymentFilter} onChange={(event) => setExpensePaymentFilter(event.target.value as typeof expensePaymentFilter)} className="h-10 rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" aria-label="Filter expenses by payment status"><option value="all">All payment statuses</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select>
+                            {expenseTrackingView === 'admin' ? (
+                              <select value={expensePersonSearch} onChange={(event) => setExpensePersonSearch(event.target.value)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none sm:ml-auto sm:min-w-64 sm:max-w-sm sm:flex-1" aria-label="Filter expenses by Admin name">
+                                <option value="">All Admins</option>
+                                {ADMIN_NAMES.map((name) => <option key={name} value={name}>{name}</option>)}
+                              </select>
+                            ) : (
+                              <label className="relative w-full sm:ml-auto sm:min-w-64 sm:max-w-sm sm:flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={expensePersonSearch} onChange={(event) => setExpensePersonSearch(event.target.value)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search staff name" aria-label="Search expenses by staff name" /></label>
+                            )}
+                            <select value={expenseMonthFilter} onChange={(event) => setExpenseMonthFilter(event.target.value)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none sm:w-auto" aria-label="Filter expenses by month">
+                              <option value="">All months</option>
+                              {expenseMonthOptions.map((month) => <option key={month} value={month}>{new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</option>)}
+                            </select>
+                            <select value={expensePaymentFilter} onChange={(event) => setExpensePaymentFilter(event.target.value as typeof expensePaymentFilter)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none sm:w-auto" aria-label="Filter expenses by payment status"><option value="all">All payment statuses</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select>
                           </div>
                         </div>
                       <div className="overflow-x-auto">
@@ -1401,7 +1419,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             {loading ? (
                               <tr><td colSpan={expenseTrackingView === 'admin' ? 5 : 6} className="py-10 text-center text-sub"><Loader2 className="mx-auto h-6 w-6 animate-spin" /></td></tr>
                             ) : visibleTrackedExpenses.length === 0 ? (
-                              <tr><td colSpan={expenseTrackingView === 'admin' ? 5 : 6} className="py-10 text-center text-sub">{expensePersonSearch.trim() || expensePaymentFilter !== 'all' ? 'No expenses match the selected search and payment status.' : expenseTrackingView === 'admin' ? 'No Admin expenses recorded yet.' : 'No staff expenses submitted yet.'}</td></tr>
+                              <tr><td colSpan={expenseTrackingView === 'admin' ? 5 : 6} className="py-10 text-center text-sub">{expensePersonSearch.trim() || expenseMonthFilter || expensePaymentFilter !== 'all' ? 'No expenses match the selected filters.' : expenseTrackingView === 'admin' ? 'No Admin expenses recorded yet.' : 'No staff expenses submitted yet.'}</td></tr>
                             ) : (
                               visibleTrackedExpenses.map((expense) => (
                                 <tr key={expense.id} className="border-b border-zinc-800 last:border-none">
@@ -2054,6 +2072,7 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
   const [department, setDepartment] = useState(staff.department || '')
   const [role, setRole] = useState(staff.role || '')
   const [annualCtc, setAnnualCtc] = useState(staff.annualCtc ? String(staff.annualCtc) : '')
+  const [salaryEffectiveFromMonth, setSalaryEffectiveFromMonth] = useState(currentPayrollMonth())
   const [revenueAccess, setRevenueAccess] = useState(staff.clientAccess?.revenueManagement === true)
   const [onboardingAccess, setOnboardingAccess] = useState(staff.clientAccess?.otaOnboarding === true)
   const [loading, setLoading] = useState(false)
@@ -2081,7 +2100,7 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
       ...(employeeId !== (staff.employeeId || '') && { employeeId }),
       ...(department !== (staff.department || '') && { department }),
       ...(role !== (staff.role || '') && { role }),
-      ...(Number(annualCtc) !== (staff.annualCtc || 0) && { annualCtc: Number(annualCtc) }),
+      ...(Number(annualCtc) !== (staff.annualCtc || 0) && { annualCtc: Number(annualCtc), salaryEffectiveFromMonth }),
       ...((revenueAccess !== (staff.clientAccess?.revenueManagement === true) || onboardingAccess !== (staff.clientAccess?.otaOnboarding === true)) && { clientAccess: { revenueManagement: revenueAccess, otaOnboarding: onboardingAccess } }),
     }
 
@@ -2156,6 +2175,10 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
                 <label htmlFor="edit-staffAnnualCtc" className="label-upper mb-2 block text-ghost">Annual CTC</label>
                 <input id="edit-staffAnnualCtc" type="number" inputMode="decimal" min="0.01" step="0.01" value={annualCtc} onChange={(e) => setAnnualCtc(e.target.value)} className={inputClass} required />
               </div>
+              {Number(annualCtc) !== (staff.annualCtc || 0) ? <div>
+                <label htmlFor="edit-salaryEffectiveMonth" className="label-upper mb-2 block text-ghost">Salary effective from</label>
+                <input id="edit-salaryEffectiveMonth" type="month" value={salaryEffectiveFromMonth} onChange={(e) => setSalaryEffectiveFromMonth(e.target.value)} className={inputClass} required />
+              </div> : null}
             </div>
             <fieldset className="rounded-lg border border-zinc-700 bg-zinc-950/30 p-4">
               <legend className="label-upper px-1 text-ghost">Client service access</legend>

@@ -60,7 +60,7 @@ Keep existing `{{placeholder}}` names when changing template styling. Payment va
 - Generating an OTA or Revenue Management invoice creates an immutable financial snapshot with its invoice number, service, client, dates, and amount.
 - Admins record the full received payment against its invoice; partial payments are not enabled.
 - Approved staff expenses affect cash only after an Admin marks the reimbursement as paid. Admin expenses are treated as paid when recorded.
-- The Finance screen shows received income by service, unpaid approved expenses, paid expenses, and `received income - paid expenses`.
+- The Finance screen shows received total income by service, unpaid approved expenses, paid expenses, and `received income - paid expenses`.
 - `finance_invoices` stores invoice snapshots and `finance_payments` stores the payment ledger. Payment records should not be edited or deleted manually.
 
 ## Tasks and work-time workflow

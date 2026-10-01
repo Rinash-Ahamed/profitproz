@@ -5,7 +5,7 @@ import { AlertTriangle, CheckCircle2, CreditCard, FileDown, Loader2, RefreshCw, 
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import { ToastMessage } from '@/components/ui/ToastMessage'
 import { useAppDialog } from '@/components/ui/AppDialogProvider'
-import { calculatePayrollPeriodAmounts, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthDates, type MissingAttendanceDecision, type PayrollRecord, type PayrollStatus } from '@/lib/payroll'
+import { calculatePayrollPeriodAmounts, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, payrollMonthDates, type MissingAttendanceDecision, type PayrollRecord, type PayrollStatus } from '@/lib/payroll'
 
 const money = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)
 
@@ -53,7 +53,12 @@ export function PayrollPanel() {
     setLoading(true)
     setError('')
     try {
-      const response = await fetch(`/api/admin/payroll?month=${encodeURIComponent(month)}`, { signal })
+      const response = await fetch('/api/admin/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month }),
+        signal,
+      })
       const data = await response.json() as { payroll?: PayrollRecord[]; message?: string }
       if (!response.ok || !data.payroll) throw new Error(data.message || 'Unable to load payroll records.')
       setRecords(data.payroll)
@@ -70,27 +75,6 @@ export function PayrollPanel() {
     void load(controller.signal)
     return () => controller.abort()
   }, [load])
-
-  async function generate() {
-    setActionId('generate')
-    setError('')
-    setMessage('')
-    try {
-      const response = await fetch('/api/admin/payroll', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ month }),
-      })
-      const data = await response.json() as { payroll?: PayrollRecord[]; message?: string }
-      if (!response.ok || !data.payroll) throw new Error(data.message || 'Unable to generate payroll.')
-      setRecords(data.payroll)
-      setMessage(`${monthLabel(month)} payroll snapshots are ready for review.`)
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to generate payroll.')
-    } finally {
-      setActionId('')
-    }
-  }
 
   async function advance(record: PayrollRecord) {
     const status = nextPayrollStatus(record.status)
@@ -189,7 +173,7 @@ export function PayrollPanel() {
 
   function exportCsv() {
     if (!records.length) {
-      setError('Generate payroll before exporting it.')
+      setError('No payroll records are available to export.')
       return
     }
     const firstPeriod = calculatePayrollPeriodAmounts(records[0])
@@ -230,14 +214,15 @@ export function PayrollPanel() {
             <p className="text-lg font-semibold text-ink">Payroll Processing</p>
             <p className="mt-1 text-sm text-sub">Review attendance, confirm calculations, approve payroll, and record payment in order.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 xl:w-auto">
             <input type="month" value={month} min={minimumPickerMonth} max={maximumPickerMonth} onChange={(event) => setMonth(event.target.value)} className="h-10 rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" aria-label="Payroll month" />
             <span title="Salary and LOP rates use calendar days." className="flex h-10 items-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs text-sub">Calendar days: <strong className="ml-1 font-semibold text-ink">{selectedMonthDates.length}</strong></span>
             <span title="Sundays are paid holidays and do not require attendance." className="flex h-10 items-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs text-sub">Paid Sundays: <strong className="ml-1 font-semibold text-ink">{selectedMonthSundays}</strong></span>
             {displayedPeriod?.isIncomplete ? <span className="flex h-10 whitespace-nowrap items-center rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-xs text-sub">Calculated through: <strong className="ml-1 font-semibold text-ink">{periodDateLabel}</strong></span> : null}
-            <button type="button" onClick={() => void load()} disabled={loading} className="flex h-10 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>
-            <button type="button" onClick={generate} disabled={!!actionId || !month || month < PAYROLL_START_MONTH || month > currentMonth} className="flex h-10 items-center gap-2 rounded-lg border border-[#66B159]/35 bg-[#66B159]/15 px-4 text-sm font-semibold text-[#66B159] transition-colors hover:bg-[#66B159]/25 disabled:opacity-50">{actionId === 'generate' ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Generate or refresh draft</button>
-            <button type="button" onClick={exportCsv} disabled={!records.length} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66] disabled:opacity-50"><FileDown className="h-4 w-4" /> Export payroll CSV</button>
+            <div className="ml-auto flex items-center gap-2">
+              <button type="button" onClick={() => void load()} disabled={loading} className="flex h-10 shrink-0 items-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-50"><RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh</button>
+              <button type="button" onClick={exportCsv} disabled={!records.length} className="flex h-10 shrink-0 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66] disabled:opacity-50"><FileDown className="h-4 w-4" /> Export payroll CSV</button>
+            </div>
           </div>
         </div>
 
