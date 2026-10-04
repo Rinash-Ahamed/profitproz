@@ -1232,13 +1232,15 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
   const paymentsQuery = db.collection(COLLECTIONS.FINANCE_PAYMENTS)
   const expensesQuery = db.collection(COLLECTIONS.EXPENSES)
   const payrollQuery = db.collection(COLLECTIONS.PAYROLL)
+  const currentMonthStart = `${currentPayrollMonth()}-01`
+  const currentMonthStartTimestamp = Timestamp.fromDate(new Date(`${currentMonthStart}T00:00:00+05:30`))
   const aggregateSum = async (query: Query, field: string) => {
     const result = await query.aggregate({ total: AggregateField.sum(field) }).get()
     return roundCurrency(Number(result.data().total || 0))
   }
   const totalsPromise = (async () => {
     try {
-      const [totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll] = await Promise.all([
+      const [totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll, previousIncomeReceived, previousPaidExpenses, previousPaidPayroll] = await Promise.all([
         aggregateSum(invoicesQuery.where('status', 'in', ['pending', 'paid']), 'amount'),
         aggregateSum(paymentsQuery, 'amount'),
         aggregateSum(paymentsQuery.where('service', '==', 'revenue_management'), 'amount'),
@@ -1246,8 +1248,11 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
         aggregateSum(expensesQuery.where('status', '==', 'approved'), 'amount'),
         aggregateSum(expensesQuery.where('paymentStatus', '==', 'paid'), 'amount'),
         aggregateSum(payrollQuery.where('status', '==', 'paid'), 'netSalary'),
+        aggregateSum(paymentsQuery.where('paymentDate', '<', currentMonthStart), 'amount'),
+        aggregateSum(expensesQuery.where('paidAt', '<', currentMonthStartTimestamp), 'amount'),
+        aggregateSum(payrollQuery.where('paidAt', '<', currentMonthStartTimestamp), 'netSalary'),
       ])
-      return { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll }
+      return { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll, previousMonthClosingBalance: sumCurrency([previousIncomeReceived, -previousPaidExpenses, -previousPaidPayroll]) }
     } catch (error) {
       if (!isMissingIndexError(error)) throw error
 
@@ -1255,9 +1260,9 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
       // Each collection is read once, selecting only fields needed for totals.
       const [invoiceTotals, paymentTotals, expenseTotals, payrollTotals] = await Promise.all([
         invoicesQuery.select('amount', 'status').get(),
-        paymentsQuery.select('amount', 'service').get(),
-        expensesQuery.select('amount', 'status', 'paymentStatus').get(),
-        payrollQuery.where('status', '==', 'paid').select('netSalary').get(),
+        paymentsQuery.select('amount', 'service', 'paymentDate').get(),
+        expensesQuery.select('amount', 'status', 'paymentStatus', 'paidAt').get(),
+        payrollQuery.where('status', '==', 'paid').select('netSalary', 'paidAt').get(),
       ])
       const amountOf = (data: Record<string, unknown>, field = 'amount') => typeof data[field] === 'number' && Number.isFinite(data[field]) ? data[field] as number : 0
       const activeInvoices = invoiceTotals.docs.filter((document) => document.data().status !== 'cancelled')
@@ -1265,6 +1270,15 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
       const onboardingPayments = paymentTotals.docs.filter((document) => document.data().service === 'ota_onboarding')
       const approvedExpenses = expenseTotals.docs.filter((document) => document.data().status === 'approved')
       const paidExpenseDocs = expenseTotals.docs.filter((document) => document.data().paymentStatus === 'paid')
+      const previousPaymentDocs = paymentTotals.docs.filter((document) => typeof document.data().paymentDate === 'string' && document.data().paymentDate < currentMonthStart)
+      const previousPaidExpenseDocs = paidExpenseDocs.filter((document) => {
+        const paidDate = mapTimestamp(document.data().paidAt)?.slice(0, 10)
+        return !!paidDate && paidDate < currentMonthStart
+      })
+      const previousPaidPayrollDocs = payrollTotals.docs.filter((document) => {
+        const paidDate = mapTimestamp(document.data().paidAt)?.slice(0, 10)
+        return !!paidDate && paidDate < currentMonthStart
+      })
       return {
         totalInvoiced: sumCurrency(activeInvoices.map((document) => amountOf(document.data()))),
         incomeReceived: sumCurrency(paymentTotals.docs.map((document) => amountOf(document.data()))),
@@ -1273,6 +1287,11 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
         approvedExpenseTotal: sumCurrency(approvedExpenses.map((document) => amountOf(document.data()))),
         paidExpenses: sumCurrency(paidExpenseDocs.map((document) => amountOf(document.data()))),
         paidPayroll: sumCurrency(payrollTotals.docs.map((document) => amountOf(document.data(), 'netSalary'))),
+        previousMonthClosingBalance: sumCurrency([
+          sumCurrency(previousPaymentDocs.map((document) => amountOf(document.data()))),
+          -sumCurrency(previousPaidExpenseDocs.map((document) => amountOf(document.data()))),
+          -sumCurrency(previousPaidPayrollDocs.map((document) => amountOf(document.data(), 'netSalary'))),
+        ]),
       }
     }
   })()
@@ -1281,7 +1300,7 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
     includeTables ? paymentsQuery.orderBy('paymentDate', 'desc').limit(tableLimit + 1).get() : Promise.resolve({ docs: [] }),
     totalsPromise,
   ])
-  const { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll } = totals
+  const { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll, previousMonthClosingBalance } = totals
   const activeInvoiceDocuments = invoiceSnapshot.docs.filter((document) => document.data().status !== 'cancelled')
   const invoicesTruncated = invoiceSnapshot.docs.length > tableLimit
   const paymentsTruncated = paymentSnapshot.docs.length > tableLimit
@@ -1296,6 +1315,7 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
     paidExpenses,
     paidPayroll,
     unpaidExpenses,
+    previousMonthClosingBalance,
     netCashBalance: sumCurrency([incomeReceived, -paidExpenses, -paidPayroll]),
     revenueIncome,
     onboardingIncome,

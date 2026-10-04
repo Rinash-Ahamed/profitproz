@@ -12,7 +12,7 @@ import { useAppDialog } from '@/components/ui/AppDialogProvider'
 import { useFinancePage } from '@/components/finance/useFinancePage'
 import { currentPayrollMonth, parsePayrollMonth } from '@/lib/payroll'
 
-const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, paidPayroll: 0, unpaidExpenses: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0, invoicesTruncated: false, paymentsTruncated: false }
+const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, paidPayroll: 0, unpaidExpenses: 0, previousMonthClosingBalance: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0, invoicesTruncated: false, paymentsTruncated: false }
 const money = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 
 export function FinancePanel() {
@@ -35,6 +35,10 @@ export function FinancePanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
+  const currentMonth = parsePayrollMonth(currentPayrollMonth())
+  const previousMonthEndLabel = currentMonth
+    ? new Date(Date.UTC(currentMonth.year, currentMonth.month - 1, 0)).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
+    : 'last month end'
 
   const [refresh, setRefresh] = useState(0)
   const [filteredPaymentTotal, setFilteredPaymentTotal] = useState<number | null>(null)
@@ -200,11 +204,12 @@ export function FinancePanel() {
       <div><p className="font-semibold text-ink">Financial data export</p><p className="mt-1 text-sm text-sub">Download client terms, invoices, income, expenses, salary settings, and payroll in one CSV.</p></div>
       <button type="button" onClick={() => void exportAllFinancials()} disabled={exportingAll} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"><FileDown className="h-4 w-4" /> {exportingAll ? 'Exporting…' : 'Export all financials'}</button>
     </div>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
       <FinanceMetric label="Income received" value={money(finance.incomeReceived)} detail="Payments actually received" />
       <FinanceMetric label="Unpaid expenses" value={money(finance.unpaidExpenses)} detail="Approved expenses awaiting payment" />
       <FinanceMetric label="Expenses paid" value={money(finance.paidExpenses)} detail="Cash expenses and reimbursements" />
       <FinanceMetric label="Payroll paid" value={money(finance.paidPayroll)} detail="Payroll records marked Paid" />
+      <FinanceMetric label="Previous closing balance" value={money(finance.previousMonthClosingBalance)} detail={`Balance at ${previousMonthEndLabel}`} />
       <FinanceMetric label="Remaining balance" value={money(finance.netCashBalance)} detail="Income - paid expenses - paid payroll" primary />
     </div>
 
