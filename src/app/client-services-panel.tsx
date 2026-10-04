@@ -24,7 +24,11 @@ export function ClientServicesPanel({ properties, onboardings, loading, onProper
   return (
     <div className="space-y-5">
       {showServiceCounts ? <div className="grid gap-3 sm:grid-cols-2">
-        <ServiceCount label="Revenue Management Properties" count={properties.length} loading={loading} />
+        <RevenueServiceCount
+          activeCount={properties.filter((property) => property.status === 'active').length}
+          inactiveCount={properties.filter((property) => property.status === 'inactive').length}
+          loading={loading}
+        />
         <ServiceCount label="OTA Onboarding Properties" count={onboardings.length} loading={loading} />
       </div> : null}
       <div className="surface flex flex-wrap gap-2 rounded-lg p-2">
@@ -37,6 +41,22 @@ export function ClientServicesPanel({ properties, onboardings, loading, onProper
         : <OnboardingPanel onboardings={onboardings} loading={loading} onChange={onOnboardingsChange} readOnly={readOnly && !onboardingEditor} editorOnly={onboardingEditor} />}
     </div>
   )
+}
+
+function RevenueServiceCount({ activeCount, inactiveCount, loading }: { activeCount: number; inactiveCount: number; loading: boolean }) {
+  return <div className="surface rounded-lg border border-zinc-800 px-5 py-4">
+    <p className="text-xs font-medium uppercase tracking-wide text-ghost">Revenue Management Properties</p>
+    <div className="mt-3 grid grid-cols-2 divide-x divide-zinc-800">
+      <div className="pr-4">
+        <p className="text-xs font-medium text-sub">Active</p>
+        <p className="mt-1 text-2xl font-semibold text-[#66B159]">{loading ? '—' : activeCount.toLocaleString('en-IN')}</p>
+      </div>
+      <div className="pl-4">
+        <p className="text-xs font-medium text-sub">Inactive</p>
+        <p className="mt-1 text-2xl font-semibold text-ink">{loading ? '—' : inactiveCount.toLocaleString('en-IN')}</p>
+      </div>
+    </div>
+  </div>
 }
 
 function ServiceCount({ label, count, loading }: { label: string; count: number; loading: boolean }) {
