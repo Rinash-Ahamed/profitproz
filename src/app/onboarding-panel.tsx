@@ -2,7 +2,9 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CheckCircle2, ChevronDown, CreditCard, Download, Edit, FileText, Loader2, Plus, Save, Search, Trash2 } from 'lucide-react'
+import { CheckCircle2, ChevronDown, CreditCard, Download, Edit, FileText, Loader2, Plus, Save, Trash2, X } from 'lucide-react'
+import { PortalActionButton } from '@/components/ui/PortalActionButton'
+import { PortalSearchField } from '@/components/ui/PortalSearchField'
 import { getOtaPlatformLabel, OTA_PLATFORMS, type OnboardingPlatformProgress, type OnboardingRecord, type OtaPlatform } from '@/lib/onboarding'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
@@ -124,14 +126,11 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
           <p className="text-lg font-semibold text-ink">OTA Onboarding</p>
           <p className="mt-1 text-sm text-sub">{readOnly ? 'View each selected platform and its current onboarding progress.' : 'Track every selected platform from Pending to Live.'}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" />
-            <input value={search} onChange={(event) => setSearch(event.target.value)} className="h-11 w-64 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search property name" aria-label="Search OTA onboarding properties" />
-          </label>
-          {!readOnly ? <button type="button" onClick={() => setShowCreate(true)} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white hover:bg-[#73bd66]">
+        <div className="flex w-full flex-wrap items-end gap-3 sm:w-auto">
+          <PortalSearchField label="Search properties" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Property name" aria-label="Search OTA onboarding properties" />
+          {!readOnly ? <PortalActionButton type="button" onClick={() => setShowCreate(true)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white hover:bg-[#73bd66]">
             <Plus className="h-4 w-4" /> Add onboarding property
-          </button> : null}
+          </PortalActionButton> : null}
         </div>
       </div>
 
@@ -169,10 +168,10 @@ export function OnboardingPanel({ onboardings, loading, onChange, readOnly = fal
                     {!readOnly && !editorOnly && paymentStatus === 'pending' ? <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-xs font-medium text-amber-300">Payment pending</span> : null}
                     {!readOnly && !editorOnly && paymentStatus === 'complete' ? <span className="rounded-full border border-green-500/25 bg-green-500/10 px-3 py-1 text-xs font-medium text-green-300">Payment complete</span> : null}
                     {!readOnly ? <div className="mt-1 flex w-full flex-wrap items-center justify-start gap-2 sm:ml-1 sm:mt-0 sm:w-auto sm:justify-end sm:gap-1">
-                      {!editorOnly && liveCount === record.platforms.length && paymentStatus !== 'complete' ? <button type="button" onClick={() => setInvoiceRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`${paymentStatus === 'pending' ? 'Open' : 'Generate'} invoice for ${record.propertyName}`} title={paymentStatus === 'pending' ? 'Open invoice PDF' : 'Generate invoice'}><FileText className="h-4 w-4" /><span className="ml-2 text-xs font-medium sm:hidden">Invoice</span></button> : null}
-                      {!editorOnly && record.invoiceSequence && paymentStatus !== 'complete' ? <button type="button" disabled={completingPaymentId === record.id} onClick={() => openPaymentRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50 sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`Record payment for ${record.propertyName}`} title="Record payment">{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}<span className="ml-2 text-xs font-medium sm:hidden">Pay</span></button> : null}
-                      {!editorOnly ? <button type="button" onClick={() => setEditing(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-ink sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`Edit onboarding details for ${record.propertyName}`} title="Edit onboarding"><Edit className="h-4 w-4" /><span className="ml-2 text-xs font-medium sm:hidden">Edit</span></button> : null}
-                      {!editorOnly ? <button type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50 sm:h-9 sm:w-9 sm:min-w-0 sm:px-0" aria-label={`Delete onboarding for ${record.propertyName}`} title="Delete onboarding">{deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}<span className="ml-2 text-xs font-medium sm:hidden">Delete</span></button> : null}
+                      {!editorOnly && liveCount === record.platforms.length && paymentStatus !== 'complete' ? <PortalActionButton type="button" onClick={() => setInvoiceRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] sm:h-9" aria-label={`${paymentStatus === 'pending' ? 'Open' : 'Generate'} invoice for ${record.propertyName}`} title={paymentStatus === 'pending' ? 'Open invoice PDF' : 'Generate invoice'}><FileText className="h-4 w-4" /><span className="text-xs font-medium">Invoice</span></PortalActionButton> : null}
+                      {!editorOnly && record.invoiceSequence && paymentStatus !== 'complete' ? <PortalActionButton type="button" disabled={completingPaymentId === record.id} onClick={() => openPaymentRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-[#66B159] disabled:opacity-50 sm:h-9" aria-label={`Record payment for ${record.propertyName}`} title="Record payment">{completingPaymentId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}<span className="text-xs font-medium">Pay</span></PortalActionButton> : null}
+                      {!editorOnly ? <PortalActionButton type="button" onClick={() => setEditing(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-zinc-800 hover:text-ink sm:h-9" aria-label={`Edit onboarding details for ${record.propertyName}`} title="Edit onboarding"><Edit className="h-4 w-4" /><span className="text-xs font-medium">Edit</span></PortalActionButton> : null}
+                      {!editorOnly ? <PortalActionButton type="button" disabled={deletingId === record.id} onClick={() => deleteRecord(record)} className="flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sub transition-colors hover:bg-red-500/20 hover:text-red-400 disabled:opacity-50 sm:h-9" aria-label={`Delete onboarding for ${record.propertyName}`} title="Delete onboarding">{deletingId === record.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}<span className="text-xs font-medium">Delete</span></PortalActionButton> : null}
                     </div> : null}
                   </div>
                 </div>
@@ -443,11 +442,11 @@ function InvoiceModal({ record, onGenerated, onClose }: { record: OnboardingReco
               <span className="label-upper mb-2 block text-ghost">Due date</span>
               <div className="flex h-11 items-center rounded-lg border border-zinc-700 bg-zinc-950 px-3 text-sm text-sub">{formatDateOnlyDisplay(dueDate)}</div>
             </div>
-            <button type="button" onClick={downloadPdf} disabled={loading || downloading || issuing || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink disabled:cursor-not-allowed disabled:opacity-60">
+            <PortalActionButton type="button" onClick={downloadPdf} disabled={loading || downloading || issuing || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink disabled:cursor-not-allowed disabled:opacity-60">
               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} {downloading ? 'Preparing…' : issuedInvoice ? 'Download PDF' : 'Download preview'}
-            </button>
-            {!issuedInvoice ? <button type="button" onClick={() => void issueInvoice()} disabled={loading || downloading || issuing || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} {replacingCancelledInvoice ? 'Issue replacement' : 'Issue invoice'}</button> : null}
-            <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Close</button>
+            </PortalActionButton>
+            {!issuedInvoice ? <PortalActionButton type="button" onClick={() => void issueInvoice()} disabled={loading || downloading || issuing || Boolean(error)} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">{issuing ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} {replacingCancelledInvoice ? 'Issue replacement' : 'Issue invoice'}</PortalActionButton> : null}
+            <PortalActionButton type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /> Close</PortalActionButton>
           </div>
         </div>
         <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
@@ -514,9 +513,9 @@ function PlatformProgressCard({ onboardingId, progress, onSaved, readOnly = fals
         <textarea rows={3} maxLength={1000} value={notes} onChange={(event) => setNotes(event.target.value)} className="w-full resize-y rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Account setup, verification, pending documents…" />
       </label>
       <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
-      <button type="button" onClick={saveProgress} disabled={!dirty || saving} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-[#66B159] px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
+      <PortalActionButton type="button" onClick={saveProgress} disabled={!dirty || saving} className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-[#66B159] px-3 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">
         {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save progress
-      </button>
+      </PortalActionButton>
       </>}
     </div>
   )
@@ -622,11 +621,11 @@ function OnboardingDetailsModal({ initial, onCorrectPayment, onClose, onSaved }:
 
           <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
           <div className="mt-7 flex justify-end gap-3">
-            {onCorrectPayment ? <button type="button" onClick={onCorrectPayment} className="mr-auto inline-flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Correct payment</button> : null}
-            <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
-            <button type="submit" disabled={saving || selectedPlatforms.length === 0} className="flex h-11 min-w-32 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {initial ? 'Save changes' : 'Add property'}
-            </button>
+            {onCorrectPayment ? <PortalActionButton type="button" onClick={onCorrectPayment} className="mr-auto inline-flex h-11 items-center gap-2 rounded-lg border border-[#66B159]/40 bg-[#66B159]/10 px-4 text-sm font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Correct payment</PortalActionButton> : null}
+            <PortalActionButton type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /> Cancel</PortalActionButton>
+            <PortalActionButton type="submit" disabled={saving || selectedPlatforms.length === 0} className="flex h-11 min-w-32 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60">
+              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" aria-hidden="true" />} {initial ? 'Save changes' : 'Add property'}
+            </PortalActionButton>
           </div>
         </form>
       </div>

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Eye, EyeOff, KeyRound, Loader2, Plus, Trash2, X } from 'lucide-react'
+import { Eye, EyeOff, KeyRound, Loader2, Plus, Trash2, X, Save } from 'lucide-react'
+import { PortalActionButton } from '@/components/ui/PortalActionButton'
 import type { ClientPlatformCredential } from '@/lib/client-credentials'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
 import type { PropertyRecord } from '@/lib/firestore'
@@ -99,7 +100,7 @@ export function PropertyCredentialsModal({ property, onClose }: { property: Prop
                 <section key={credential.id} className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-4">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <p className="text-sm font-semibold text-ink">Platform {index + 1}</p>
-                    <button type="button" onClick={() => removeCredential(credential.id)} className="flex h-8 w-8 items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400" aria-label={`Remove ${credential.platform || `platform ${index + 1}`}`} title="Remove credential"><Trash2 className="h-4 w-4" /></button>
+                    <PortalActionButton type="button" onClick={() => removeCredential(credential.id)} className="h-9 rounded-md px-3 text-xs font-medium text-sub hover:bg-red-500/20 hover:text-red-400" aria-label={`Remove ${credential.platform || `platform ${index + 1}`}`} title="Remove credential"><Trash2 className="h-4 w-4" /> Remove</PortalActionButton>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label>
@@ -126,10 +127,10 @@ export function PropertyCredentialsModal({ property, onClose }: { property: Prop
 
           <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
-            <button type="button" onClick={addCredential} disabled={loading || credentials.length >= OTA_PLATFORMS.length} className="inline-flex h-10 items-center gap-2 rounded-md border border-zinc-700 px-3 text-sm font-semibold text-sub hover:border-zinc-600 hover:text-ink disabled:opacity-50"><Plus className="h-4 w-4" /> Add platform</button>
+            <PortalActionButton type="button" onClick={addCredential} disabled={loading || credentials.length >= OTA_PLATFORMS.length} className="inline-flex h-10 items-center gap-2 rounded-md border border-zinc-700 px-3 text-sm font-semibold text-sub hover:border-zinc-600 hover:text-ink disabled:opacity-50"><Plus className="h-4 w-4" /> Add platform</PortalActionButton>
             <div className="flex gap-3">
-              <button type="button" onClick={onClose} className="h-10 rounded-md border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
-              <button type="button" onClick={save} disabled={loading || saving} className="inline-flex h-10 min-w-28 items-center justify-center gap-2 rounded-md bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save credentials'}</button>
+              <PortalActionButton type="button" onClick={onClose} className="h-10 rounded-md border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /> Cancel</PortalActionButton>
+              <PortalActionButton type="button" onClick={save} disabled={loading || saving} className="inline-flex h-10 min-w-28 items-center justify-center gap-2 rounded-md bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" aria-hidden="true" />} Save credentials</PortalActionButton>
             </div>
           </div>
         </div>

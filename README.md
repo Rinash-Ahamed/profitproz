@@ -59,8 +59,10 @@ Keep existing `{{placeholder}}` names when changing template styling. Payment va
 
 - Generating an OTA or Revenue Management invoice creates an immutable financial snapshot with its invoice number, service, client, dates, and amount.
 - Admins record the full received payment against its invoice; partial payments are not enabled.
-- Approved staff expenses affect cash only after an Admin marks the reimbursement as paid. Admin expenses are treated as paid when recorded.
-- The Finance screen shows received total income by service, unpaid approved expenses, paid expenses, and `received income - paid expenses`.
+- Approved staff and Admin expenses affect cash only after an Admin marks them Paid.
+- The Finance screen shows received total income by service, unpaid approved expenses, paid expenses, and `received income - paid expenses`. Previous closing balance uses the same cash calculation through the previous month-end in India time.
+- Payroll is calculation-only: there is no confirmation, approval, or payment-status workflow. Attendance, CL, LOP, salary history, and amount-payable calculations remain in Payroll, with a separate payroll CSV export.
+- Finance does not read payroll or salary records. Record the total payroll paid manually as an Admin Expense (Other, with a description such as `Payroll - October 2026`) and mark the expense Paid when payment is made. It is then deducted once through the normal expense workflow. Existing payroll records, including legacy Paid records, do not reduce Finance balances; any historical payroll payments must also be represented by Admin Expenses.
 - `finance_invoices` stores invoice snapshots and `finance_payments` stores the payment ledger. Payment records should not be edited or deleted manually.
 
 ## Tasks and work-time workflow
@@ -85,6 +87,12 @@ Vercel is configured for the Mumbai region (`bom1`). Add every value from `.env.
 SMTP messages use connection, greeting, and socket timeouts, are serialized per server instance, retried once, and awaited before the API request completes. For high-volume delivery, replace this local delivery queue with a durable external job queue.
 
 ## Operational notes
+
+- The Admin header bell shows notifications for new employee leave submissions. Alerts and leave requests are committed atomically. The closed bell polls only an unread-count aggregation every 30 seconds while visible and on window focus; notification documents are fetched only when the dropdown is open or explicitly refreshed. Hidden tabs do not poll, and overlapping requests are skipped. Opening the bell marks existing alerts read; Clear past hides alerts through the latest loaded notification for the current Admin only, preserving newer alerts and all leave requests. Older notifications are paginated. `admin_notifications` stores alerts and `admin_notification_state` stores per-Admin read/clear positions, accessed only through Admin-authenticated APIs.
+- Run `node scripts/test-admin-notifications.mjs` to verify atomic creation, unread counts, pagination, concurrent clear behavior, and API authorization without accessing Firestore.
+- Run `node scripts/test-notification-polling.mjs` to verify count-only polling, hidden-tab pause, lazy list loading, and request-race handling.
+
+- Use `npm run version:patch` for a routine release, or `npm run version:minor` / `npm run version:major` for a requested release type. These commands update the package and lockfile versions together without creating a Git commit or tag. The project agent rule in `AGENTS.md` applies one patch bump per completed code-change task; checks and builds do not increment the version.
 
 - Generated PDFs use adaptive 3x rendering on lower-memory/mobile devices and 4x on capable desktops.
 - Employee and salary creation/update are committed atomically.

@@ -5,8 +5,8 @@ import { roundCurrency, sumCurrency } from '@/lib/finance'
 
 const HEADERS = [
   'Record Type', 'Date / Period', 'Reference', 'Client / Employee', 'Property', 'Category / Service', 'Status',
-  'Invoice Amount', 'Income Received', 'Expense Amount', 'Gross Payroll', 'Payroll Deduction', 'Net Payroll',
-  'Outstanding Balance', 'Commission Percent', 'Monthly Salary', 'Annual CTC', 'Payment Status', 'Payment Method',
+  'Invoice Amount', 'Income Received', 'Expense Amount',
+  'Outstanding Balance', 'Commission Percent', 'Payment Status', 'Payment Method',
   'Payment Reference', 'Due Date', 'Billing Period', 'City', 'GST Number', 'Room Count', 'Email', 'Notes',
   'Document Link', 'Record ID',
 ] as const
@@ -33,17 +33,15 @@ export async function GET() {
     const activeInvoices = data.invoices.filter((invoice) => invoice.status !== 'cancelled')
     const approvedExpenses = data.expenses.filter((expense) => expense.status === 'approved')
     const paidExpenses = data.expenses.filter((expense) => expense.paymentStatus === 'paid')
-    const paidPayroll = data.payroll.filter((record) => record.status === 'paid')
     const summary: CsvRow[] = [
       { 'Record Type': 'Summary', 'Category / Service': 'Total invoiced', 'Invoice Amount': sumCurrency(activeInvoices.map((record) => record.amount)) },
       { 'Record Type': 'Summary', 'Category / Service': 'Income received', 'Income Received': sumCurrency(data.payments.map((record) => record.amount)) },
       { 'Record Type': 'Summary', 'Category / Service': 'Approved expenses', 'Expense Amount': sumCurrency(approvedExpenses.map((record) => record.amount)) },
       { 'Record Type': 'Summary', 'Category / Service': 'Paid expenses', 'Expense Amount': sumCurrency(paidExpenses.map((record) => record.amount)) },
-      { 'Record Type': 'Summary', 'Category / Service': 'Paid payroll', 'Net Payroll': sumCurrency(paidPayroll.map((record) => record.netSalary)) },
       {
         'Record Type': 'Summary',
         'Category / Service': 'Net cash balance',
-        'Income Received': roundCurrency(sumCurrency(data.payments.map((record) => record.amount)) - sumCurrency(paidExpenses.map((record) => record.amount)) - sumCurrency(paidPayroll.map((record) => record.netSalary))),
+        'Income Received': roundCurrency(sumCurrency(data.payments.map((record) => record.amount)) - sumCurrency(paidExpenses.map((record) => record.amount))),
       },
     ]
     const rows: CsvRow[] = [
@@ -75,19 +73,6 @@ export async function GET() {
         Status: expense.status, 'Expense Amount': expense.amount, 'Payment Status': expense.paymentStatus,
         City: expense.city, Email: expense.staffEmail, Notes: expense.description || expense.notes,
         'Document Link': expense.receiptUrl || '', 'Record ID': expense.id,
-      })),
-      ...data.salaries.map((salary): CsvRow => ({
-        'Record Type': 'Salary Setting', 'Date / Period': salary.updatedAt || '', 'Client / Employee': salary.staffEmail,
-        'Category / Service': 'Employee salary', 'Monthly Salary': salary.baseSalary, 'Annual CTC': roundCurrency(salary.baseSalary * 12),
-        Email: salary.staffEmail, Notes: salary.notes, 'Record ID': salary.id,
-      })),
-      ...data.payroll.map((payroll): CsvRow => ({
-        'Record Type': 'Payroll', 'Date / Period': payroll.month, Reference: payroll.employeeId,
-        'Client / Employee': payroll.employeeName, 'Category / Service': payroll.department || payroll.designation,
-        Status: payroll.status, 'Gross Payroll': payroll.grossSalary, 'Payroll Deduction': payroll.lopDeduction,
-        'Net Payroll': payroll.netSalary, 'Monthly Salary': payroll.monthlySalary, 'Annual CTC': payroll.annualCtc,
-        'Payment Status': payroll.status === 'paid' ? 'paid' : 'unpaid', Email: payroll.staffEmail,
-        Notes: `Payable days: ${payroll.payableDays}; LOP days: ${payroll.lopDays}`, 'Record ID': payroll.id,
       })),
     ]
 

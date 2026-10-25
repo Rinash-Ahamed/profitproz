@@ -52,6 +52,27 @@ body {
   text-transform: uppercase;
 }
 
+/* Shared geometry for labeled actions throughout the employee/admin portal. */
+.portal-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  min-height: 2.25rem;
+  white-space: nowrap;
+}
+.portal-action > svg {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+}
+.portal-action:focus-visible {
+  outline: 2px solid #66B159;
+  outline-offset: 2px;
+}
+.portal-action:disabled { cursor: not-allowed; }
+
 /* ─── Surface system ─────────────────────────────────── */
 /* Rule: surfaces are opaque. No backdrop-filter unless critical. */
 .surface {

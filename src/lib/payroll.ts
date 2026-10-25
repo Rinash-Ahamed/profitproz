@@ -340,10 +340,3 @@ export function calculatePayrollPeriodAmounts(record: PayrollRecord): PayrollPer
     netSalary: roundMoney(dailySalary * paidSalaryDays),
   }
 }
-
-export function nextPayrollStatus(status: PayrollStatus): PayrollStatus | null {
-  if (status === 'draft') return 'calculated'
-  if (status === 'calculated') return 'approved'
-  if (status === 'approved') return 'paid'
-  return null
-}

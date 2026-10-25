@@ -6,8 +6,9 @@ import type { OnboardingDetailsInput, OnboardingRecord, OnboardingPlatformProgre
 import type { PaginationRequest } from './pagination'
 import { countNonSundayDaysInclusive, parseDateOnly, todayInTimeZone } from './date-only'
 import type { HalfDayPeriod, HistoricalLeaveType, LeaveDurationType, LeavePayrollTreatment } from './leave'
-import { calculatePayroll, currentPayrollMonth, nextPayrollStatus, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthEndDate, type MissingAttendanceDecision, type PayrollRecord, type PayrollStatus } from './payroll'
+import { calculatePayroll, currentPayrollMonth, parsePayrollMonth, PAYROLL_START_MONTH, payrollMonthEndDate, type MissingAttendanceDecision, type PayrollRecord, type PayrollStatus } from './payroll'
 import { roundCurrency, sumCurrency, type FinanceInvoiceRecord, type FinanceOverview, type FinancePaymentRecord, type FinanceService, type PaymentMethod } from './finance'
+import type { AdminNotificationPage } from './admin-notifications'
 
 export type StaffRecord = {
   id: string
@@ -153,6 +154,8 @@ const COLLECTIONS = {
   WORK_SESSIONS: 'work_sessions',
   LEGACY_TIMESHEETS: 'timesheets',
   LEAVE_REQUESTS: 'leave_requests',
+  ADMIN_NOTIFICATIONS: 'admin_notifications',
+  ADMIN_NOTIFICATION_STATE: 'admin_notification_state',
   SALARIES: 'salaries',
   PAYROLL: 'payroll',
   AUDIT_LOG: 'audit_log',
@@ -1231,8 +1234,7 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
   const invoicesQuery = db.collection(COLLECTIONS.FINANCE_INVOICES)
   const paymentsQuery = db.collection(COLLECTIONS.FINANCE_PAYMENTS)
   const expensesQuery = db.collection(COLLECTIONS.EXPENSES)
-  const payrollQuery = db.collection(COLLECTIONS.PAYROLL)
-  const currentMonthStart = `${currentPayrollMonth()}-01`
+  const currentMonthStart = `${todayInTimeZone('Asia/Kolkata').slice(0, 7)}-01`
   const currentMonthStartTimestamp = Timestamp.fromDate(new Date(`${currentMonthStart}T00:00:00+05:30`))
   const aggregateSum = async (query: Query, field: string) => {
     const result = await query.aggregate({ total: AggregateField.sum(field) }).get()
@@ -1240,29 +1242,26 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
   }
   const totalsPromise = (async () => {
     try {
-      const [totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll, previousIncomeReceived, previousPaidExpenses, previousPaidPayroll] = await Promise.all([
+      const [totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, previousIncomeReceived, previousPaidExpenses] = await Promise.all([
         aggregateSum(invoicesQuery.where('status', 'in', ['pending', 'paid']), 'amount'),
         aggregateSum(paymentsQuery, 'amount'),
         aggregateSum(paymentsQuery.where('service', '==', 'revenue_management'), 'amount'),
         aggregateSum(paymentsQuery.where('service', '==', 'ota_onboarding'), 'amount'),
         aggregateSum(expensesQuery.where('status', '==', 'approved'), 'amount'),
         aggregateSum(expensesQuery.where('paymentStatus', '==', 'paid'), 'amount'),
-        aggregateSum(payrollQuery.where('status', '==', 'paid'), 'netSalary'),
         aggregateSum(paymentsQuery.where('paymentDate', '<', currentMonthStart), 'amount'),
         aggregateSum(expensesQuery.where('paidAt', '<', currentMonthStartTimestamp), 'amount'),
-        aggregateSum(payrollQuery.where('paidAt', '<', currentMonthStartTimestamp), 'netSalary'),
       ])
-      return { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll, previousMonthClosingBalance: sumCurrency([previousIncomeReceived, -previousPaidExpenses, -previousPaidPayroll]) }
+      return { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, previousMonthClosingBalance: sumCurrency([previousIncomeReceived, -previousPaidExpenses]) }
     } catch (error) {
       if (!isMissingIndexError(error)) throw error
 
       // Keep Finance available while newly declared aggregate indexes build.
       // Each collection is read once, selecting only fields needed for totals.
-      const [invoiceTotals, paymentTotals, expenseTotals, payrollTotals] = await Promise.all([
+      const [invoiceTotals, paymentTotals, expenseTotals] = await Promise.all([
         invoicesQuery.select('amount', 'status').get(),
         paymentsQuery.select('amount', 'service', 'paymentDate').get(),
         expensesQuery.select('amount', 'status', 'paymentStatus', 'paidAt').get(),
-        payrollQuery.where('status', '==', 'paid').select('netSalary', 'paidAt').get(),
       ])
       const amountOf = (data: Record<string, unknown>, field = 'amount') => typeof data[field] === 'number' && Number.isFinite(data[field]) ? data[field] as number : 0
       const activeInvoices = invoiceTotals.docs.filter((document) => document.data().status !== 'cancelled')
@@ -1272,12 +1271,8 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
       const paidExpenseDocs = expenseTotals.docs.filter((document) => document.data().paymentStatus === 'paid')
       const previousPaymentDocs = paymentTotals.docs.filter((document) => typeof document.data().paymentDate === 'string' && document.data().paymentDate < currentMonthStart)
       const previousPaidExpenseDocs = paidExpenseDocs.filter((document) => {
-        const paidDate = mapTimestamp(document.data().paidAt)?.slice(0, 10)
-        return !!paidDate && paidDate < currentMonthStart
-      })
-      const previousPaidPayrollDocs = payrollTotals.docs.filter((document) => {
-        const paidDate = mapTimestamp(document.data().paidAt)?.slice(0, 10)
-        return !!paidDate && paidDate < currentMonthStart
+        const paidAt = mapTimestamp(document.data().paidAt)
+        return !!paidAt && new Date(paidAt).getTime() < currentMonthStartTimestamp.toMillis()
       })
       return {
         totalInvoiced: sumCurrency(activeInvoices.map((document) => amountOf(document.data()))),
@@ -1286,11 +1281,9 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
         onboardingIncome: sumCurrency(onboardingPayments.map((document) => amountOf(document.data()))),
         approvedExpenseTotal: sumCurrency(approvedExpenses.map((document) => amountOf(document.data()))),
         paidExpenses: sumCurrency(paidExpenseDocs.map((document) => amountOf(document.data()))),
-        paidPayroll: sumCurrency(payrollTotals.docs.map((document) => amountOf(document.data(), 'netSalary'))),
         previousMonthClosingBalance: sumCurrency([
           sumCurrency(previousPaymentDocs.map((document) => amountOf(document.data()))),
           -sumCurrency(previousPaidExpenseDocs.map((document) => amountOf(document.data()))),
-          -sumCurrency(previousPaidPayrollDocs.map((document) => amountOf(document.data(), 'netSalary'))),
         ]),
       }
     }
@@ -1300,7 +1293,7 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
     includeTables ? paymentsQuery.orderBy('paymentDate', 'desc').limit(tableLimit + 1).get() : Promise.resolve({ docs: [] }),
     totalsPromise,
   ])
-  const { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, paidPayroll, previousMonthClosingBalance } = totals
+  const { totalInvoiced, incomeReceived, revenueIncome, onboardingIncome, approvedExpenseTotal, paidExpenses, previousMonthClosingBalance } = totals
   const activeInvoiceDocuments = invoiceSnapshot.docs.filter((document) => document.data().status !== 'cancelled')
   const invoicesTruncated = invoiceSnapshot.docs.length > tableLimit
   const paymentsTruncated = paymentSnapshot.docs.length > tableLimit
@@ -1313,10 +1306,9 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
     totalInvoiced,
     incomeReceived,
     paidExpenses,
-    paidPayroll,
     unpaidExpenses,
     previousMonthClosingBalance,
-    netCashBalance: sumCurrency([incomeReceived, -paidExpenses, -paidPayroll]),
+    netCashBalance: sumCurrency([incomeReceived, -paidExpenses]),
     revenueIncome,
     onboardingIncome,
     invoicesTruncated,
@@ -1326,13 +1318,11 @@ export async function getFinanceOverview(includeTables = true): Promise<FinanceO
 
 export async function getFinancialExportData() {
   const db = ensureDb()
-  const [properties, invoices, payments, expenses, salaries, payroll] = await Promise.all([
+  const [properties, invoices, payments, expenses] = await Promise.all([
     db.collection(COLLECTIONS.PROPERTIES).get(),
     db.collection(COLLECTIONS.FINANCE_INVOICES).get(),
     db.collection(COLLECTIONS.FINANCE_PAYMENTS).get(),
     db.collection(COLLECTIONS.EXPENSES).get(),
-    db.collection(COLLECTIONS.SALARIES).get(),
-    db.collection(COLLECTIONS.PAYROLL).get(),
   ])
 
   return {
@@ -1340,8 +1330,6 @@ export async function getFinancialExportData() {
     invoices: invoices.docs.map(mapDocToFinanceInvoice),
     payments: payments.docs.map(mapDocToFinancePayment),
     expenses: expenses.docs.map(mapDocToExpense),
-    salaries: salaries.docs.map(mapDocToSalary),
-    payroll: payroll.docs.map(mapDocToPayroll),
   }
 }
 
@@ -2354,7 +2342,6 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
     await db.runTransaction(async (transaction) => {
       const existing = await transaction.get(docRef)
       const existingPayroll = existing.exists ? mapDocToPayroll(existing) : null
-      if (existingPayroll && existingPayroll.status !== 'draft') return
       if (existingPayroll?.sourceFingerprint === sourceFingerprint) return
       const snapshotData = {
         month,
@@ -2391,7 +2378,7 @@ export async function generatePayrollRecords(month: string, actorEmail: string):
         actorEmail: normalizedActor,
         action: existing.exists ? 'PAYROLL_REFRESH' : 'PAYROLL_GENERATE',
         targetId: docRef.id,
-        details: `${existing.exists ? 'Refreshed Draft' : 'Generated'} ${month} payroll snapshot for ${employee.name} (${employee.employeeId || employee.email}) through ${calculationThroughDate}.`,
+        details: `${existing.exists ? 'Refreshed' : 'Generated'} ${month} payroll snapshot for ${employee.name} (${employee.employeeId || employee.email}) through ${calculationThroughDate}.`,
       })
     })
   }))
@@ -2431,7 +2418,6 @@ export async function decideMissingAttendance(id: string, date: string, decision
     const snapshot = await transaction.get(docRef)
     if (!snapshot.exists) throw new Error('PAYROLL_NOT_FOUND')
     const payroll = mapDocToPayroll(snapshot)
-    if (payroll.status !== 'draft') throw new Error('PAYROLL_DECISION_LOCKED')
     if (!payroll.missingAttendanceDates.includes(date)) throw new Error('MISSING_ATTENDANCE_DATE_NOT_FOUND')
 
     const previousDecision = payroll.missingAttendanceDecisions[date]
@@ -2462,7 +2448,6 @@ export async function revertMissingAttendanceDecision(id: string, date: string, 
     const snapshot = await transaction.get(docRef)
     if (!snapshot.exists) throw new Error('PAYROLL_NOT_FOUND')
     const payroll = mapDocToPayroll(snapshot)
-    if (payroll.status !== 'draft') throw new Error('PAYROLL_DECISION_LOCKED')
     if (!payroll.missingAttendanceDates.includes(date)) throw new Error('MISSING_ATTENDANCE_DATE_NOT_FOUND')
     const previousDecision = payroll.missingAttendanceDecisions[date]
     if (!previousDecision) throw new Error('MISSING_ATTENDANCE_NOT_DECIDED')
@@ -2477,54 +2462,6 @@ export async function revertMissingAttendanceDecision(id: string, date: string, 
       targetId: id,
       details: `${date} missing-attendance decision for ${payroll.employeeName} reverted to pending.`,
       changes: { [`missingAttendanceDecisions.${date}`]: { from: previousDecision, to: null } },
-    })
-  })
-
-  requestAuditLogPrune()
-  return mapDocToPayroll(await docRef.get())
-}
-
-export async function transitionPayrollStatus(id: string, requestedStatus: PayrollStatus, actorEmail: string): Promise<PayrollRecord> {
-  const db = ensureDb()
-  const docRef = db.collection(COLLECTIONS.PAYROLL).doc(id)
-  const auditRef = db.collection(COLLECTIONS.AUDIT_LOG).doc()
-  const normalizedActor = actorEmail.trim().toLowerCase()
-
-  await db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(docRef)
-    if (!snapshot.exists) throw new Error('PAYROLL_NOT_FOUND')
-    const payroll = mapDocToPayroll(snapshot)
-    const expectedStatus = nextPayrollStatus(payroll.status)
-    if (requestedStatus !== expectedStatus) throw new Error('INVALID_PAYROLL_TRANSITION')
-    if ((requestedStatus === 'approved' || requestedStatus === 'paid') && payroll.completedThroughDate < payrollMonthEndDate(payroll.month)) {
-      throw new Error('PAYROLL_MONTH_INCOMPLETE')
-    }
-    if (payroll.status === 'draft' && payroll.missingAttendanceDates.some((date) => !payroll.missingAttendanceDecisions[date])) {
-      throw new Error('PENDING_MISSING_ATTENDANCE_DECISIONS')
-    }
-    const now = new Date().toISOString()
-    const updates: Record<string, unknown> = {
-      status: requestedStatus,
-      statusHistory: [...payroll.statusHistory, { from: payroll.status, to: requestedStatus, actorEmail: normalizedActor, at: now }],
-      updatedAt: FieldValue.serverTimestamp(),
-    }
-    if (requestedStatus === 'calculated') updates.calculatedAt = FieldValue.serverTimestamp()
-    if (requestedStatus === 'approved') {
-      updates.approvedAt = FieldValue.serverTimestamp()
-      updates.approvedBy = normalizedActor
-    }
-    if (requestedStatus === 'paid') {
-      updates.paidAt = FieldValue.serverTimestamp()
-      updates.paidBy = normalizedActor
-    }
-    transaction.update(docRef, updates)
-    transaction.set(auditRef, {
-      timestamp: FieldValue.serverTimestamp(),
-      actorEmail: normalizedActor,
-      action: `PAYROLL_${requestedStatus.toUpperCase()}`,
-      targetId: id,
-      details: `${payroll.month} payroll for ${payroll.employeeName} moved from ${payroll.status} to ${requestedStatus}.`,
-      changes: { status: { from: payroll.status, to: requestedStatus } },
     })
   })
 
@@ -2725,7 +2662,8 @@ export async function createLeaveRequest(input: { staffEmail: string; startDate:
   const docRef = db.collection(COLLECTIONS.LEAVE_REQUESTS).doc()
   const staffEmail = input.staffEmail.trim().toLowerCase()
   const durationDays = input.durationType === 'half_day' ? 0.5 : countNonSundayDaysInclusive(input.startDate, input.endDate)
-  await docRef.set({
+  const batch = db.batch()
+  batch.set(docRef, {
     staffEmail,
     startDate: input.startDate,
     endDate: input.endDate,
@@ -2738,8 +2676,102 @@ export async function createLeaveRequest(input: { staffEmail: string; startDate:
     status: 'pending',
     createdAt: FieldValue.serverTimestamp(),
   })
-
+  // Leave and alert are committed together: neither can be saved on its own.
+  batch.set(db.collection(COLLECTIONS.ADMIN_NOTIFICATIONS).doc(docRef.id), {
+    type: 'leave_submitted', leaveId: docRef.id, staffEmail,
+    startDate: input.startDate, endDate: input.endDate, durationDays,
+    createdAt: FieldValue.serverTimestamp(),
+  })
+  await batch.commit()
   return mapDocToLeaveRequest(await docRef.get())
+}
+
+type NotificationPosition = { id: string; createdAt: Timestamp }
+
+function notificationPosition(value: unknown): NotificationPosition | null {
+  if (!value || typeof value !== 'object') return null
+  const position = value as Partial<NotificationPosition>
+  return typeof position.id === 'string' && position.createdAt instanceof Timestamp
+    ? { id: position.id, createdAt: position.createdAt } : null
+}
+
+function compareNotificationPositions(a: NotificationPosition, b: NotificationPosition) {
+  return a.createdAt.seconds - b.createdAt.seconds || a.createdAt.nanoseconds - b.createdAt.nanoseconds || (a.id > b.id ? 1 : a.id < b.id ? -1 : 0)
+}
+
+function newestNotificationPosition(a: NotificationPosition | null, b: NotificationPosition | null) {
+  if (!a) return b
+  if (!b) return a
+  return compareNotificationPositions(a, b) >= 0 ? a : b
+}
+
+function adminNotificationStateRef(adminEmail: string) {
+  const id = crypto.createHash('sha256').update(adminEmail.trim().toLowerCase()).digest('hex')
+  return ensureDb().collection(COLLECTIONS.ADMIN_NOTIFICATION_STATE).doc(id)
+}
+
+async function adminNotificationQueries(adminEmail: string) {
+  const db = ensureDb()
+  const state = (await adminNotificationStateRef(adminEmail).get()).data() || {}
+  const cleared = notificationPosition(state.clearedThrough)
+  const read = newestNotificationPosition(notificationPosition(state.readThrough), cleared)
+  const events = db.collection(COLLECTIONS.ADMIN_NOTIFICATIONS)
+  let visible: Query = events.orderBy('createdAt', 'desc').orderBy(FieldPath.documentId(), 'desc')
+  if (cleared) visible = visible.endBefore(cleared.createdAt, cleared.id)
+  let unread = visible
+  if (read) unread = unread.endBefore(read.createdAt, read.id)
+  return { events, visible, unread, read }
+}
+
+export async function getAdminNotificationUnreadCount(adminEmail: string): Promise<number> {
+  const { unread } = await adminNotificationQueries(adminEmail)
+  return (await unread.count().get()).data().count
+}
+
+export async function listAdminNotifications(adminEmail: string, cursor?: string): Promise<AdminNotificationPage> {
+  const { events, read, unread, visible: initialVisible } = await adminNotificationQueries(adminEmail)
+  let visible = initialVisible
+  if (cursor) {
+    const document = await events.doc(cursor).get()
+    const position = notificationPosition({ id: document.id, createdAt: document.data()?.createdAt })
+    if (!position) throw new Error('INVALID_NOTIFICATION_CURSOR')
+    visible = visible.startAfter(position.createdAt, position.id)
+  }
+  const [snapshot, unreadSnapshot] = await Promise.all([visible.limit(21).get(), unread.count().get()])
+  const documents = snapshot.docs.slice(0, 20)
+  return {
+    notifications: documents.map((document) => {
+      const data = document.data()
+      const position = notificationPosition({ id: document.id, createdAt: data.createdAt })!
+      return {
+        id: document.id, type: 'leave_submitted', leaveId: data.leaveId,
+        staffEmail: data.staffEmail, startDate: data.startDate, endDate: data.endDate,
+        durationDays: data.durationDays, createdAt: data.createdAt.toDate().toISOString(),
+        unread: !read || compareNotificationPositions(position, read) > 0,
+      }
+    }),
+    unreadCount: unreadSnapshot.data().count,
+    nextCursor: snapshot.size > 20 ? documents.at(-1)!.id : null,
+  }
+}
+
+export async function updateAdminNotifications(adminEmail: string, action: 'read' | 'clear', throughId: string) {
+  const db = ensureDb()
+  const stateRef = adminNotificationStateRef(adminEmail)
+  const eventRef = db.collection(COLLECTIONS.ADMIN_NOTIFICATIONS).doc(throughId)
+  await db.runTransaction(async (transaction) => {
+    const [event, state] = await Promise.all([transaction.get(eventRef), transaction.get(stateRef)])
+    const through = notificationPosition({ id: event.id, createdAt: event.data()?.createdAt })
+    if (!through) throw new Error('NOTIFICATION_NOT_FOUND')
+    const data = state.data() || {}
+    const cleared = newestNotificationPosition(notificationPosition(data.clearedThrough), action === 'clear' ? through : null)
+    const read = newestNotificationPosition(newestNotificationPosition(notificationPosition(data.readThrough), cleared), through)
+    transaction.set(stateRef, {
+      readThrough: read,
+      ...(cleared ? { clearedThrough: cleared } : {}),
+      updatedAt: FieldValue.serverTimestamp(),
+    }, { merge: true })
+  })
 }
 
 export async function deletePendingLeaveRequest(id: string, staffEmail: string) {

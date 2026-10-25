@@ -60,7 +60,6 @@ export type FinanceOverview = {
   totalInvoiced: number
   incomeReceived: number
   paidExpenses: number
-  paidPayroll: number
   unpaidExpenses: number
   previousMonthClosingBalance: number
   netCashBalance: number

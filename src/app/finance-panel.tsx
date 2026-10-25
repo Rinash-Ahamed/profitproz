@@ -1,18 +1,19 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Ban, CreditCard, FileDown, Loader2, RefreshCw, Search } from 'lucide-react'
+import { Ban, CreditCard, FileDown, Loader2, RefreshCw, FilterX, ChevronLeft, ArrowRight } from 'lucide-react'
+import { PortalActionButton } from '@/components/ui/PortalActionButton'
+import { PortalSearchField } from '@/components/ui/PortalSearchField'
 import type { FinanceInvoiceRecord, FinancePaymentRecord, FinanceOverview, FinanceService } from '@/lib/finance'
 import { authenticatedFetch as fetch, cachedTabFetch, clearTabCache } from '@/lib/client-api'
-import { formatDateOnlyDisplay } from '@/lib/date-only'
+import { formatDateOnlyDisplay, parseDateOnly, todayInTimeZone } from '@/lib/date-only'
 import { RecordPaymentModal } from '@/components/finance/RecordPaymentModal'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { ToastMessage } from '@/components/ui/ToastMessage'
 import { useAppDialog } from '@/components/ui/AppDialogProvider'
 import { useFinancePage } from '@/components/finance/useFinancePage'
-import { currentPayrollMonth, parsePayrollMonth } from '@/lib/payroll'
 
-const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, paidPayroll: 0, unpaidExpenses: 0, previousMonthClosingBalance: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0, invoicesTruncated: false, paymentsTruncated: false }
+const emptyOverview: FinanceOverview = { invoices: [], payments: [], totalInvoiced: 0, incomeReceived: 0, paidExpenses: 0, unpaidExpenses: 0, previousMonthClosingBalance: 0, netCashBalance: 0, revenueIncome: 0, onboardingIncome: 0, invoicesTruncated: false, paymentsTruncated: false }
 const money = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`
 
 export function FinancePanel() {
@@ -26,7 +27,7 @@ export function FinancePanel() {
   const [paymentService, setPaymentService] = useState<'all' | FinanceService>('all')
   const [paymentDateFrom, setPaymentDateFrom] = useState('')
   const [paymentDateTo, setPaymentDateTo] = useState('')
-  const [incomeMonth, setIncomeMonth] = useState(currentPayrollMonth())
+  const [incomeMonth, setIncomeMonth] = useState(() => todayInTimeZone('Asia/Kolkata').slice(0, 7))
   const [monthlyServiceIncome, setMonthlyServiceIncome] = useState<{ revenueIncome: number; onboardingIncome: number } | null>(null)
   const [monthlyServiceIncomeLoading, setMonthlyServiceIncomeLoading] = useState(true)
 
@@ -35,10 +36,9 @@ export function FinancePanel() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const currentMonth = parsePayrollMonth(currentPayrollMonth())
-  const previousMonthEndLabel = currentMonth
-    ? new Date(Date.UTC(currentMonth.year, currentMonth.month - 1, 0)).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
-    : 'last month end'
+  const currentMonth = parseDateOnly(`${todayInTimeZone('Asia/Kolkata').slice(0, 7)}-01`)!
+  const previousMonthEndLabel = new Date(Date.UTC(currentMonth.getUTCFullYear(), currentMonth.getUTCMonth(), 0))
+    .toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 
   const [refresh, setRefresh] = useState(0)
   const [filteredPaymentTotal, setFilteredPaymentTotal] = useState<number | null>(null)
@@ -78,14 +78,14 @@ export function FinancePanel() {
 
   useEffect(() => {
     const controller = new AbortController()
-    const parsed = parsePayrollMonth(incomeMonth)
+    const parsed = parseDateOnly(`${incomeMonth}-01`)
     if (!parsed) {
       setMonthlyServiceIncome(null)
       setMonthlyServiceIncomeLoading(false)
       return () => controller.abort()
     }
     const from = `${incomeMonth}-01`
-    const to = `${incomeMonth}-${String(new Date(Date.UTC(parsed.year, parsed.month, 0)).getUTCDate()).padStart(2, '0')}`
+    const to = `${incomeMonth}-${String(new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth() + 1, 0)).getUTCDate()).padStart(2, '0')}`
     setMonthlyServiceIncome(null)
     setMonthlyServiceIncomeLoading(true)
     async function loadMonthlyServiceIncome() {
@@ -201,22 +201,21 @@ export function FinancePanel() {
   return <div className="space-y-6">
     <ToastMessage message={error || message} tone={error ? 'error' : 'success'} onDismiss={() => { setError(''); setMessage('') }} />
     <div className="surface flex flex-wrap items-center justify-between gap-4 rounded-lg p-5">
-      <div><p className="font-semibold text-ink">Financial data export</p><p className="mt-1 text-sm text-sub">Download client terms, invoices, income, expenses, salary settings, and payroll in one CSV.</p></div>
-      <button type="button" onClick={() => void exportAllFinancials()} disabled={exportingAll} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"><FileDown className="h-4 w-4" /> {exportingAll ? 'Exporting…' : 'Export all financials'}</button>
+      <div><p className="font-semibold text-ink">Financial data export</p><p className="mt-1 text-sm text-sub">Download client terms, invoices, income, and expenses in one CSV.</p></div>
+      <PortalActionButton type="button" onClick={() => void exportAllFinancials()} disabled={exportingAll} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"><FileDown className="h-4 w-4" /> {exportingAll ? 'Exporting…' : 'Export all financials'}</PortalActionButton>
     </div>
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
       <FinanceMetric label="Income received" value={money(finance.incomeReceived)} detail="Payments actually received" />
       <FinanceMetric label="Unpaid expenses" value={money(finance.unpaidExpenses)} detail="Approved expenses awaiting payment" />
       <FinanceMetric label="Expenses paid" value={money(finance.paidExpenses)} detail="Cash expenses and reimbursements" />
-      <FinanceMetric label="Payroll paid" value={money(finance.paidPayroll)} detail="Payroll records marked Paid" />
       <FinanceMetric label="Previous closing balance" value={money(finance.previousMonthClosingBalance)} detail={`Balance at ${previousMonthEndLabel}`} />
-      <FinanceMetric label="Remaining balance" value={money(finance.netCashBalance)} detail="Income - paid expenses - paid payroll" primary />
+      <FinanceMetric label="Remaining balance" value={money(finance.netCashBalance)} detail="Income - paid expenses" primary />
     </div>
 
     <div className="grid gap-4 lg:grid-cols-2">
       <section className="surface rounded-lg p-6"><p className="font-semibold text-ink">Total income by service</p><div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">Revenue Management</p><p className="mt-1 font-semibold text-ink">{money(finance.revenueIncome)}</p></div><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">OTA Onboarding</p><p className="mt-1 font-semibold text-ink">{money(finance.onboardingIncome)}</p></div></div></section>
       <section className="surface rounded-lg p-4 sm:p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="font-semibold text-ink">Monthly income by service</p><label className="block w-full sm:w-44"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub sm:sr-only">Income month</span><input type="month" value={incomeMonth} onChange={(event) => setIncomeMonth(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" /></label></div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><p className="font-semibold text-ink">Monthly income by service</p><label className="block w-full sm:w-44"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Income month</span><input type="month" value={incomeMonth} onChange={(event) => setIncomeMonth(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink" /></label></div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2"><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">Revenue Management</p><p className="mt-1 font-semibold text-ink">{monthlyServiceIncomeLoading || !monthlyServiceIncome ? '—' : money(monthlyServiceIncome.revenueIncome)}</p></div><div className="rounded-lg border border-zinc-800 p-3"><p className="text-xs text-sub">OTA Onboarding</p><p className="mt-1 font-semibold text-ink">{monthlyServiceIncomeLoading || !monthlyServiceIncome ? '—' : money(monthlyServiceIncome.onboardingIncome)}</p></div></div>
       </section>
     </div>
@@ -224,9 +223,9 @@ export function FinancePanel() {
 
     <section className="surface rounded-lg">
       <div className="border-b border-zinc-800 p-4 sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-lg font-semibold text-ink">Client invoices</p><p className="mt-1 text-sm text-sub">Issued invoice amounts, received payments, outstanding balances, and cancellation history.</p></div><button type="button" onClick={() => void load()} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink sm:w-auto"><RefreshCw className="h-4 w-4" /> Refresh data</button></div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between"><div><p className="text-lg font-semibold text-ink">Client invoices</p><p className="mt-1 text-sm text-sub">Issued invoice amounts, received payments, outstanding balances, and cancellation history.</p></div><PortalActionButton type="button" onClick={() => void load()} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-zinc-700 px-3 text-sm text-sub hover:text-ink sm:w-auto"><RefreshCw className="h-4 w-4" /> Refresh data</PortalActionButton></div>
         <div className="mt-5 grid gap-3 border-t border-zinc-800 pt-4 sm:grid-cols-2 xl:grid-cols-6">
-          <label className="block sm:col-span-2"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Search invoices</span><span className="relative block"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={search} onChange={(event) => setSearch(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Invoice, client or property" /></span></label>
+          <PortalSearchField label="Search invoices" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Invoice, client or property" className="sm:col-span-2 sm:w-full" />
           <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Service</span><select value={service} onChange={(event) => setService(event.target.value as typeof service)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="all">All services</option><option value="revenue_management">Revenue Management</option><option value="ota_onboarding">OTA Onboarding</option></select></label>
           <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Status</span><select value={status} onChange={(event) => setStatus(event.target.value as typeof status)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink"><option value="all">All statuses</option><option value="pending">Payment pending</option><option value="paid">Paid</option><option value="cancelled">Cancelled</option></select></label>
           <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Invoice from</span><DatePickerInput value={invoiceDateFrom} onChange={(value) => { setInvoiceDateFrom(value); if (invoiceDateTo && invoiceDateTo < value) setInvoiceDateTo('') }} max={invoiceDateTo || undefined} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
@@ -237,7 +236,7 @@ export function FinancePanel() {
       <div className="overflow-x-auto">
         <table className="w-full min-w-[1080px] text-sm">
           <thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Client</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Dates</th><th className="px-5 py-4 font-medium text-sub">Amount</th><th className="px-5 py-4 font-medium text-sub">Paid / Balance</th><th className="px-5 py-4 font-medium text-sub">Status</th><th className="px-5 py-4 font-medium text-sub">Actions</th></tr></thead>
-          <tbody>{invoiceTable.loading ? <tr><td colSpan={8} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : invoices.length === 0 ? <tr><td colSpan={8} className="py-12 text-center text-sub">No invoices match the selected filters.</td></tr> : invoices.map((invoice) => <tr key={invoice.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 font-medium text-ink">{invoice.invoiceNumber}</td><td className="px-5 py-4"><p className="text-ink">{invoice.propertyName}</p><p className="text-xs text-sub">{invoice.clientName}</p></td><td className="px-5 py-4 text-sub">{invoice.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management'}</td><td className="px-5 py-4 text-xs text-sub"><p>{formatDateOnlyDisplay(invoice.invoiceDate)}</p><p>Due {formatDateOnlyDisplay(invoice.dueDate)}</p>{invoice.billingPeriod ? <p>{invoice.billingPeriod}</p> : null}</td><td className="px-5 py-4 font-semibold text-ink">{money(invoice.amount)}</td><td className="px-5 py-4 text-sub"><p>{money(invoice.paidAmount)} paid</p><p>{money(invoice.balanceAmount)} due</p></td><td className="px-5 py-4"><FinanceStatus status={invoice.status} /></td><td className="px-5 py-4">{invoice.status === 'pending' ? <div className="flex items-center gap-2"><button type="button" onClick={() => setPaymentInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Record payment</button><button type="button" disabled={cancellingInvoiceId === invoice.id} onClick={() => void cancelInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-red-500/20 px-3 text-xs font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50">{cancellingInvoiceId === invoice.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />} Cancel</button></div> : <span className="text-xs font-medium text-sub">{invoice.status === 'paid' ? 'Paid' : 'Cancelled'}</span>}</td></tr>)}</tbody>
+          <tbody>{invoiceTable.loading ? <tr><td colSpan={8} className="py-12 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : invoices.length === 0 ? <tr><td colSpan={8} className="py-12 text-center text-sub">No invoices match the selected filters.</td></tr> : invoices.map((invoice) => <tr key={invoice.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 font-medium text-ink">{invoice.invoiceNumber}</td><td className="px-5 py-4"><p className="text-ink">{invoice.propertyName}</p><p className="text-xs text-sub">{invoice.clientName}</p></td><td className="px-5 py-4 text-sub">{invoice.service === 'ota_onboarding' ? 'OTA Onboarding' : 'Revenue Management'}</td><td className="px-5 py-4 text-xs text-sub"><p>{formatDateOnlyDisplay(invoice.invoiceDate)}</p><p>Due {formatDateOnlyDisplay(invoice.dueDate)}</p>{invoice.billingPeriod ? <p>{invoice.billingPeriod}</p> : null}</td><td className="px-5 py-4 font-semibold text-ink">{money(invoice.amount)}</td><td className="px-5 py-4 text-sub"><p>{money(invoice.paidAmount)} paid</p><p>{money(invoice.balanceAmount)} due</p></td><td className="px-5 py-4"><FinanceStatus status={invoice.status} /></td><td className="px-5 py-4">{invoice.status === 'pending' ? <div className="flex items-center gap-2"><PortalActionButton type="button" onClick={() => setPaymentInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md bg-[#66B159]/10 px-3 text-xs font-semibold text-[#66B159] hover:bg-[#66B159]/20"><CreditCard className="h-4 w-4" /> Record payment</PortalActionButton><PortalActionButton type="button" disabled={cancellingInvoiceId === invoice.id} onClick={() => void cancelInvoice(invoice)} className="flex h-9 items-center gap-2 whitespace-nowrap rounded-md border border-red-500/20 px-3 text-xs font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50">{cancellingInvoiceId === invoice.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />} Cancel</PortalActionButton></div> : <span className="text-xs font-medium text-sub">{invoice.status === 'paid' ? 'Paid' : 'Cancelled'}</span>}</td></tr>)}</tbody>
         </table>
       </div>
       <FinancePagination table={invoiceTable} label="Client invoices" />
@@ -249,14 +248,14 @@ export function FinancePanel() {
           <div><p className="text-lg font-semibold text-ink">Received payments</p><p className="mt-1 text-sm text-sub">Every income transaction recorded against an invoice.</p></div>
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
             <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-left sm:text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'Filtered total' : 'Total received'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">{displayedPaymentTotal === null ? '—' : money(displayedPaymentTotal)}</p></div>
-            <button type="button" onClick={() => void exportIncome()} disabled={exporting || loading} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white sm:w-auto"><FileDown className="h-4 w-4" /> {exporting ? 'Exporting…' : 'Export income'}</button>
+            <PortalActionButton type="button" onClick={() => void exportIncome()} disabled={exporting || loading} className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white sm:w-auto"><FileDown className="h-4 w-4" /> {exporting ? 'Exporting…' : 'Export income'}</PortalActionButton>
           </div>
         </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Service</span><select value={paymentService} onChange={(event) => setPaymentService(event.target.value as typeof paymentService)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="all">All services</option><option value="revenue_management">Revenue Management</option><option value="ota_onboarding">OTA Onboarding</option></select></label>
           <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">From date</span><DatePickerInput value={paymentDateFrom} onChange={setPaymentDateFrom} max={paymentDateTo || undefined} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
           <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">To date</span><DatePickerInput value={paymentDateTo} onChange={setPaymentDateTo} min={paymentDateFrom || undefined} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none" /></label>
-          <div className="flex items-end"><button type="button" disabled={paymentService === 'all' && !paymentDateFrom && !paymentDateTo} onClick={() => { setPaymentService('all'); setPaymentDateFrom(''); setPaymentDateTo('') }} className="h-10 w-full rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub transition-colors hover:border-zinc-600 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40">Clear filters</button></div>
+          <div className="flex items-end"><PortalActionButton type="button" disabled={paymentService === 'all' && !paymentDateFrom && !paymentDateTo} onClick={() => { setPaymentService('all'); setPaymentDateFrom(''); setPaymentDateTo('') }} className="h-10 w-full rounded-lg border border-zinc-700 px-3 text-sm font-medium text-sub transition-colors hover:border-zinc-600 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"><FilterX className="h-4 w-4" aria-hidden="true" /> Clear filters</PortalActionButton></div>
         </div>
       </div>
       <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-5 py-4 font-medium text-sub">Date</th><th className="px-5 py-4 font-medium text-sub">Invoice</th><th className="px-5 py-4 font-medium text-sub">Service</th><th className="px-5 py-4 font-medium text-sub">Method</th><th className="px-5 py-4 font-medium text-sub">Reference</th><th className="px-5 py-4 font-medium text-sub">Amount</th></tr></thead><tbody>{paymentTable.loading ? <tr><td colSpan={6} className="py-10 text-center"><Loader2 className="mx-auto h-5 w-5 animate-spin text-sub" /></td></tr> : payments.length === 0 ? <tr><td colSpan={6} className="py-10 text-center text-sub">{paymentService !== 'all' || paymentDateFrom || paymentDateTo ? 'No received payments match the selected filters.' : 'No payments recorded yet.'}</td></tr> : payments.map((payment) => <tr key={payment.id} className="border-b border-zinc-800 last:border-none"><td className="px-5 py-4 text-sub">{formatDateOnlyDisplay(payment.paymentDate)}</td><td className="px-5 py-4 font-medium text-ink">{payment.invoiceNumber}</td><td className="px-5 py-4 text-sub">{payment.service === 'ota_onboarding' ? 'OTA' : 'Revenue'}</td><td className="px-5 py-4 uppercase text-sub">{payment.method.replace('_', ' ')}</td><td className="px-5 py-4 text-sub">{payment.reference || '—'}</td><td className="px-5 py-4 font-semibold text-[#66B159]">{money(payment.amount)}</td></tr>)}</tbody></table></div>
@@ -269,7 +268,7 @@ export function FinancePanel() {
 
 function FinancePagination({ table, label }: { table: { page: number; loading: boolean; hasMore: boolean; previous: () => void; next: () => void }; label: string }) {
   if (table.page === 1 && !table.hasMore) return null
-  return <nav aria-label={label + ' pagination'} className="flex flex-wrap items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">10 records per page</p><div className="flex items-center gap-2"><button type="button" onClick={table.previous} disabled={table.loading || table.page === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Previous</button><span className="text-xs text-sub">Page {table.page}</span><button type="button" onClick={table.next} disabled={table.loading || !table.hasMore} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40">Next</button></div></nav>
+  return <nav aria-label={label + ' pagination'} className="flex flex-wrap items-center justify-between gap-4 border-t border-zinc-800 px-5 py-4"><p className="text-xs text-sub">10 records per page</p><div className="flex items-center gap-2"><PortalActionButton type="button" onClick={table.previous} disabled={table.loading || table.page === 1} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40"><ChevronLeft className="h-4 w-4" aria-hidden="true" /> Previous</PortalActionButton><span className="text-xs text-sub">Page {table.page}</span><PortalActionButton type="button" onClick={table.next} disabled={table.loading || !table.hasMore} className="h-9 rounded-md border border-zinc-700 px-3 text-sm text-sub hover:text-ink disabled:opacity-40"><ArrowRight className="h-4 w-4" aria-hidden="true" /> Next</PortalActionButton></div></nav>
 }
 
 function FinanceMetric({ label, value, detail, primary = false }: { label: string; value: string; detail: string; primary?: boolean }) {

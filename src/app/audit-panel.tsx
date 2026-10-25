@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
+import { PortalActionButton } from '@/components/ui/PortalActionButton'
 import type { AuditLogRecord } from '@/lib/firestore'
 import { apiFetch } from '@/lib/client-api'
 import { ToastMessage } from '@/components/ui/ToastMessage'
@@ -80,7 +81,7 @@ export function AuditPanel() {
             <p className="mt-1 text-sm text-sub">10 records per page. Loaded only when opened or refreshed.</p>
           </div>
         </div>
-        <button
+        <PortalActionButton
           type="button"
           onClick={() => void loadPage(pageCursors[page - 1] || null, page)}
           disabled={loading}
@@ -88,7 +89,7 @@ export function AuditPanel() {
         >
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />
           Refresh
-        </button>
+        </PortalActionButton>
       </div>
 
       <div className="overflow-x-auto">
@@ -124,8 +125,8 @@ export function AuditPanel() {
       <div className="flex items-center justify-between gap-4 border-t border-zinc-800 px-6 py-4">
         <p className="text-sm text-sub">Page {page}</p>
         <div className="flex gap-2">
-          <button type="button" onClick={showPreviousPage} disabled={page === 1 || loading} className="inline-flex h-9 items-center gap-1 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-ink hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" />Previous</button>
-          <button type="button" onClick={showNextPage} disabled={!nextCursor || loading} className="inline-flex h-9 items-center gap-1 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-ink hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40">Next<ChevronRight className="h-4 w-4" /></button>
+          <PortalActionButton type="button" onClick={showPreviousPage} disabled={page === 1 || loading} className="inline-flex h-9 items-center gap-1 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-ink hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"><ChevronLeft className="h-4 w-4" />Previous</PortalActionButton>
+          <PortalActionButton type="button" onClick={showNextPage} disabled={!nextCursor || loading} className="inline-flex h-9 items-center gap-1 rounded-lg border border-zinc-700 px-3 text-sm font-medium text-ink hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40">Next<ChevronRight className="h-4 w-4" /></PortalActionButton>
         </div>
       </div>
     </div>

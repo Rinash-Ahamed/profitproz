@@ -2,7 +2,8 @@
 
 import { FormEvent, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Loader2 } from 'lucide-react'
+import { Loader2, X, Save } from 'lucide-react'
+import { PortalActionButton } from '@/components/ui/PortalActionButton'
 import type { FinanceInvoiceRecord, FinancePaymentRecord, PaymentMethod } from '@/lib/finance'
 import { DatePickerInput } from '@/components/ui/DatePickerInput'
 import { authenticatedFetch as fetch } from '@/lib/client-api'
@@ -54,7 +55,7 @@ export function RecordPaymentModal({ invoice, payment, onClose, onRecorded }: { 
         </div>
         <label className="mt-4 block"><span className="label-upper mb-2 block text-ghost">Notes (optional)</span><textarea rows={3} value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={1000} className={`${inputClass} h-auto resize-y py-3`} /></label>
         <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
-        <div className="mt-6 flex justify-end gap-3"><button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button><button type="submit" disabled={saving} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-5 text-sm font-semibold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {correcting ? 'Save correction' : 'Save payment'}</button></div>
+        <div className="mt-6 flex justify-end gap-3"><PortalActionButton type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /> Cancel</PortalActionButton><PortalActionButton type="submit" disabled={saving} className="flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-5 text-sm font-semibold text-white disabled:opacity-60">{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" aria-hidden="true" />} {correcting ? 'Save correction' : 'Save payment'}</PortalActionButton></div>
       </form>
     </div>, document.body,
   )

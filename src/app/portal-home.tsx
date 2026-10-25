@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useMemo, useRef, useState, type ReactNode } from 
 import Image from 'next/image'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
-import { Building2, CheckCircle2, ChevronDown, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, LayoutDashboard, Loader2, LogOut, Menu, Play, ReceiptText, RefreshCw, Search, Settings2, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle } from 'lucide-react'
+import { Building2, CheckCircle2, ChevronDown, Clock3, CreditCard, Download, Edit, Eye, EyeOff, FileDown, FileText, KeyRound, LayoutDashboard, Loader2, LogOut, Menu, Play, ReceiptText, RefreshCw, Settings2, Square, Trash2, User, UserPlus, Users, WalletCards, XCircle, AlertTriangle, Save, CalendarPlus, X } from 'lucide-react'
+import { PortalActionButton } from '@/components/ui/PortalActionButton'
 import type { SessionUser } from '@/lib/auth'
 import type { DashboardSummary, ExpenseFieldSettings, ExpenseRecord, LeaveRequestRecord, PropertyRecord, PublicStaffRecord, SecuritySettings, WorkSessionRecord } from '@/lib/firestore'
 import type { OnboardingRecord } from '@/lib/onboarding'
@@ -24,6 +25,9 @@ import type { HalfDayPeriod, LeaveDurationType, LeavePayrollTreatment } from '@/
 import { HolidayCalendarCard } from '@/components/ui/HolidayCalendarCard'
 import { formatLiveWorkDuration, formatWorkDuration, formatWorkTime } from '@/lib/work-session-format'
 import { currentPayrollMonth } from '@/lib/payroll'
+import { ExpensePaymentDate } from '@/components/finance/ExpensePaymentDate'
+import { PortalSearchField } from '@/components/ui/PortalSearchField'
+import { AdminNotifications } from '@/components/ui/AdminNotifications'
 
 const ClientServicesPanel = dynamic(() => import('@/app/client-services-panel').then((module) => module.ClientServicesPanel))
 const FinancePanel = dynamic(() => import('@/app/finance-panel').then((module) => module.FinancePanel))
@@ -125,7 +129,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
   const [deletingExpenseId, setDeletingExpenseId] = useState('')
   const [correctingExpense, setCorrectingExpense] = useState<ExpenseRecord | null>(null)
   const [adminExpenseName, setAdminExpenseName] = useState('')
-  const [expenseTrackingView, setExpenseTrackingView] = useState<'staff' | 'admin'>('staff')
+  const [expenseTrackingView, setExpenseTrackingView] = useState<'staff' | 'admin'>('admin')
   const [expensePersonSearch, setExpensePersonSearch] = useState('')
   const [expenseMonthFilter, setExpenseMonthFilter] = useState('')
   const [expensePaymentFilter, setExpensePaymentFilter] = useState<'all' | 'paid' | 'unpaid'>('all')
@@ -735,17 +739,17 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     const leaveDescription = leaveRequest ? `${leaveRequest.staffEmail}'s leave from ${leaveRequest.startDate} to ${leaveRequest.endDate}` : 'this leave request'
     const decisionNote = status === 'rejected'
       ? await promptAction({ title: 'Reject leave request?', message: `Reject ${leaveDescription}? Add a reason that will be shown to the employee.`, label: 'Rejection reason', confirmLabel: 'Reject leave', tone: 'danger' })
-      : await confirmAction({ title: payrollTreatment === 'lop' ? 'Approve as half-day LOP?' : payrollTreatment === 'cl' ? 'Approve using 0.5 CL?' : 'Approve leave request?', message: payrollTreatment === 'lop' ? `Approve ${leaveDescription} as 0.5 LOP? Half of the calendar-day salary will be deducted.` : payrollTreatment === 'cl' ? `Approve ${leaveDescription} using 0.5 CL? No salary will be deducted while CL is available.` : `Approve ${leaveDescription}? It will be included when Draft payroll is refreshed.`, confirmLabel: payrollTreatment === 'lop' ? 'Approve 0.5 LOP' : payrollTreatment === 'cl' ? 'Use 0.5 CL' : 'Approve leave', tone: payrollTreatment === 'lop' ? 'warning' : 'default' }) ? '' : null
+      : await confirmAction({ title: payrollTreatment === 'lop' ? 'Approve as half-day LOP?' : payrollTreatment === 'cl' ? 'Approve using 0.5 CL?' : 'Approve leave request?', message: payrollTreatment === 'lop' ? `Approve ${leaveDescription} as 0.5 LOP? Half of the calendar-day salary will be deducted.` : payrollTreatment === 'cl' ? `Approve ${leaveDescription} using 0.5 CL? No salary will be deducted while CL is available.` : `Approve ${leaveDescription}? It will be included when payroll is refreshed.`, confirmLabel: payrollTreatment === 'lop' ? 'Approve 0.5 LOP' : payrollTreatment === 'cl' ? 'Use 0.5 CL' : 'Approve leave', tone: payrollTreatment === 'lop' ? 'warning' : 'default' }) ? '' : null
     if (decisionNote === null) return
     const response = await fetch(`/api/admin/leaves/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status, decisionNote, payrollTreatment }) })
     const data = await response.json() as { leave?: LeaveRequestRecord; message?: string }
     if (!response.ok || !data.leave) { setError(data.message || 'Unable to update leave request.'); return }
     setLeaveList((current) => current.map((leave) => leave.id === id ? data.leave! : leave))
-    setMessage(status === 'approved' ? 'Leave approved and ready for the next Draft payroll refresh.' : 'Leave rejected and the employee can see the reason.')
+    setMessage(status === 'approved' ? 'Leave approved and ready for the next payroll refresh.' : 'Leave rejected and the employee can see the reason.')
   }
 
   async function deleteAdminLeaveRequest(leave: LeaveRequestRecord) {
-    const approvedWarning = leave.status === 'approved' ? ' A refreshed Draft payroll will no longer include this approved leave.' : ''
+    const approvedWarning = leave.status === 'approved' ? ' A refreshed payroll will no longer include this approved leave.' : ''
     if (!await confirmAction({ title: 'Delete leave request?', message: `Delete this ${leave.status} leave request for ${leave.staffEmail}?${approvedWarning} This action cannot be undone.`, confirmLabel: 'Delete leave', tone: 'danger' })) return
     setDeletingLeaveId(leave.id)
     setError('')
@@ -981,6 +985,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
     .filter((expense) => !expenseMonthFilter || expense.expenseDate?.startsWith(`${expenseMonthFilter}-`))
     .filter((expense) => expensePaymentFilter === 'all' || (expensePaymentFilter === 'paid' ? expense.paymentStatus === 'paid' : expense.status === 'approved' && expense.paymentStatus !== 'paid'))
     .sort((a, b) => {
+      if (expensePaymentFilter === 'all') {
+        const paymentOrder = Number(a.paymentStatus === 'paid') - Number(b.paymentStatus === 'paid')
+        if (paymentOrder) return paymentOrder
+      }
       if (expensePersonQuery) {
         const aStartsWith = (a.staffName || a.staffEmail).toLowerCase().startsWith(expensePersonQuery)
         const bStartsWith = (b.staffName || b.staffEmail).toLowerCase().startsWith(expensePersonQuery)
@@ -1033,7 +1041,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
           <nav className="hidden items-center rounded-full border border-zinc-800 bg-zinc-900/80 p-1 shadow-lg shadow-black/20 backdrop-blur-sm md:flex">
             <div className="flex items-center gap-1">
               {['dashboard', 'properties', 'expenses', 'tasks', 'leaves'].map((tab) => (
-                <button
+                <PortalActionButton
                   key={tab}
                   type="button"
                   onClick={() => setActiveTab(tab)}
@@ -1042,13 +1050,23 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   }`}
                 >
                   {tab === 'properties' ? 'Clients' : tab}
-                </button>
+                </PortalActionButton>
               ))}
             </div>
           </nav>
         )}
 
-        <div className="relative flex flex-1 items-center justify-end" onMouseEnter={() => setIsProfileOpen(true)} onMouseLeave={() => setIsProfileOpen(false)}>
+        <div className="flex flex-1 items-center justify-end gap-3">
+          {user.role === 'admin' ? <AdminNotifications onOpenLeaves={() => {
+            setIsProfileOpen(false)
+            clearTabCache()
+            if (activeTab === 'leaves') {
+              apiFetch<{ leaves: LeaveRequestRecord[] }>('/api/admin/leaves')
+                .then((data) => setLeaveList(data.leaves))
+                .catch(() => setError('Could not refresh leave requests.'))
+            } else openAdminTab('leaves')
+          }} /> : null}
+        <div className="relative flex items-center justify-end" onMouseEnter={() => setIsProfileOpen(true)} onMouseLeave={() => setIsProfileOpen(false)}>
           <button
             type="button"
             onFocus={() => setIsProfileOpen(true)}
@@ -1076,6 +1094,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
               </div>
             </div>
           )}
+        </div>
         </div>
       </header>
 
@@ -1266,14 +1285,14 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           </fieldset>
 
 
-                          <button
+                          <PortalActionButton
                             type="submit"
                             disabled={loading}
                             className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none sm:w-auto sm:px-6"
                           >
-                            {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+                            {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <UserPlus className="h-4 w-4" aria-hidden="true" />}
                             Add employee
-                          </button>
+                          </PortalActionButton>
                         </form>
                       ) : (
                         <div className="surface rounded-lg">
@@ -1282,10 +1301,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                               <p className="font-semibold text-ink">Employees</p>
                               <p className="mt-1 text-xs text-sub">{visibleStaffList.length} of {staffList.length} shown</p>
                             </div>
-                            <label className="relative block">
-                              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" />
-                              <input value={staffSearch} onChange={(event) => setStaffSearch(event.target.value)} className="h-11 w-72 max-w-full rounded-lg border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search employees" aria-label="Search employees" />
-                            </label>
+                            <PortalSearchField label="Search employees" value={staffSearch} onChange={(event) => setStaffSearch(event.target.value)} placeholder="Name or email" className="sm:w-72" />
                           </div>
                           <div className="overflow-x-auto">
                             <table className="w-full text-sm">
@@ -1334,13 +1350,13 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                       <td className="px-6 py-4"><span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${staff.active ? 'border-green-500/20 bg-green-500/10 text-green-400' : !staff.activatedAt ? 'border-amber-500/20 bg-amber-500/10 text-amber-400' : 'border-zinc-600 bg-zinc-800 text-sub'}`}>{staff.active ? 'Active' : !staff.activatedAt ? 'Pending' : 'Inactive'}</span></td>
                                       <td className="px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                          <button type="button" onClick={() => setViewingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`View details for ${staff.name}`} title="View employee details"><Eye className="h-4 w-4" /></button>
-                                          {!staff.active && !staff.activatedAt ? <button type="button" onClick={() => setOfferStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors" aria-label={`Generate offer letter for ${staff.name}`} title="Generate offer letter"><FileText className="h-4 w-4" /></button> : null}
-                                          {!staff.active ? <button type="button" onClick={() => void setStaffActive(staff, true)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-green-500/20 hover:text-green-400 transition-colors" aria-label={`${!staff.activatedAt ? 'Acknowledge offer and activate' : 'Reactivate'} ${staff.name}`} title={!staff.activatedAt ? 'Acknowledge & activate' : 'Reactivate employee'}><CheckCircle2 className="h-4 w-4" /></button> : null}
-                                          {staff.active ? <button type="button" onClick={() => void setStaffActive(staff, false)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Make ${staff.name} inactive`} title="Make employee inactive"><XCircle className="h-4 w-4" /></button> : null}
-                                          <button type="button" onClick={() => setEditingStaff(staff)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors" aria-label={`Edit ${staff.name}`} title="Edit employee"><Edit className="h-4 w-4" /></button>
-                                          <button type="button" onClick={() => handleResetPassword(staff.id, staff.name)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-amber-500/20 hover:text-amber-400 transition-colors" aria-label={`Reset password for ${staff.name}`} title="Reset password"><RefreshCw className="h-4 w-4" /></button>
-                                          <button type="button" onClick={() => handleDeleteStaff(staff.id, staff.name, staff.email)} className="h-8 w-8 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors" aria-label={`Delete ${staff.name}`} title="Delete employee and records"><Trash2 className="h-4 w-4" /></button>
+                                          <PortalActionButton type="button" onClick={() => setViewingStaff(staff)} className="h-9 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors gap-2 px-3 text-xs font-medium" aria-label={`View details for ${staff.name}`} title="View employee details"><Eye className="h-4 w-4" /> View</PortalActionButton>
+                                          {!staff.active && !staff.activatedAt ? <PortalActionButton type="button" onClick={() => setOfferStaff(staff)} className="h-9 flex items-center justify-center rounded-md text-sub hover:bg-[#66B159]/20 hover:text-[#66B159] transition-colors gap-2 px-3 text-xs font-medium" aria-label={`Generate offer letter for ${staff.name}`} title="Generate offer letter"><FileText className="h-4 w-4" /> Offer letter</PortalActionButton> : null}
+                                          {!staff.active ? <PortalActionButton type="button" onClick={() => void setStaffActive(staff, true)} className="h-9 flex items-center justify-center rounded-md text-sub hover:bg-green-500/20 hover:text-green-400 transition-colors gap-2 px-3 text-xs font-medium" aria-label={`${!staff.activatedAt ? 'Acknowledge offer and activate' : 'Reactivate'} ${staff.name}`} title={!staff.activatedAt ? 'Acknowledge & activate' : 'Reactivate employee'}><CheckCircle2 className="h-4 w-4" /> {!staff.activatedAt ? 'Activate' : 'Reactivate'}</PortalActionButton> : null}
+                                          {staff.active ? <PortalActionButton type="button" onClick={() => void setStaffActive(staff, false)} className="h-9 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors gap-2 px-3 text-xs font-medium" aria-label={`Make ${staff.name} inactive`} title="Make employee inactive"><XCircle className="h-4 w-4" /> Deactivate</PortalActionButton> : null}
+                                          <PortalActionButton type="button" onClick={() => setEditingStaff(staff)} className="h-9 flex items-center justify-center rounded-md text-sub hover:bg-zinc-800 hover:text-ink transition-colors gap-2 px-3 text-xs font-medium" aria-label={`Edit ${staff.name}`} title="Edit employee"><Edit className="h-4 w-4" /> Edit</PortalActionButton>
+                                          <PortalActionButton type="button" onClick={() => handleResetPassword(staff.id, staff.name)} className="h-9 flex items-center justify-center rounded-md text-sub hover:bg-amber-500/20 hover:text-amber-400 transition-colors gap-2 px-3 text-xs font-medium" aria-label={`Reset password for ${staff.name}`} title="Reset password"><RefreshCw className="h-4 w-4" /> Reset password</PortalActionButton>
+                                          <PortalActionButton type="button" onClick={() => handleDeleteStaff(staff.id, staff.name, staff.email)} className="h-9 flex items-center justify-center rounded-md text-sub hover:bg-red-500/20 hover:text-red-400 transition-colors gap-2 px-3 text-xs font-medium" aria-label={`Delete ${staff.name}`} title="Delete employee and records"><Trash2 className="h-4 w-4" /> Delete</PortalActionButton>
                                         </div>
                                       </td>
                                     </tr>
@@ -1373,7 +1389,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <div><label htmlFor="adminExpenseReceipt" className="label-upper mb-2 block text-ghost">Receipt link (optional)</label><input id="adminExpenseReceipt" type="url" inputMode="url" value={expenseReceiptUrl} onChange={(event) => setExpenseReceiptUrl(event.target.value)} maxLength={2048} className={inputClass} placeholder="https://..." /></div>
                         </div>
                         <div className="mt-4"><label htmlFor="adminExpenseDescription" className="label-upper mb-2 block text-ghost">Description</label><textarea id="adminExpenseDescription" rows={2} value={expenseNotes} onChange={(event) => setExpenseNotes(event.target.value)} maxLength={2000} className={`${inputClass} h-auto resize-y py-3`} /></div>
-                        <button type="submit" disabled={loading} className="mt-5 flex h-11 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-5 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Record expense</button>
+                        <PortalActionButton type="submit" disabled={loading} className="mt-5 flex h-11 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-5 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ReceiptText className="h-4 w-4" aria-hidden="true" />} Record expense</PortalActionButton>
                       </form>
 
                       <div className="surface rounded-lg">
@@ -1382,25 +1398,33 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             <div><p className="text-lg font-semibold text-ink">{expenseTrackingView === 'admin' ? 'Admin Expenses' : 'Staff Expense Approvals'}</p><p className="mt-1 text-sm text-sub">{expenseTrackingView === 'admin' ? 'Review expenses recorded directly by Admin users.' : 'Review and decide employee expense claims.'}</p></div>
                             <div className="flex flex-wrap items-center gap-3">
                               <div className="rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-2 text-right"><p className="text-[10px] font-semibold uppercase tracking-wider text-sub">{expensePersonSearch.trim() || expenseMonthFilter || expensePaymentFilter !== 'all' ? 'Filtered total' : 'Total amount'}</p><p className="mt-0.5 text-lg font-bold text-[#66B159]">₹{visibleTrackedExpenseTotal.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p></div>
-                              <button type="button" onClick={handleExportExpenses} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</button>
+                              <PortalActionButton type="button" onClick={handleExportExpenses} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66]"><FileDown className="h-4 w-4" /> Export CSV</PortalActionButton>
                             </div>
                           </div>
                           <div className="mt-5 flex flex-wrap gap-2 rounded-lg border border-zinc-800 bg-zinc-950/30 p-1.5">
-                            <button type="button" onClick={() => { setExpenseTrackingView('staff'); setExpensePersonSearch(''); setExpensePaymentFilter('all') }} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'staff' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Staff Expenses</button>
                             <button type="button" onClick={() => { setExpenseTrackingView('admin'); setExpensePersonSearch(''); setExpensePaymentFilter('all') }} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'admin' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Admin Expenses</button>
+                            <button type="button" onClick={() => { setExpenseTrackingView('staff'); setExpensePersonSearch(''); setExpensePaymentFilter('all') }} className={`rounded-md px-4 py-2 text-sm font-semibold transition-colors ${expenseTrackingView === 'staff' ? 'bg-[#66B159] text-white' : 'text-sub hover:bg-zinc-800 hover:text-ink'}`}>Staff Expenses</button>
+                          </div>
+                          <div className="mt-4 grid gap-3 sm:grid-cols-3">
                             {expenseTrackingView === 'admin' ? (
-                              <select value={expensePersonSearch} onChange={(event) => setExpensePersonSearch(event.target.value)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none sm:ml-auto sm:min-w-64 sm:max-w-sm sm:flex-1" aria-label="Filter expenses by Admin name">
+                              <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Admin name</span>
+                              <select value={expensePersonSearch} onChange={(event) => setExpensePersonSearch(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none">
                                 <option value="">All Admins</option>
                                 {ADMIN_NAMES.map((name) => <option key={name} value={name}>{name}</option>)}
                               </select>
+                              </label>
                             ) : (
-                              <label className="relative w-full sm:ml-auto sm:min-w-64 sm:max-w-sm sm:flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ghost" /><input value={expensePersonSearch} onChange={(event) => setExpensePersonSearch(event.target.value)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 pl-9 pr-3 text-sm text-ink placeholder:text-ghost focus:border-[#66B159] focus:outline-none" placeholder="Search staff name" aria-label="Search expenses by staff name" /></label>
+                              <PortalSearchField label="Search staff" value={expensePersonSearch} onChange={(event) => setExpensePersonSearch(event.target.value)} placeholder="Name or email" className="sm:w-full" />
                             )}
-                            <select value={expenseMonthFilter} onChange={(event) => setExpenseMonthFilter(event.target.value)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none sm:w-auto" aria-label="Filter expenses by month">
+                            <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Expense month</span>
+                            <select value={expenseMonthFilter} onChange={(event) => setExpenseMonthFilter(event.target.value)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none">
                               <option value="">All months</option>
                               {expenseMonthOptions.map((month) => <option key={month} value={month}>{new Date(`${month}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</option>)}
                             </select>
-                            <select value={expensePaymentFilter} onChange={(event) => setExpensePaymentFilter(event.target.value as typeof expensePaymentFilter)} className="h-10 w-full rounded-md border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none sm:w-auto" aria-label="Filter expenses by payment status"><option value="all">All payment statuses</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select>
+                            </label>
+                            <label className="block"><span className="mb-1.5 block text-[10px] font-semibold uppercase tracking-wider text-sub">Payment status</span>
+                            <select value={expensePaymentFilter} onChange={(event) => setExpensePaymentFilter(event.target.value as typeof expensePaymentFilter)} className="h-10 w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 text-sm text-ink focus:border-[#66B159] focus:outline-none"><option value="all">All payment statuses</option><option value="paid">Paid</option><option value="unpaid">Unpaid</option></select>
+                            </label>
                           </div>
                         </div>
                       <div className="overflow-x-auto">
@@ -1412,7 +1436,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                   <th className="px-6 py-4 font-medium text-sub">Claim</th>
                               <th className="px-6 py-4 font-medium text-sub">Amount</th>
                               {expenseTrackingView === 'staff' ? <th className="px-6 py-4 font-medium text-sub">Status</th> : null}
-                              <th className="px-6 py-4 font-medium text-sub">Actions</th>
+                              <th className="w-px whitespace-nowrap px-6 py-4 font-medium text-sub">Actions</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1428,7 +1452,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                     <p className="text-xs text-sub">{expense.staffEmail}</p>
                                     {expense.submittedByRole === 'admin' ? <span className="mt-1 inline-block rounded border border-[#66B159]/25 bg-[#66B159]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#66B159]">Admin expense</span> : null}
                                   </td>
-                                  <td className="whitespace-nowrap px-6 py-4 text-sub">{formatDateOnlyDisplay(expense.expenseDate) || 'Not recorded'}</td>
+                                  <td className="whitespace-nowrap px-6 py-4 text-sub">{formatDateOnlyDisplay(expense.expenseDate) || 'Not recorded'}<ExpensePaymentDate expense={expense} /></td>
                                   <td className="px-6 py-4">
                                     <p className="font-medium capitalize text-ink">{expense.expenseType === 'other' ? expense.customExpenseType || 'Other' : expense.expenseType || expense.title}</p>
                                     <p className="mt-1 text-xs text-sub">{expense.city || 'No city'}{expense.description ? ` · ${expense.description}` : ''}</p>
@@ -1436,20 +1460,20 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                   </td>
                                   <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
                                   {expenseTrackingView === 'staff' ? <td className="px-6 py-4"><StatusBadge status={expense.status} />{expense.status === 'approved' ? <p className={`mt-1 text-xs font-medium ${expense.paymentStatus === 'paid' ? 'text-green-400' : 'text-amber-300'}`}>{expense.paymentStatus === 'paid' ? 'Reimbursement paid' : 'Reimbursement unpaid'}</p> : null}</td> : null}
-                                  <td className="px-6 py-4">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      {expense.paymentStatus !== 'paid' ? <button type="button" onClick={() => setCorrectingExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md border border-zinc-700 px-2.5 text-xs font-medium text-sub transition-colors hover:border-[#66B159]/50 hover:text-ink" title="Correct expense details"><Edit className="h-3.5 w-3.5" /> Correct</button> : null}
+                                  <td className="w-px whitespace-nowrap px-6 py-4 align-middle">
+                                    <div className="flex w-max items-center gap-2">
+                                      {expense.paymentStatus !== 'paid' ? <PortalActionButton type="button" onClick={() => setCorrectingExpense(expense)} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap gap-1.5 rounded-md border border-zinc-700 px-3 text-xs font-medium text-sub transition-colors hover:border-[#66B159]/50 hover:text-ink" title="Correct expense details"><Edit className="h-3.5 w-3.5 shrink-0" /> Correct</PortalActionButton> : null}
                                       {expense.submittedByRole === 'admin' ? (
                                         <>
-                                        {expense.paymentStatus !== 'paid' ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-[#66B159]/10 px-2.5 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark expense paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />} Mark paid</button> : <span className="text-xs font-medium text-green-400">Paid</span>}
+                                        {expense.paymentStatus !== 'paid' ? <PortalActionButton type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap gap-1.5 rounded-md bg-[#66B159]/10 px-3 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark expense paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <CreditCard className="h-3.5 w-3.5 shrink-0" />} Mark paid</PortalActionButton> : <span className="inline-flex h-9 items-center px-3 text-xs font-medium text-green-400">Paid</span>}
                                         </>
                                     ) : expense.status === 'pending' ? (
                                       <>
-                                        <button type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'approved')} className="flex h-8 items-center gap-1.5 rounded-md bg-green-500/10 px-2.5 text-xs text-green-400 transition-colors hover:bg-green-500/20"><CheckCircle2 className="h-3.5 w-3.5" />Approve</button>
-                                        <button type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'rejected')} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs text-red-400 transition-colors hover:bg-red-500/20"><XCircle className="h-3.5 w-3.5" />Reject</button>
+                                        <PortalActionButton type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'approved')} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap gap-1.5 rounded-md bg-green-500/10 px-3 text-xs font-medium text-green-400 transition-colors hover:bg-green-500/20"><CheckCircle2 className="h-3.5 w-3.5 shrink-0" />Approve</PortalActionButton>
+                                        <PortalActionButton type="button" onClick={() => handleExpenseStatusUpdate(expense.id, 'rejected')} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap gap-1.5 rounded-md bg-red-500/10 px-3 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20"><XCircle className="h-3.5 w-3.5 shrink-0" />Reject</PortalActionButton>
                                       </>
                                     ) : expense.status === 'approved' && expense.paymentStatus !== 'paid' ? (
-                                      <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-[#66B159]/10 px-2.5 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark reimbursement paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CreditCard className="h-3.5 w-3.5" />} Mark paid</button>
+                                      <PortalActionButton type="button" disabled={deletingExpenseId === expense.id} onClick={() => markExpenseReimbursed(expense)} className="inline-flex h-9 shrink-0 items-center justify-center whitespace-nowrap gap-1.5 rounded-md bg-[#66B159]/10 px-3 text-xs font-medium text-[#66B159] transition-colors hover:bg-[#66B159]/20 disabled:opacity-50" title="Mark reimbursement paid">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" /> : <CreditCard className="h-3.5 w-3.5 shrink-0" />} Mark paid</PortalActionButton>
                                     ) : null}
                                     </div>
                                   </td>
@@ -1467,7 +1491,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                       <HolidayCalendarCard />
                       <div className="surface rounded-lg">
                         <div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">Leave Requests</p><p className="mt-1 text-sm text-sub">Review employee leave requests.</p></div>
-                        <div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="px-6 py-4 text-sub"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4"><div className="flex flex-wrap items-center gap-3">{leave.status === 'pending' ? <>{leave.durationType === 'half_day' ? <><button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved', 'cl')} className="text-sm text-green-400 disabled:opacity-50">Use 0.5 CL</button><button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved', 'lop')} className="text-sm text-amber-300 disabled:opacity-50">0.5 LOP</button></> : <button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved')} className="text-sm text-green-400 disabled:opacity-50">Approve</button>}<button type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="text-sm text-red-400 disabled:opacity-50">Reject</button></> : null}<button type="button" disabled={deletingLeaveId === leave.id} onClick={() => void deleteAdminLeaveRequest(leave)} className="inline-flex items-center gap-1.5 text-sm text-red-400 transition-colors hover:text-red-300 disabled:opacity-50">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}Delete</button></div></td></tr>)}</tbody></table></div>
+                        <div className="overflow-x-auto"><table className="w-full min-w-[1000px] text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Employee</th><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="w-px whitespace-nowrap px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800 last:border-none"><td className="px-6 py-4 text-ink">{leave.staffEmail}</td><td className="min-w-40 px-6 py-4 text-sub"><LeaveDateSummary leave={leave} /></td><td className="min-w-64 max-w-md break-words px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="w-px whitespace-nowrap px-6 py-4 align-middle"><div className="flex w-max items-center gap-2">{leave.status === 'pending' ? <>{leave.durationType === 'half_day' ? <><PortalActionButton type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved', 'cl')} className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-3 text-sm text-green-400 transition-colors hover:bg-green-500/10 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Use 0.5 CL</PortalActionButton><PortalActionButton type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved', 'lop')} className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-3 text-sm text-amber-300 transition-colors hover:bg-amber-500/10 disabled:opacity-50"><AlertTriangle className="h-4 w-4" aria-hidden="true" /> 0.5 LOP</PortalActionButton></> : <PortalActionButton type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'approved')} className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-3 text-sm text-green-400 transition-colors hover:bg-green-500/10 disabled:opacity-50"><CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Approve</PortalActionButton>}<PortalActionButton type="button" disabled={deletingLeaveId === leave.id} onClick={() => updateLeaveStatus(leave.id, 'rejected')} className="inline-flex h-9 items-center justify-center whitespace-nowrap rounded-md px-3 text-sm text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"><XCircle className="h-4 w-4" aria-hidden="true" /> Reject</PortalActionButton></> : null}<PortalActionButton type="button" disabled={deletingLeaveId === leave.id} onClick={() => void deleteAdminLeaveRequest(leave)} className="inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-sm text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:opacity-50">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}Delete</PortalActionButton></div></td></tr>)}</tbody></table></div>
                       </div>
                     </div>
                   ),
@@ -1491,7 +1515,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             </label>
                           ))}
                         </div>
-                        <button type="button" onClick={saveExpenseSettings} disabled={loading} className="mt-4 flex h-9 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save expense fields</button>
+                        <PortalActionButton type="button" onClick={saveExpenseSettings} disabled={loading} className="mt-4 flex h-9 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60"><Save className="h-4 w-4" aria-hidden="true" /> Save expense fields</PortalActionButton>
                       </div>
 
                       <form className="surface rounded-lg p-5" onSubmit={changeAdminPassword}>
@@ -1504,7 +1528,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <div><label htmlFor="adminNewPassword" className="label-upper mb-2 block text-ghost">New password</label><input id="adminNewPassword" type="password" minLength={securitySettings.minPasswordLength} value={adminNewPassword} onChange={(event) => setAdminNewPassword(event.target.value)} className={inputClass} required /></div>
                           <div><label htmlFor="adminConfirmPassword" className="label-upper mb-2 block text-ghost">Confirm new password</label><input id="adminConfirmPassword" type="password" minLength={securitySettings.minPasswordLength} value={adminConfirmPassword} onChange={(event) => setAdminConfirmPassword(event.target.value)} className={inputClass} required /></div>
                         </div>
-                        <button type="submit" disabled={loading} className="mt-4 flex h-9 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Update password</button>
+                        <PortalActionButton type="submit" disabled={loading} className="mt-4 flex h-9 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" aria-hidden="true" />}Update password</PortalActionButton>
                       </form>
 
                       <div className="space-y-4">
@@ -1514,7 +1538,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <p className="mt-1 text-sm leading-5 text-sub">
                             Remove existing audit records now. A fresh record is written after the clear action.
                           </p>
-                          <button
+                          <PortalActionButton
                             type="button"
                             onClick={clearAuditLogs}
                             disabled={loading}
@@ -1522,7 +1546,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           >
                             {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Trash2 className="h-4 w-4" aria-hidden="true" />}
                             Clear audit logs
-                          </button>
+                          </PortalActionButton>
                         </div>
                       </div>
 
@@ -1533,7 +1557,7 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                           <div><label htmlFor="minPasswordLength" className="label-upper mb-2 block text-ghost">Minimum password length</label><input id="minPasswordLength" type="number" min="12" max="64" value={securitySettings.minPasswordLength} onChange={(event) => setSecuritySettings((current) => ({ ...current, minPasswordLength: Number(event.target.value) || 12 }))} className={inputClass} /></div>
                           {([['requireUppercase', 'Require uppercase letter'], ['requireNumber', 'Require number']] as const).map(([field, label]) => <label key={field} className="flex items-center justify-between gap-4 rounded-lg border border-zinc-700 px-3.5 py-2.5 text-sm text-ink">{label}<input type="checkbox" checked={securitySettings[field]} onChange={(event) => setSecuritySettings((current) => ({ ...current, [field]: event.target.checked }))} className="h-4 w-4 accent-[#66B159]" /></label>)}
                         </div>
-                        <button type="button" onClick={saveSecuritySettings} disabled={loading} className="mt-4 flex h-9 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60">Save security policy</button>
+                        <PortalActionButton type="button" onClick={saveSecuritySettings} disabled={loading} className="mt-4 flex h-9 items-center justify-center rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-60"><Save className="h-4 w-4" aria-hidden="true" /> Save security policy</PortalActionButton>
                       </div>
 
                     </div>
@@ -1622,14 +1646,14 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                   </div>
 
 
-                  <button
+                  <PortalActionButton
                     type="submit"
                     disabled={loading}
                     className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60 disabled:shadow-none sm:w-auto sm:px-6"
                   >
-                    {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+                    {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <User className="h-4 w-4" aria-hidden="true" />}
                     Complete profile
-                  </button>
+                  </PortalActionButton>
                 </form>
               ) : {
                   dashboard: (
@@ -1712,14 +1736,14 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         </div>
 
 
-                        <button
+                        <PortalActionButton
                           type="submit"
                           disabled={loading}
                           className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-6"
                         >
-                          {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+                          {loading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <ReceiptText className="h-4 w-4" aria-hidden="true" />}
                           Submit expense
-                        </button>
+                        </PortalActionButton>
                       </form>
 
                       <div className="staff-work-card rounded-lg">
@@ -1749,10 +1773,10 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                                       <p className="font-medium text-ink">{expense.expenseType === 'other' ? expense.customExpenseType || 'Other' : expense.expenseType}</p>
                                       <p className="text-xs text-sub">{expense.city || 'No city'}{expense.receiptName ? ' · Receipt submitted' : ''}</p>
                                     </td>
-                                    <td className="whitespace-nowrap px-6 py-4 text-sub">{formatDateOnlyDisplay(expense.expenseDate) || 'Not recorded'}</td>
+                                    <td className="whitespace-nowrap px-6 py-4 text-sub">{formatDateOnlyDisplay(expense.expenseDate) || 'Not recorded'}<ExpensePaymentDate expense={expense} /></td>
                                     <td className="px-6 py-4 text-sub">₹{expense.amount.toLocaleString('en-IN')}</td>
                                     <td className="px-6 py-4"><StatusBadge status={expense.status} />{expense.status === 'approved' ? <p className={`mt-1 text-xs font-medium ${expense.paymentStatus === 'paid' ? 'text-green-400' : 'text-amber-300'}`}>{expense.paymentStatus === 'paid' ? 'Reimbursement paid' : 'Reimbursement pending'}</p> : null}{expense.decisionNote ? <p className="mt-1 max-w-48 text-xs text-sub">{expense.decisionNote}</p> : null}{expense.approvedAt || expense.rejectedAt ? <p className="mt-1 text-xs text-sub">{new Date(expense.approvedAt || expense.rejectedAt || '').toLocaleDateString('en-IN')}</p> : null}</td>
-                                    <td className="px-6 py-4">{expense.status === 'pending' ? <button type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : <span className="text-xs text-ghost">Locked</span>}</td>
+                                    <td className="px-6 py-4">{expense.status === 'pending' ? <PortalActionButton type="button" disabled={deletingExpenseId === expense.id} onClick={() => withdrawExpense(expense)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw expense">{deletingExpenseId === expense.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</PortalActionButton> : <span className="text-xs text-ghost">Locked</span>}</td>
                                   </tr>
                                 ))
                               )}
@@ -1775,12 +1799,12 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                             <div className="flex items-center gap-3 rounded-lg border border-[#66B159]/25 bg-[#66B159]/10 px-4 py-3"><span className="relative flex h-3 w-3"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#66B159] opacity-50" /><span className="relative inline-flex h-3 w-3 rounded-full bg-[#66B159]" /></span><div><p className="font-semibold text-ink">Work in progress</p><p className="text-xs text-sub">Started at {formatWorkTime(activeWorkSession.startedAt)}</p></div></div>
                             <label className="mt-5 block"><span className="label-upper mb-2 block text-ghost">Today’s work summary</span><textarea rows={5} value={workNotes} onChange={(event) => setWorkNotes(event.target.value)} maxLength={2000} className={`${inputClass} h-auto resize-y py-3`} placeholder="Example: Completed 45 calls. 8 clients were interested, 3 follow-ups were scheduled, and 1 client was converted. Add any onboarding or other tasks completed today." required /></label>
                             <p className="mt-2 text-xs text-sub">Add the work completed, calls made, interested leads, conversions, follow-ups, or onboarding progress.</p>
-                            <button type="button" onClick={() => void endWork(activeWorkSession)} disabled={workActionLoading || workNotes.trim().length < 3} className="mt-5 flex h-12 items-center gap-2 rounded-lg bg-red-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50">{workActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4 fill-current" />} End work & save summary</button>
+                            <PortalActionButton type="button" onClick={() => void endWork(activeWorkSession)} disabled={workActionLoading || workNotes.trim().length < 3} className="mt-5 flex h-12 items-center gap-2 rounded-lg bg-red-500 px-5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50">{workActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Square className="h-4 w-4 fill-current" />} End work & save summary</PortalActionButton>
                           </div>
                         ) : todayCompletedSession ? (
                           <div className="mt-6 rounded-lg border border-green-500/25 bg-green-500/10 p-5"><div className="flex items-center gap-3"><CheckCircle2 className="h-5 w-5 text-green-400" /><div><p className="font-semibold text-ink">Today’s work is completed</p><p className="mt-1 text-sm text-sub">{formatWorkTime(todayCompletedSession.startedAt)} – {todayCompletedSession.endedAt ? formatWorkTime(todayCompletedSession.endedAt) : ''} · {formatWorkDuration(todayCompletedSession.durationMinutes)}</p></div></div><p className="mt-4 text-sm leading-6 text-sub">{todayCompletedSession.notes}</p></div>
                         ) : (
-                          <div className="mt-6"><p className="max-w-2xl text-sm leading-6 text-sub">Start the timer when you begin today’s work. After starting, the End Work option will appear and a work summary will be required before finishing.</p><button type="button" onClick={() => void startWork()} disabled={workActionLoading} className="mt-5 flex h-12 items-center gap-2 rounded-lg bg-[#66B159] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66] disabled:opacity-50">{workActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />} Start work</button></div>
+                          <div className="mt-6"><p className="max-w-2xl text-sm leading-6 text-sub">Start the timer when you begin today’s work. After starting, the End Work option will appear and a work summary will be required before finishing.</p><PortalActionButton type="button" onClick={() => void startWork()} disabled={workActionLoading} className="mt-5 flex h-12 items-center gap-2 rounded-lg bg-[#66B159] px-6 text-sm font-semibold text-white transition-colors hover:bg-[#73bd66] disabled:opacity-50">{workActionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4 fill-current" />} Start work</PortalActionButton></div>
                         )}
                       </section>
 
@@ -1837,9 +1861,9 @@ export function PortalHome({ user, version, title, description }: PortalHomeProp
                         </div>
                         {requestedLeaveDays > 0 ? <div className="mt-3 rounded-lg border border-zinc-700 bg-zinc-900/60 px-4 py-3 text-sm text-sub">Selected duration: <span className="font-medium text-ink">{requestedLeaveDays} {requestedLeaveDays === 1 ? 'day' : 'days'}</span>. Sundays are excluded.</div> : null}
                         <div className="mt-4"><label className="label-upper mb-2 block text-ghost">Reason</label><textarea value={leaveReason} onChange={(event) => setLeaveReason(event.target.value)} className={`${inputClass} h-auto resize-none py-3`} rows={3} required /></div>
-                        <button type="submit" disabled={requestedLeaveDays < 0.5} className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Submit leave request</button>
+                        <PortalActionButton type="submit" disabled={requestedLeaveDays < 0.5} className="mt-5 h-11 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"><CalendarPlus className="h-4 w-4" aria-hidden="true" /> Submit leave request</PortalActionButton>
                       </form>
-                      <div className="staff-work-card rounded-lg"><div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">My Leave Requests</p></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800"><td className="px-6 py-4 text-ink"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <button type="button" disabled={deletingLeaveId === leave.id} onClick={() => withdrawLeaveRequest(leave)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw leave request">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</button> : <span className="text-xs text-ghost">Locked</span>}</td></tr>)}</tbody></table></div></div>
+                      <div className="staff-work-card rounded-lg"><div className="border-b border-zinc-800 p-6"><p className="text-lg font-semibold text-ink">My Leave Requests</p></div><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-zinc-700 text-left"><tr><th className="px-6 py-4 font-medium text-sub">Dates</th><th className="px-6 py-4 font-medium text-sub">Reason</th><th className="px-6 py-4 font-medium text-sub">Status</th><th className="px-6 py-4 font-medium text-sub">Actions</th></tr></thead><tbody>{leaveList.map((leave) => <tr key={leave.id} className="border-b border-zinc-800"><td className="px-6 py-4 text-ink"><LeaveDateSummary leave={leave} /></td><td className="px-6 py-4 text-sub">{leave.reason}</td><td className="px-6 py-4"><StatusBadge status={leave.status} />{leave.decisionNote ? <p className="mt-1 text-xs text-sub">{leave.decisionNote}</p> : null}</td><td className="px-6 py-4">{leave.status === 'pending' ? <PortalActionButton type="button" disabled={deletingLeaveId === leave.id} onClick={() => withdrawLeaveRequest(leave)} className="flex h-8 items-center gap-1.5 rounded-md bg-red-500/10 px-2.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:opacity-50" title="Withdraw leave request">{deletingLeaveId === leave.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />} Withdraw</PortalActionButton> : <span className="text-xs text-ghost">Locked</span>}</td></tr>)}</tbody></table></div></div>
                     </div>
                   ),
                 }[activeTab]}
@@ -2005,8 +2029,8 @@ function OfferLetterModal({ staff, onClose }: { staff: PublicStaffRecord; onClos
             <label className="block w-40"><span className="label-upper mb-2 block text-ghost">Offer date</span><DatePickerInput value={offerDate} onChange={setOfferDate} className={inputClass} required /></label>
             <label className="block w-40"><span className="label-upper mb-2 block text-ghost">Joining date</span><DatePickerInput value={joiningDate} onChange={setJoiningDate} className={inputClass} min={offerDate} required /></label>
             <label className="block w-52"><span className="label-upper mb-2 block text-ghost">Work location</span><input value={location} onChange={(event) => setLocation(event.target.value)} className={inputClass} maxLength={120} required /></label>
-            <button type="button" onClick={downloadOffer} disabled={!renderedOffer || downloading} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</button>
-            <button type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Close</button>
+            <PortalActionButton type="button" onClick={downloadOffer} disabled={!renderedOffer || downloading} className="inline-flex h-11 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF</PortalActionButton>
+            <PortalActionButton type="button" onClick={onClose} className="h-11 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /> Close</PortalActionButton>
           </div>
         </div>
         <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
@@ -2039,7 +2063,7 @@ function StaffDetailsModal({ staff, onClose }: { staff: PublicStaffRecord; onClo
       <section className="surface my-auto w-full max-w-2xl overflow-hidden rounded-xl shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="staff-details-title" onClick={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 border-b border-zinc-800 p-5 sm:p-6">
           <div><p id="staff-details-title" className="text-lg font-semibold text-ink">{staff.name}</p><p className="mt-1 text-sm text-sub">{staff.employeeId || 'Employee ID not available'} · {status}</p></div>
-          <button type="button" onClick={onClose} className="h-9 rounded-lg border border-zinc-700 px-3 text-sm font-semibold text-sub transition-colors hover:border-zinc-600 hover:text-ink">Close</button>
+          <PortalActionButton type="button" onClick={onClose} className="h-9 rounded-lg border border-zinc-700 px-3 text-sm font-semibold text-sub transition-colors hover:border-zinc-600 hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /> Close</PortalActionButton>
         </div>
 
         <div className="max-h-[calc(100vh-9rem)] overflow-y-auto p-5 sm:p-6">
@@ -2191,10 +2215,10 @@ function EditStaffModal({ staff, onClose, onSave }: { staff: PublicStaffRecord; 
           </div>
 
           <div className="mt-8 flex justify-end gap-3">
-            <button type="button" onClick={onClose} className="flex h-11 items-center justify-center rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub transition-colors hover:border-zinc-600 hover:text-ink">Cancel</button>
-            <button type="submit" disabled={loading} className="flex h-11 w-28 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}
-            </button>
+            <PortalActionButton type="button" onClick={onClose} className="flex h-11 items-center justify-center rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub transition-colors hover:border-zinc-600 hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /> Cancel</PortalActionButton>
+            <PortalActionButton type="submit" disabled={loading} className="flex h-11 w-28 items-center justify-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-[#FFFCFC] transition-colors hover:bg-[#73bd66] disabled:cursor-not-allowed disabled:opacity-60">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" aria-hidden="true" />} Save
+            </PortalActionButton>
           </div>
         </form>
       </div>
@@ -2266,8 +2290,8 @@ function WorkSessionCorrectionModal({ session, employeeName, onClose, onSaved }:
         </div>
         <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
         <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
-          <button type="submit" disabled={loading || !startedAt || (session.status === 'completed' && !endedAt)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Save correction</button>
+          <PortalActionButton type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /> Cancel</PortalActionButton>
+          <PortalActionButton type="submit" disabled={loading || !startedAt || (session.status === 'completed' && !endedAt)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" aria-hidden="true" />}Save correction</PortalActionButton>
         </div>
       </form>
     </div>
@@ -2348,8 +2372,8 @@ function ExpenseCorrectionModal({ expense, onClose, onSaved }: {
         </div>
         <ToastMessage message={error} tone="error" onDismiss={() => setError('')} />
         <div className="mt-6 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink">Cancel</button>
-          <button type="submit" disabled={loading || !expenseDate || !amount || (expense.submittedByRole === 'admin' && !staffName)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}Save correction</button>
+          <PortalActionButton type="button" onClick={onClose} className="h-10 rounded-lg border border-zinc-700 px-4 text-sm font-semibold text-sub hover:text-ink"><X className="h-4 w-4" aria-hidden="true" /> Cancel</PortalActionButton>
+          <PortalActionButton type="submit" disabled={loading || !expenseDate || !amount || (expense.submittedByRole === 'admin' && !staffName)} className="flex h-10 items-center gap-2 rounded-lg bg-[#66B159] px-4 text-sm font-semibold text-white disabled:opacity-50">{loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" aria-hidden="true" />}Save correction</PortalActionButton>
         </div>
       </form>
     </div>
