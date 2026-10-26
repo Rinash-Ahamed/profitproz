@@ -45,12 +45,14 @@ const testimonials: TestimonialCard[] = [
   {
     author: 'Santhosh Kumar',
     hotel: 'SPR Hotels Inn',
-    description: 'Meet SPR Hotels Inn, part of the ProfitPro client community, with Santhosh Kumar as the client contact.',
+    description: 'Smarter room pricing starts with understanding demand, competitor rates and occupancy. Revenue management brings these signals into a clear pricing plan, helping property teams make informed decisions instead of relying on guesswork.',
+    metric: 'Smarter pricing decisions',
   },
   {
     author: 'Nisar',
     hotel: 'Aradhya Residency',
-    description: 'Introducing Aradhya Residency, a ProfitPro client represented by Nisar. Every property brings its own identity to our hospitality community.',
+    description: 'A clearer online presence makes it easier for guests to understand what a property offers. Accurate room details, well-organised OTA listings and consistent availability help reduce booking confusion and simplify day-to-day distribution.',
+    metric: 'Clearer OTA presence',
   },
 ]
 

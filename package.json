@@ -1,6 +1,6 @@
 {
   "name": "profitpro",
-  "version": "1.4.16",
+  "version": "1.4.17",
   "private": true,
   "scripts": {
     "version:patch": "npm version patch --no-git-tag-version",
