@@ -1,10 +1,19 @@
 'use client'
 import { useRef, useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { useInView } from '@/hooks/useInView'
+import { motion, useMotionValue, useReducedMotion } from 'framer-motion'
+import { useVisibleActivity } from '@/hooks/useVisibleActivity'
 import { ease } from '@/lib/utils'
 
-const testimonials = [
+type TestimonialCard = {
+  author: string
+  hotel: string
+  role?: string
+  quote?: string
+  description?: string
+  metric?: string
+}
+
+const testimonials: TestimonialCard[] = [
   {
     quote: 'ProfitPro increased our RevPAR by 43% within the first quarter. What impressed us most was the proactive communication - they flagged a competitor rate drop before we even noticed it and adjusted our strategy overnight.',
     author: 'Liyakath Ali',
@@ -33,28 +42,55 @@ const testimonials = [
     hotel: 'Hotel Nachas, Coimbatore',
     metric: '+38% ADR'
   },
+  {
+    author: 'Santhosh Kumar',
+    hotel: 'SPR Hotels Inn',
+    description: 'Meet SPR Hotels Inn, part of the ProfitPro client community, with Santhosh Kumar as the client contact.',
+  },
+  {
+    author: 'Nisar',
+    hotel: 'Aradhya Residency',
+    description: 'Introducing Aradhya Residency, a ProfitPro client represented by Nisar. Every property brings its own identity to our hospitality community.',
+  },
 ]
 
 export function Testimonials() {
-  const { ref, inView } = useInView(0.1)
+  const sectionRef = useRef<HTMLElement>(null)
+  const active = useVisibleActivity(sectionRef)
+  const reduceMotion = useReducedMotion()
   const carouselRef = useRef<HTMLDivElement>(null)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const x = useMotionValue(0)
   const [carouselWidth, setCarouselWidth] = useState(0)
 
   useEffect(() => {
+    const viewport = carouselRef.current
+    const track = trackRef.current
+    if (!viewport || !track) return
+
     const calculateWidth = () => {
-      if (carouselRef.current) {
-        setCarouselWidth(carouselRef.current.scrollWidth - carouselRef.current.offsetWidth)
+      // Measure the untransformed track, not overflow affected by its drag position.
+      const width = Math.max(0, track.scrollWidth - viewport.clientWidth)
+      setCarouselWidth(width)
+      const position = x.get()
+      const clampedPosition = Math.max(-width, Math.min(0, position))
+      if (position !== clampedPosition) {
+        x.stop()
+        x.set(clampedPosition)
       }
     }
+
     calculateWidth()
-    window.addEventListener('resize', calculateWidth)
-    return () => window.removeEventListener('resize', calculateWidth)
-  }, [inView]) // Recalculate when it comes into view
+    const observer = new ResizeObserver(calculateWidth)
+    observer.observe(viewport)
+    observer.observe(track)
+    return () => observer.disconnect()
+  }, [x])
 
   return (
     <section
       id="testimonials"
-      ref={ref as React.RefObject<HTMLElement>}
+      ref={sectionRef}
       className="pt-14 pb-12 md:pt-16 md:pb-14 px-6 md:px-10 border-t border-zinc-800"
     >
       <div className="max-w-6xl mx-auto">
@@ -85,7 +121,9 @@ export function Testimonials() {
           whileTap={{ cursor: 'grabbing' }}
         >
           <motion.div
-            className="flex gap-4"
+            ref={trackRef}
+            className="flex w-max select-none gap-4"
+            style={{ x, touchAction: 'pan-y' }}
             drag="x"
             dragConstraints={{ right: 0, left: -carouselWidth }}
             transition={{ duration: 0.8, ease: ease.out }}
@@ -93,7 +131,7 @@ export function Testimonials() {
             {testimonials.map((t) => (
               <div
                 key={t.author}
-                className="min-w-[90vw] sm:min-w-[450px] rounded-2xl border border-zinc-800 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-7 flex flex-col justify-between shadow-[0_20px_60px_rgba(0,0,0,0.2)]"
+                className="w-[90vw] shrink-0 sm:w-[450px] rounded-2xl border border-zinc-800 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01))] p-7 flex flex-col justify-between shadow-[0_20px_60px_rgba(0,0,0,0.2)]"
               >
                 {/* Metric badge */}
                 <div className="flex items-center justify-between mb-5">
@@ -101,22 +139,25 @@ export function Testimonials() {
                     className="px-3 py-1 rounded-md text-xs font-sans font-semibold"
                     style={{ backgroundColor: 'rgba(102, 177, 89, 0.12)', color: '#66B159' }}
                   >
-                    {t.metric}
+                    {t.metric || 'Client spotlight'}
                   </div>
                   {/* Stars */}
-                  <div className="flex gap-0.5">
+                  {t.quote ? <div className="flex gap-0.5">
                     {[...Array(5)].map((_, i) => (
                       <svg key={i} width="11" height="11" viewBox="0 0 11 11" fill="#66B159" opacity="0.7">
                         <path d="M5.5 1l1.2 2.6L9.5 3.9l-2 1.95.47 2.75L5.5 7.4 3.03 8.6l.47-2.75L1.5 3.9l2.8-.3L5.5 1z"/>
                       </svg>
                     ))}
-                  </div>
+                  </div> : null}
                 </div>
 
                 {/* Quote */}
-                <p className="text-sub text-sm leading-relaxed mb-6 flex-1">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
+                <div className="mb-6 flex-1">
+                  {t.quote ? <p className="text-sub text-sm leading-relaxed">&ldquo;{t.quote}&rdquo;</p> : <>
+                    <p className="mb-3 font-sans text-lg font-semibold text-ink">{t.hotel}</p>
+                    <p className="text-sub text-sm leading-relaxed">{t.description}</p>
+                  </>}
+                </div>
 
                 {/* Author */}
                 <div className="flex items-center gap-3 pt-5 border-t border-zinc-800/80">
@@ -129,7 +170,7 @@ export function Testimonials() {
                   </div>
                   <div>
                     <p className="font-sans font-semibold text-ink text-sm">{t.author}</p>
-                    <p className="text-ghost text-xs font-sans">{t.role} · {t.hotel}</p>
+                    <p className="text-ghost text-xs font-sans">{t.role ? `${t.role} · ` : ''}{t.hotel}</p>
                   </div>
                 </div>
               </div>
@@ -139,8 +180,8 @@ export function Testimonials() {
 
         <motion.p
           className="text-ghost text-xs font-sans mt-6 flex items-center gap-2"
-          animate={{ x: [0, -4, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' }}
+          animate={{ x: active && !reduceMotion ? [0, -4, 0] : 0 }}
+          transition={active && !reduceMotion ? { duration: 1.5, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' } : { duration: 0 }}
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path d="M12 7H2m4 4l-4-4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>

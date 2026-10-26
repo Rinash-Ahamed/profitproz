@@ -26,7 +26,7 @@ export function MobilePreview() {
             <div key={img.src} className="group relative cursor-pointer">
               <div className="absolute inset-x-2 bottom-[-6px] h-8 rounded-full bg-[radial-gradient(circle,_rgba(102,177,89,0.45)_0%,_rgba(102,177,89,0)_72%)] opacity-0 blur-2xl transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-1" />
               <div className="relative overflow-hidden rounded-3xl transition-transform duration-300 group-hover:-translate-y-2">
-                <Image src={img.src} alt={img.alt} width={400} height={800} className="rounded-3xl object-contain" />
+                <Image src={img.src} alt={img.alt} width={400} height={800} sizes="(max-width: 767px) calc((100vw - 64px) / 2), (max-width: 1231px) calc((100vw - 152px) / 4), 270px" className="rounded-3xl object-contain" />
               </div>
             </div>
           ))}

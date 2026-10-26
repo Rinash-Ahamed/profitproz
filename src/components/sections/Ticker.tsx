@@ -1,10 +1,12 @@
 'use client'
 /* eslint-disable @next/next/no-img-element -- OTA logos intentionally use intrinsic img sizing in the continuous ticker. */
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useReducedMotion } from 'framer-motion'
+import { useVisibleActivity } from '@/hooks/useVisibleActivity'
+import type { OtaLogo } from '@/lib/getOtaLogos'
 
 type TickerProps = {
-  logos: { src: string; alt: string }[]
+  logos: OtaLogo[]
   duration?: number
 }
 
@@ -30,6 +32,17 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
   const duplicatedLogos = [...logos, ...logos]
   const [mobileSet, setMobileSet] = useState(0)
   const reduceMotion = useReducedMotion()
+  const containerRef = useRef<HTMLDivElement>(null)
+  const active = useVisibleActivity(containerRef)
+  const [mobile, setMobile] = useState(false)
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)')
+    const update = () => setMobile(query.matches)
+    update()
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
 
   const mobileLogos = useMemo(() => {
     if (logos.length <= 6) return logos
@@ -38,17 +51,17 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
   }, [logos, mobileSet])
 
   useEffect(() => {
-    if (logos.length <= 6 || reduceMotion) return
+    if (logos.length <= 6 || reduceMotion || !mobile || !active) return
 
     const id = window.setInterval(() => {
       setMobileSet((current) => (current + 1) % Math.ceil(logos.length / 3))
     }, 2400)
 
     return () => window.clearInterval(id)
-  }, [logos.length, reduceMotion])
+  }, [logos.length, reduceMotion, mobile, active])
 
   return (
-    <div className="relative w-full overflow-hidden [transform:translateZ(0)]">
+    <div ref={containerRef} className="relative w-full overflow-hidden [transform:translateZ(0)]">
       <style>{tickerKeyframes}</style>
 
       <div
@@ -64,8 +77,12 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
           <img
             key={`${logo.src}-${i}`}
             src={logo.src}
+            srcSet={logo.srcSet}
+            sizes={logo.width && logo.height ? `${Math.min(96, Math.ceil(28 * logo.width / logo.height))}px` : undefined}
+            width={logo.width}
+            height={logo.height}
             alt={logo.alt}
-            loading="eager"
+            loading="lazy"
             decoding="async"
             className="h-7 w-auto max-w-[96px] object-contain [content-visibility:visible]"
           />
@@ -78,6 +95,7 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
         className="ota-ticker-track hidden w-max flex-nowrap items-center md:flex"
         style={{
           animation: reduceMotion ? 'none' : `ticker ${duration}s linear infinite`,
+          animationPlayState: active ? 'running' : 'paused',
           willChange: 'transform',
           backfaceVisibility: 'hidden',
           WebkitBackfaceVisibility: 'hidden',
@@ -88,6 +106,10 @@ const TickerComponent = ({ logos, duration = 30 }: TickerProps) => {
           <div key={`${logo.src}-${i}`} className="flex h-7 shrink-0 items-center px-5 md:h-8 md:px-8">
             <img
               src={logo.src}
+              srcSet={logo.srcSet}
+              sizes={logo.width && logo.height ? `${Math.ceil(32 * logo.width / logo.height)}px` : undefined}
+              width={logo.width}
+              height={logo.height}
               alt={i >= logos.length ? '' : logo.alt}
               aria-hidden={i >= logos.length}
               loading="eager"

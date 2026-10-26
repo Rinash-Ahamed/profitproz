@@ -1,7 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import optimizedAssets from './ota-logo-assets.json';
 
-export function getOtaLogos() {
+export type OtaLogo = { src: string; alt: string; width?: number; height?: number; srcSet?: string };
+
+export function getOtaLogos(): OtaLogo[] {
   const otaDirectory = path.join(process.cwd(), 'public', 'ota');
   let filenames: string[] = [];
 
@@ -31,8 +34,10 @@ export function getOtaLogos() {
       if (alt.toLowerCase() === 'airbnb') alt = 'Airbnb';
       if (alt.toLowerCase() === 'booking.com') alt = 'Booking.com'; 
 
+      const optimized = optimizedAssets[filename as keyof typeof optimizedAssets];
       return {
-        src: `/ota/${filename}`,
+        ...optimized,
+        src: optimized?.src || `/ota/${filename}`,
         alt: alt,
       };
     });

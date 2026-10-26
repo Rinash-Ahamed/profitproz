@@ -27,6 +27,9 @@ const nextConfig = {
 
     return [
       { source: '/(.*)', headers: securityHeaders },
+      // Versioned public media may be cached long-term; use a new filename when replacing it.
+      { source: '/grow-silent-v1.mp4', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
+      { source: '/grow-poster-v1.webp', headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }] },
       { source: '/sw.js', headers: [
         { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
         { key: 'Service-Worker-Allowed', value: '/' },

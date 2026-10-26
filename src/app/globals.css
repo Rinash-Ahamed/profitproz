@@ -2,6 +2,25 @@
 @import 'tailwindcss/components';
 @import 'tailwindcss/utilities';
 
+.home-hero[data-paused='true'] .ambient-glow,
+.home-hero[data-paused='true'] .pulse-dot {
+  animation-play-state: paused;
+}
+
+/* Preserve the hero entrance without waiting for client hydration. */
+@keyframes hero-enter {
+  from { opacity: 0; transform: translate3d(0, var(--hero-enter-y), 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+.hero-pill-enter {
+  --hero-enter-y: 10px;
+  animation: hero-enter 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+.hero-headline-enter {
+  --hero-enter-y: 20px;
+  animation: hero-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ─── Lenis ─────────────────────────────────────────── */
 html.lenis { height: auto; }
 .lenis.lenis-smooth { scroll-behavior: auto !important; }
@@ -418,6 +437,7 @@ body {
 
 /* ─── Reduced motion ─────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+  .hero-pill-enter { animation-delay: 0s; }
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;

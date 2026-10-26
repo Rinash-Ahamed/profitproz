@@ -1,0 +1,62 @@
+{
+  "agoda.png": {
+    "src": "/ota-optimized/agoda.webp",
+    "width": 1256,
+    "height": 646,
+    "srcSet": "/ota-optimized/agoda-32.webp 62w, /ota-optimized/agoda-64.webp 124w, /ota-optimized/agoda-96.webp 187w, /ota-optimized/agoda-128.webp 249w"
+  },
+  "airbnb.png": {
+    "src": "/ota-optimized/airbnb.webp",
+    "width": 800,
+    "height": 256,
+    "srcSet": "/ota-optimized/airbnb-32.webp 100w, /ota-optimized/airbnb-64.webp 200w, /ota-optimized/airbnb-96.webp 300w, /ota-optimized/airbnb-128.webp 400w"
+  },
+  "booking.com.png": {
+    "src": "/ota-optimized/booking.com.webp",
+    "width": 1900,
+    "height": 326,
+    "srcSet": "/ota-optimized/booking.com-32.webp 187w, /ota-optimized/booking.com-64.webp 373w, /ota-optimized/booking.com-96.webp 560w, /ota-optimized/booking.com-128.webp 746w"
+  },
+  "cleartrip.png": {
+    "src": "/ota-optimized/cleartrip.webp",
+    "width": 2189,
+    "height": 443,
+    "srcSet": "/ota-optimized/cleartrip-32.webp 158w, /ota-optimized/cleartrip-64.webp 316w, /ota-optimized/cleartrip-96.webp 474w, /ota-optimized/cleartrip-128.webp 632w"
+  },
+  "expedia.png": {
+    "src": "/ota-optimized/expedia.webp",
+    "width": 2500,
+    "height": 708,
+    "srcSet": "/ota-optimized/expedia-32.webp 113w, /ota-optimized/expedia-64.webp 226w, /ota-optimized/expedia-96.webp 339w, /ota-optimized/expedia-128.webp 452w"
+  },
+  "goibibo.png": {
+    "src": "/ota-optimized/goibibo.webp",
+    "width": 166,
+    "height": 49,
+    "srcSet": "/ota-optimized/goibibo-32.webp 108w, /ota-optimized/goibibo-128.webp 166w"
+  },
+  "mmt.png": {
+    "src": "/ota-optimized/mmt.webp",
+    "width": 800,
+    "height": 255,
+    "srcSet": "/ota-optimized/mmt-32.webp 100w, /ota-optimized/mmt-64.webp 201w, /ota-optimized/mmt-96.webp 301w, /ota-optimized/mmt-128.webp 402w"
+  },
+  "trip.com.png": {
+    "src": "/ota-optimized/trip.com.webp",
+    "width": 1254,
+    "height": 309,
+    "srcSet": "/ota-optimized/trip.com-32.webp 130w, /ota-optimized/trip.com-64.webp 260w, /ota-optimized/trip.com-96.webp 390w, /ota-optimized/trip.com-128.webp 519w"
+  },
+  "tripadvisor-3.png": {
+    "src": "/ota-optimized/tripadvisor-3.webp",
+    "width": 2500,
+    "height": 779,
+    "srcSet": "/ota-optimized/tripadvisor-3-32.webp 103w, /ota-optimized/tripadvisor-3-64.webp 205w, /ota-optimized/tripadvisor-3-96.webp 308w, /ota-optimized/tripadvisor-3-128.webp 411w"
+  },
+  "trivago.png": {
+    "src": "/ota-optimized/trivago.webp",
+    "width": 1485,
+    "height": 467,
+    "srcSet": "/ota-optimized/trivago-32.webp 102w, /ota-optimized/trivago-64.webp 204w, /ota-optimized/trivago-96.webp 305w, /ota-optimized/trivago-128.webp 407w"
+  }
+}

@@ -1,15 +1,7 @@
 'use client'
 import { useEffect, useRef } from 'react'
-import { motion, useReducedMotion } from 'framer-motion'
-import { Nav } from '@/components/layout/Nav'
-import { Footer } from '@/components/layout/Footer'
-import { Ticker } from '@/components/sections/Ticker'
-import { MobilePreview } from '@/components/sections/MobilePreview'
-import { ServiceCards } from '@/components/sections/ServiceCards'
-import { Stats } from '@/components/sections/Stats'
-import { Testimonials } from '@/components/sections/Testimonials'
-import { HomeCTA } from '@/components/sections/HomeCTA'
-import { ease } from '@/lib/utils'
+import { useReducedMotion } from 'framer-motion'
+import { useVisibleActivity } from '@/hooks/useVisibleActivity'
 
 const activeMessage = {
   titleLines: ['One Platform', 'Every OTA'],
@@ -18,10 +10,11 @@ const activeMessage = {
   theme: { glowA: 'rgba(102, 177, 89, 0.18)', accent: '#66B159' },
 }
 
-export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt: string }[] }) {
-  const tickerSpeed = 40
+export default function HomeClient() {
   const reduceMotion = useReducedMotion()
   const heroVideoRef = useRef<HTMLVideoElement>(null)
+  const heroRef = useRef<HTMLElement>(null)
+  const heroActive = useVisibleActivity(heroRef)
 
   useEffect(() => {
     const video = heroVideoRef.current
@@ -33,15 +26,12 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
       return
     }
 
-    void video.play().catch(() => undefined)
-  }, [reduceMotion])
+    if (heroActive) void video.play().catch(() => undefined)
+    else video.pause()
+  }, [reduceMotion, heroActive])
 
   return (
-    <div className="min-h-[100dvh] bg-zinc-1000">
-      <Nav />
-
-      {/* ── HERO ─────────────────────────────────────── */}
-      <section className="relative min-h-[88svh] md:min-h-[96vh] flex flex-col justify-center pt-20 pb-12 md:pb-0 overflow-hidden">
+      <section ref={heroRef} data-paused={!heroActive} className="home-hero relative min-h-[88svh] md:min-h-[96vh] flex flex-col justify-center pt-20 pb-12 md:pb-0 overflow-hidden">
         <div className="ambient-glow left-[-8rem] top-[8rem] h-56 w-56" />
         <div className="ambient-glow right-[-6rem] top-[16rem] h-72 w-72" style={{ animationDelay: '2s' }} />
 
@@ -49,14 +39,14 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         <div className="absolute inset-0 pointer-events-none select-none overflow-hidden">
           <video
             ref={heroVideoRef}
-            autoPlay={!reduceMotion}
             loop={!reduceMotion}
             muted
             playsInline
             preload="metadata"
             className="h-full w-full object-cover [content-visibility:visible]"
             style={{ maskImage: 'radial-gradient(ellipse 92% 80% at 50% 10%, black 28%, transparent 100%)' }}
-            src="/grow.mp4"
+            poster="/grow-poster-v1.webp"
+            src="/grow-silent-v1.mp4"
           />
           <div className="absolute inset-0 bg-zinc-1000/60 md:bg-zinc-1000/70" />
         </div>
@@ -76,23 +66,17 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
 
         <div className="relative z-10 max-w-6xl mx-auto w-full px-6 md:px-10">
           {/* Live status pill */}
-          <motion.div
-            className="inline-flex items-center gap-2.5 glass-pill px-4 py-2 rounded-full mb-8"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: ease.out, delay: 0.12 }}
+          <div
+            className="hero-pill-enter inline-flex items-center gap-2.5 glass-pill px-4 py-2 rounded-full mb-8"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-[#66B159] pulse-dot" />
             <span className="label-upper text-ink/80">Turn potential into profit...</span>
-          </motion.div>
+          </div>
 
           {/* Headline */}
-          <motion.div
+          <div
             key={activeMessage.lastLine}
-            className="max-w-4xl flex flex-col items-start gap-4"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+            className="hero-headline-enter max-w-4xl flex flex-col items-start gap-4"
           >
             <h1
               className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl text-ink font-bold leading-none tracking-tighter max-w-4xl"
@@ -105,7 +89,7 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
             >
               {activeMessage.subtitle}
             </p>
-          </motion.div>
+          </div>
 
           {/* CTA row */}
           <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-3 mb-8 mt-6">
@@ -156,35 +140,5 @@ export default function HomeClient({ otaLogos }: { otaLogos: { src: string; alt:
         </div>
 
       </section>
-
-      {/* ── LIVE TICKER ──────────────────────────────── */}
-      {otaLogos.length > 0 && (
-        <div className="py-12 text-center">
-          <p className="label-upper text-sub mb-6">Powering listings on every major platform</p>
-          <Ticker key={tickerSpeed} logos={otaLogos} duration={tickerSpeed} />
-        </div>
-      )}
-
-      {/* ── MOBILE PREVIEW ───────────────────────────── */}
-      <div className="pt-2 md:pt-4">
-        <MobilePreview />
-      </div>
-
-      {/* ── SERVICES ─────────────────────────────────── */}
-      <div className="-mt-2 md:-mt-4 pt-2 md:pt-4">
-        <ServiceCards />
-      </div>
-
-      {/* ── STATS ────────────────────────────────────── */}
-      <Stats />
-
-      {/* ── TESTIMONIALS ─────────────────────────────── */}
-      <Testimonials />
-
-      {/* ── CTA ──────────────────────────────────────── */}
-      <HomeCTA />
-
-      <Footer />
-    </div>
   )
 }

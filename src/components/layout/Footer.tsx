@@ -1,7 +1,10 @@
 'use client'
 import Link from 'next/link'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
+import { motion, useReducedMotion } from 'framer-motion'
+import { ProvyLauncher } from '@/components/provy/ProvyLauncher'
+import { useRef } from 'react'
+import { useVisibleActivity } from '@/hooks/useVisibleActivity'
 
 const services = [
   { label: 'Revenue Management', href: '/revenue' },
@@ -17,8 +20,12 @@ const company = [
 const platforms = ['MakeMyTrip', 'Booking.com', 'Agoda', 'Yatra', 'Expedia', 'Goibibo', 'Airbnb']
 
 export function Footer() {
+  const footerRef = useRef<HTMLElement>(null)
+  const active = useVisibleActivity(footerRef)
+  const reduceMotion = useReducedMotion()
   return (
-    <footer className="border-t border-zinc-800">
+    <>
+    <footer ref={footerRef} className="border-t border-zinc-800">
       {/* Main footer body */}
       <div className="max-w-6xl mx-auto px-6 md:px-10 pt-10 pb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-8">
@@ -27,8 +34,8 @@ export function Footer() {
           <div className="lg:col-span-1">
             <Link href="/" className="block mb-5">
               <motion.div
-                animate={{ scale: [1, 1.02, 1] }}
-                transition={{ duration: 2.5, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' }}
+                animate={{ scale: active && !reduceMotion ? [1, 1.02, 1] : 1 }}
+                transition={active && !reduceMotion ? { duration: 2.5, repeat: Infinity, repeatType: 'loop', ease: 'easeInOut' } : { duration: 0 }}
               >
                 <Image src="/profitpro.png" alt="ProfitPro logo" width={240} height={240} className="h-20 w-auto object-contain" />
               </motion.div>
@@ -38,7 +45,7 @@ export function Footer() {
             </p>
             {/* Contact info */}
             <div className="space-y-2.5">
-              <a href="mailto:hello@profitpro.in" className="flex items-center gap-2.5 text-ghost hover:text-ink text-xs font-sans transition-colors duration-200">
+              <a href="mailto:support@profitproz.com" className="flex items-center gap-2.5 text-ghost hover:text-ink text-xs font-sans transition-colors duration-200">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
                   <rect x="1" y="3" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2"/>
                   <path d="M1 4.5l6 4 6-4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
@@ -124,5 +131,7 @@ export function Footer() {
         </div>
       </div>
     </footer>
+    <ProvyLauncher />
+    </>
   )
 }
